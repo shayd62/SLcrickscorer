@@ -508,15 +508,14 @@ function WicketDialog({ open, onOpenChange, onWicketConfirm, battingTeam, bowlin
 
   const availableBatsmen = useMemo(() => {
     if (!currentInnings) return [];
-    const outPlayerIds = Object.values(currentInnings.batsmen).filter(b => b.isOut).map(b => b.id);
-    return battingTeam.players.filter(p => !outPlayerIds.includes(p.id));
-}, [battingTeam, currentInnings]);
+    return battingTeam.players.filter(p => !currentInnings.batsmen[p.id]?.isOut);
+  }, [battingTeam, currentInnings]);
 
   const dismissalTypes = ['Bowled', 'Caught', 'LBW', 'Run out', 'Stumped', 'Hit wicket', 'Obstructing the field', 'Handled the ball', 'Timed out'];
   const fielderNeededDismissals = ['Caught', 'Run out', 'Stumped'];
 
   const handleConfirm = () => {
-    if (dismissalType && (newBatsmanId || availableBatsmen.length === 0)) {
+    if (dismissalType && (newBatsmanId || availableBatsmen.length <= 1)) {
       onWicketConfirm({ dismissalType, newBatsmanId: newBatsmanId, fielderId });
       onOpenChange(false);
       setDismissalType('');
@@ -525,7 +524,7 @@ function WicketDialog({ open, onOpenChange, onWicketConfirm, battingTeam, bowlin
     }
   };
   
-  const isLastWicket = availableBatsmen.length === 0;
+  const isLastWicket = availableBatsmen.length <= 1;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -569,7 +568,7 @@ function WicketDialog({ open, onOpenChange, onWicketConfirm, battingTeam, bowlin
                     <SelectValue placeholder="Select next batsman" />
                 </SelectTrigger>
                 <SelectContent>
-                    {availableBatsmen.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    {availableBatsmen.filter(p => p.id !== onStrikeBatsmanId).map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>
                 </Select>
             </div>
@@ -609,8 +608,8 @@ function RetireBatsmanDialog({
 
     const availableBatsmen = useMemo(() => {
         if (!currentInnings) return [];
-        const outPlayerIds = Object.values(currentInnings.batsmen).filter(b => b.isOut).map(b => b.id);
-        return battingTeam.players.filter(p => !outPlayerIds.includes(p.id) && p.id !== onStrikeBatsman?.id && p.id !== nonStrikeBatsman?.id);
+        const outOrCurrentIds = [...Object.values(currentInnings.batsmen).filter(b => b.isOut).map(b => b.id), onStrikeBatsman?.id, nonStrikeBatsman?.id];
+        return battingTeam.players.filter(p => !outOrCurrentIds.includes(p.id));
     }, [battingTeam, currentInnings, onStrikeBatsman, nonStrikeBatsman]);
 
     const handleConfirm = () => {
