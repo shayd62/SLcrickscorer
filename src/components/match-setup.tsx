@@ -1,5 +1,4 @@
 
-
 'use client';
 import { useState, useEffect } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
@@ -266,8 +265,8 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (conf
         <CardTitle className="text-center text-xl font-semibold flex items-center justify-center gap-2 text-black">
           <Users className="h-6 w-6 text-primary" />
             {step === 1 && "Match Details"}
-            {step === 2 && "Toss"}
-            {step === 3 && "Assign Roles"}
+            {step === 2 && "Assign Roles"}
+            {step === 3 && "Toss"}
             {step === 4 && "Opening Lineup"}
         </CardTitle>
       </CardHeader>
@@ -429,45 +428,6 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (conf
           )}
 
           {step === 2 && (
-             <div className="space-y-8 text-center">
-                <Controller
-                  control={form.control}
-                  name="toss"
-                  render={({ field }) => (
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="font-semibold mb-2 text-center flex items-center justify-center gap-2"><Trophy className="text-primary h-5 w-5"/> Toss Winner</h3>
-                         <RadioGroup onValueChange={(val) => field.onChange({...field.value, winner: val as 'team1' | 'team2'})} defaultValue={field.value.winner} className="bg-secondary p-2 rounded-lg grid grid-cols-2 gap-2">
-                            <Label htmlFor="t1" className={cn("p-2 rounded-md text-center", field.value.winner === 'team1' && "bg-background shadow-sm")}>
-                              <RadioGroupItem value="team1" id="t1" className="sr-only"/>
-                              {form.watch('team1.name') || 'Team A'}
-                            </Label>
-                             <Label htmlFor="t2" className={cn("p-2 rounded-md text-center", field.value.winner === 'team2' && "bg-background shadow-sm")}>
-                              <RadioGroupItem value="team2" id="t2" className="sr-only"/>
-                              {form.watch('team2.name') || 'Team B'}
-                            </Label>
-                        </RadioGroup>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold mb-2 text-center flex items-center justify-center gap-2"><Swords className="text-primary h-5 w-5"/> Decision</h3>
-                         <RadioGroup onValueChange={(val) => field.onChange({...field.value, decision: val as 'bat' | 'bowl'})} defaultValue={field.value.decision} className="bg-secondary p-2 rounded-lg grid grid-cols-2 gap-2">
-                             <Label htmlFor="bat" className={cn("p-2 rounded-md text-center flex items-center justify-center gap-2", field.value.decision === 'bat' && "bg-background shadow-sm")}>
-                              <RadioGroupItem value="bat" id="bat" className="sr-only"/>
-                              <CricketBatIcon className="h-4 w-4"/> Bat
-                            </Label>
-                             <Label htmlFor="bowl" className={cn("p-2 rounded-md text-center flex items-center justify-center gap-2", field.value.decision === 'bowl' && "bg-background shadow-sm")}>
-                              <RadioGroupItem value="bowl" id="bowl" className="sr-only"/>
-                              <CricketBallIcon className="h-4 w-4"/> Bowl
-                            </Label>
-                        </RadioGroup>
-                      </div>
-                    </div>
-                  )}
-                />
-             </div>
-          )}
-
-          {step === 3 && (
              <div className="space-y-6">
                {[ 'team1', 'team2' ].map((teamKey) => {
                  const team = getTeamWithIds(teamKey as 'team1' | 'team2');
@@ -525,6 +485,45 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (conf
                    </div>
                  )
                })}
+             </div>
+          )}
+
+          {step === 3 && (
+             <div className="space-y-8 text-center">
+                <Controller
+                  control={form.control}
+                  name="toss"
+                  render={({ field }) => (
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="font-semibold mb-2 text-center flex items-center justify-center gap-2"><Trophy className="text-primary h-5 w-5"/> Toss Winner</h3>
+                         <RadioGroup onValueChange={(val) => field.onChange({...field.value, winner: val as 'team1' | 'team2'})} defaultValue={field.value.winner} className="bg-secondary p-2 rounded-lg grid grid-cols-2 gap-2">
+                            <Label htmlFor="t1" className={cn("p-2 rounded-md text-center", field.value.winner === 'team1' && "bg-background shadow-sm")}>
+                              <RadioGroupItem value="team1" id="t1" className="sr-only"/>
+                              {form.watch('team1.name') || 'Team A'}
+                            </Label>
+                             <Label htmlFor="t2" className={cn("p-2 rounded-md text-center", field.value.winner === 'team2' && "bg-background shadow-sm")}>
+                              <RadioGroupItem value="team2" id="t2" className="sr-only"/>
+                              {form.watch('team2.name') || 'Team B'}
+                            </Label>
+                        </RadioGroup>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold mb-2 text-center flex items-center justify-center gap-2"><Swords className="text-primary h-5 w-5"/> Decision</h3>
+                         <RadioGroup onValueChange={(val) => field.onChange({...field.value, decision: val as 'bat' | 'bowl'})} defaultValue={field.value.decision} className="bg-secondary p-2 rounded-lg grid grid-cols-2 gap-2">
+                             <Label htmlFor="bat" className={cn("p-2 rounded-md text-center flex items-center justify-center gap-2", field.value.decision === 'bat' && "bg-background shadow-sm")}>
+                              <RadioGroupItem value="bat" id="bat" className="sr-only"/>
+                              <CricketBatIcon className="h-4 w-4"/> Bat
+                            </Label>
+                             <Label htmlFor="bowl" className={cn("p-2 rounded-md text-center flex items-center justify-center gap-2", field.value.decision === 'bowl' && "bg-background shadow-sm")}>
+                              <RadioGroupItem value="bowl" id="bowl" className="sr-only"/>
+                              <CricketBallIcon className="h-4 w-4"/> Bowl
+                            </Label>
+                        </RadioGroup>
+                      </div>
+                    </div>
+                  )}
+                />
              </div>
           )}
 
@@ -601,15 +600,15 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (conf
                     onClick={async () => {
                         const stepFields: (keyof SetupFormValues | 'team1.name' | 'team2.name')[] = [
                           ['team1.name', 'team2.name', 'oversPerInnings', 'playersPerSide'], 
-                          ['toss'],
                           ['team1.captainId', 'team1.wicketKeeperId', 'team2.captainId', 'team2.wicketKeeperId'],
+                          ['toss'],
                         ][step - 1] as any;
                         
                         const result = await form.trigger(stepFields);
                         if(result) nextStep();
                     }}
                 >
-                    Next : {step === 1 ? 'Toss' : step === 2 ? 'Assign Roles' : 'Opening Lineup'}
+                    Next : {step === 1 ? 'Assign Roles' : step === 2 ? 'Toss' : 'Opening Lineup'}
                 </Button>
             ) : (
                 <Button type="button" onClick={form.handleSubmit(onSubmit)} className="w-full bg-green-600 hover:bg-green-700 text-lg py-6">
@@ -621,3 +620,5 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (conf
     </div>
   );
 }
+
+    
