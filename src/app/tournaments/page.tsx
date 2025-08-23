@@ -22,7 +22,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import withAuth from '@/components/with-auth';
 
 function TournamentsPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -165,4 +164,4 @@ function TournamentsPage() {
   );
 }
 
-export default withAuth(TournamentsPage);
+export default TournamentsPage;

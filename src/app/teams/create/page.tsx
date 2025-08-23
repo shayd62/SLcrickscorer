@@ -15,7 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from "firebase/firestore";
-import withAuth from '@/components/with-auth';
 
 const playerSchema = z.object({
   id: z.string(),
@@ -140,4 +139,4 @@ function CreateTeamPage() {
   );
 }
 
-export default withAuth(CreateTeamPage);
+export default CreateTeamPage;

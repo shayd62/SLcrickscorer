@@ -21,7 +21,6 @@ import { cn } from '@/lib/utils';
 import type { Team, Tournament } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
-import withAuth from '@/components/with-auth';
 
 const tournamentSchema = z.object({
   name: z.string().min(1, 'Tournament name is required.'),
@@ -344,4 +343,4 @@ function CreateTournamentPage() {
   );
 }
 
-export default withAuth(CreateTournamentPage);
+export default CreateTournamentPage;

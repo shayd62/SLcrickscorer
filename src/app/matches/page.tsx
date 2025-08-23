@@ -6,12 +6,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Trophy, Trash2, Play, Home as HomeIcon, ArrowLeft } from 'lucide-react';
+import { Plus, Trophy, Trash2, Play, HomeIcon, ArrowLeft } from 'lucide-react';
 import type { MatchState } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import withAuth from '@/components/with-auth';
 
 function ActiveMatchCard({ match, onDelete }: { match: MatchState, onDelete: (id: string) => void }) {
   const router = useRouter();
@@ -194,4 +193,4 @@ function MatchesPage() {
 }
 
 
-export default withAuth(MatchesPage);
+export default MatchesPage;

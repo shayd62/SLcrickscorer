@@ -22,7 +22,6 @@ import {
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import withAuth from '@/components/with-auth';
 
 function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -141,4 +140,4 @@ function TeamsPage() {
 }
 
 
-export default withAuth(TeamsPage);
+export default TeamsPage;

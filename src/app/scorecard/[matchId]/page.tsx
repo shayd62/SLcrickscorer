@@ -9,7 +9,6 @@ import { ArrowLeft } from 'lucide-react';
 import ScorecardDisplay from '@/components/scorecard-display';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import withAuth from '@/components/with-auth';
 
 
 function ScorecardPage() {
@@ -65,4 +64,4 @@ function ScorecardPage() {
   );
 }
 
-export default withAuth(ScorecardPage);
+export default ScorecardPage;

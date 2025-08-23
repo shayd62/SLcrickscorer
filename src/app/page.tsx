@@ -6,14 +6,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, BarChart3, Trophy, Trash2, Play, Home as HomeIcon, Users, Shield, LogOut } from 'lucide-react';
+import { Plus, BarChart3, Trophy, Trash2, Play, HomeIcon, Users, Shield } from 'lucide-react';
 import type { MatchState } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { CricketBallIcon } from '@/components/icons';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import withAuth from '@/components/with-auth';
-import { useAuth } from '@/contexts/auth-context';
 
 
 function ActiveMatchCard({ match, onDelete }: { match: MatchState, onDelete: (id: string) => void }) {
@@ -113,7 +111,6 @@ function Home() {
   const [activeMatches, setActiveMatches] = useState<MatchState[]>([]);
   const [completedMatches, setCompletedMatches] = useState<MatchState[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
   const router = useRouter();
 
   const fetchMatches = async () => {
@@ -145,11 +142,6 @@ function Home() {
         console.error("Error deleting match:", error);
     }
   };
-  
-  const handleLogout = async () => {
-    await auth.signOut();
-    router.push('/login');
-  }
 
   return (
     <div className="min-h-screen bg-secondary/30 text-foreground flex flex-col items-center font-sans">
@@ -160,11 +152,9 @@ function Home() {
             <h1 className="text-3xl font-bold">
               <span className="text-red-500">SL</span><span className="text-green-600">cricscorer</span>
             </h1>
-            <p className="text-muted-foreground">Welcome, {user?.isAnonymous ? 'Guest' : user?.displayName || 'User'}</p>
+            <p className="text-muted-foreground">Welcome to your scoring app</p>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
-              <LogOut className="h-5 w-5" />
-          </Button>
+          <div></div>
         </header>
         
         <main className="space-y-4">
@@ -216,4 +206,4 @@ function Home() {
   );
 }
 
-export default withAuth(Home);
+export default Home;

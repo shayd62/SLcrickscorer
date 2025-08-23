@@ -22,7 +22,6 @@ import type { Team, Tournament } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
-import withAuth from '@/components/with-auth';
 
 const tournamentSchema = z.object({
   name: z.string().min(1, 'Tournament name is required.'),
@@ -372,4 +371,4 @@ function EditTournamentPage() {
   );
 }
 
-export default withAuth(EditTournamentPage);
+export default EditTournamentPage;

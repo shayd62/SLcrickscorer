@@ -8,7 +8,6 @@ import { ArrowLeft, BarChart3, Home as HomeIcon, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import withAuth from '@/components/with-auth';
 
 function BottomNav() {
   const navItems = [
@@ -73,4 +72,4 @@ function SetupPage() {
   );
 }
 
-export default withAuth(SetupPage);
+export default SetupPage;

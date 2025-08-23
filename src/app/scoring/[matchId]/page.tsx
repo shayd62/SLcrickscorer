@@ -15,7 +15,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose 
 import ScorecardDisplay from '@/components/scorecard-display';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
-import withAuth from '@/components/with-auth';
 
 
 function BottomNav() {
@@ -150,4 +149,4 @@ function ScoringPage() {
 }
 
 
-export default withAuth(ScoringPage);
+export default ScoringPage;

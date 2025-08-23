@@ -17,7 +17,6 @@ import Link from 'next/link';
 import type { Team } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
-import withAuth from '@/components/with-auth';
 
 const playerSchema = z.object({
   id: z.string(),
@@ -164,4 +163,4 @@ function EditTeamPage() {
   );
 }
 
-export default withAuth(EditTeamPage);
+export default EditTeamPage;
