@@ -4,13 +4,11 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from '@/contexts/auth-context';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+function AppBody({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const isObs = searchParams.get('obs') === 'true';
 
@@ -27,5 +25,19 @@ export default function RootLayout({
         <Toaster />
       </body>
     </html>
+  );
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <AuthProvider>
+      <Suspense>
+        <AppBody>{children}</AppBody>
+      </Suspense>
+    </AuthProvider>
   );
 }

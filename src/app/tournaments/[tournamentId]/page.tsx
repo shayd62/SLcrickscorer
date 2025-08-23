@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Tournament, Team } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, arrayUnion, collection, getDocs, onSnapshot } from 'firebase/firestore';
+import withAuth from '@/components/with-auth';
 
 function JoinTournamentCard({ tournament, onTeamAdded }: { tournament: Tournament, onTeamAdded: () => void }) {
     const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
@@ -86,7 +87,7 @@ function JoinTournamentCard({ tournament, onTeamAdded }: { tournament: Tournamen
     )
 }
 
-export default function TournamentDetailsPage() {
+function TournamentDetailsPage() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
     const params = useParams();
@@ -216,3 +217,5 @@ export default function TournamentDetailsPage() {
         </div>
     );
 }
+
+export default withAuth(TournamentDetailsPage);

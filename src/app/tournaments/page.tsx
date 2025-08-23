@@ -22,8 +22,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import withAuth from '@/components/with-auth';
 
-export default function TournamentsPage() {
+function TournamentsPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -163,3 +164,5 @@ export default function TournamentsPage() {
     </div>
   );
 }
+
+export default withAuth(TournamentsPage);

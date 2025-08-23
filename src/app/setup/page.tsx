@@ -8,6 +8,7 @@ import { ArrowLeft, BarChart3, Home as HomeIcon, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import withAuth from '@/components/with-auth';
 
 function BottomNav() {
   const navItems = [
@@ -37,7 +38,7 @@ function BottomNav() {
 }
 
 
-export default function SetupPage() {
+function SetupPage() {
   const router = useRouter();
 
   const handleSetupComplete = (config: MatchConfig) => {
@@ -71,3 +72,5 @@ export default function SetupPage() {
     </div>
   );
 }
+
+export default withAuth(SetupPage);

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -8,9 +9,10 @@ import { ArrowLeft } from 'lucide-react';
 import ScorecardDisplay from '@/components/scorecard-display';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import withAuth from '@/components/with-auth';
 
 
-export default function ScorecardPage() {
+function ScorecardPage() {
   const [match, setMatch] = useState<MatchState | null>(null);
   const params = useParams();
   const router = useRouter();
@@ -62,3 +64,5 @@ export default function ScorecardPage() {
     </div>
   );
 }
+
+export default withAuth(ScorecardPage);

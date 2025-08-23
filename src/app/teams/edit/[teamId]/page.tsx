@@ -17,6 +17,7 @@ import Link from 'next/link';
 import type { Team } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import withAuth from '@/components/with-auth';
 
 const playerSchema = z.object({
   id: z.string(),
@@ -30,7 +31,7 @@ const teamSchema = z.object({
 
 type TeamFormValues = z.infer<typeof teamSchema>;
 
-export default function EditTeamPage() {
+function EditTeamPage() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
@@ -162,3 +163,5 @@ export default function EditTeamPage() {
     </div>
   );
 }
+
+export default withAuth(EditTeamPage);

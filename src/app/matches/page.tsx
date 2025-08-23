@@ -11,6 +11,7 @@ import type { MatchState } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import withAuth from '@/components/with-auth';
 
 function ActiveMatchCard({ match, onDelete }: { match: MatchState, onDelete: (id: string) => void }) {
   const router = useRouter();
@@ -105,7 +106,7 @@ function BottomNav() {
 }
 
 
-export default function MatchesPage() {
+function MatchesPage() {
   const [activeMatches, setActiveMatches] = useState<MatchState[]>([]);
   const [completedMatches, setCompletedMatches] = useState<MatchState[]>([]);
   const [loading, setLoading] = useState(true);
@@ -191,3 +192,6 @@ export default function MatchesPage() {
     </div>
   );
 }
+
+
+export default withAuth(MatchesPage);

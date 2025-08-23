@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import type { Team, Tournament } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import withAuth from '@/components/with-auth';
 
 const tournamentSchema = z.object({
   name: z.string().min(1, 'Tournament name is required.'),
@@ -43,7 +44,7 @@ const tournamentSchema = z.object({
 
 type TournamentFormValues = z.infer<typeof tournamentSchema>;
 
-export default function CreateTournamentPage() {
+function CreateTournamentPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
@@ -342,3 +343,5 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
+
+export default withAuth(CreateTournamentPage);
