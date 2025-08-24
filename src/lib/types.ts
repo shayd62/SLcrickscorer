@@ -1,5 +1,4 @@
 
-
 export interface Player {
   id: string;
   name: string;
@@ -151,4 +150,13 @@ export interface MatchState {
   id?: string;
   activeTicker?: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | null;
   revisedOvers?: number;
+}
+
+export interface UserProfile {
+  uid: string;
+  name: string;
+  email: string;
+  phoneNumber: string;
+  address: string | null;
+  gender: 'Male' | 'Female' | 'Other';
 }
