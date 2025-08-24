@@ -1,4 +1,5 @@
 
+
 export interface Player {
   id: string;
   name: string;
@@ -155,8 +156,8 @@ export interface MatchState {
 export interface UserProfile {
   uid: string;
   name: string;
-  email: string;
-  phoneNumber: string;
-  address: string | null;
+  email?: string;
+  phoneNumber?: string;
+  address?: string | null;
   gender: 'Male' | 'Female' | 'Other';
 }

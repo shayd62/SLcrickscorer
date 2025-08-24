@@ -1,0 +1,135 @@
+
+'use client';
+
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
+import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
+import { ConfirmationResult } from 'firebase/auth';
+
+const emailSchema = z.object({
+  email: z.string().email('Invalid email address.'),
+  password: z.string().min(1, 'Password is required.'),
+});
+
+const phoneSchema = z.object({
+  phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits.'),
+});
+
+type EmailFormValues = z.infer<typeof emailSchema>;
+type PhoneFormValues = z.infer<typeof phoneSchema>;
+
+function LoginPage() {
+  const router = useRouter();
+  const { signInWithEmail, setupRecaptcha, signInWithPhone, confirmPhoneSignIn } = useAuth();
+  const { toast } = useToast();
+  const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email');
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [otp, setOtp] = useState('');
+
+  const emailForm = useForm<EmailFormValues>({ resolver: zodResolver(emailSchema) });
+  const phoneForm = useForm<PhoneFormValues>({ resolver: zodResolver(phoneSchema) });
+
+  const onEmailSubmit = async (data: EmailFormValues) => {
+    try {
+      await signInWithEmail(data.email, data.password);
+      toast({ title: "Login Successful!" });
+      router.push('/');
+    } catch (error: any) {
+      toast({ title: "Login Failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const onPhoneSubmit = async (data: PhoneFormValues) => {
+    try {
+      const appVerifier = setupRecaptcha('recaptcha-container');
+      const result = await signInWithPhone(data.phoneNumber, appVerifier);
+      setConfirmationResult(result);
+      toast({ title: "OTP Sent", description: "Please check your phone for the OTP." });
+    } catch (error: any) {
+      toast({ title: "Failed to send OTP", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const onOtpSubmit = async () => {
+    if (!confirmationResult || !otp) {
+      toast({ title: "Error", description: "Something went wrong. Please try again.", variant: "destructive" });
+      return;
+    }
+    try {
+      await confirmPhoneSignIn(confirmationResult, otp);
+      toast({ title: "Login Successful!" });
+      router.push('/');
+    } catch (error: any) {
+      toast({ title: "Invalid OTP", description: error.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Welcome Back!</CardTitle>
+          <CardDescription>Log in to your account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2 mb-4">
+            <Button variant={loginMethod === 'email' ? 'default' : 'outline'} onClick={() => setLoginMethod('email')} className="w-full">Email</Button>
+            <Button variant={loginMethod === 'phone' ? 'default' : 'outline'} onClick={() => setLoginMethod('phone')} className="w-full">Phone</Button>
+          </div>
+
+          {loginMethod === 'email' ? (
+            <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" {...emailForm.register('email')} />
+                {emailForm.formState.errors.email && <p className="text-destructive text-sm">{emailForm.formState.errors.email.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input id="password" type="password" {...emailForm.register('password')} />
+                {emailForm.formState.errors.password && <p className="text-destructive text-sm">{emailForm.formState.errors.password.message}</p>}
+              </div>
+              <Button type="submit" className="w-full">Log In</Button>
+            </form>
+          ) : confirmationResult ? (
+             <div className="space-y-4">
+                <div className="space-y-2">
+                    <Label htmlFor="otp">Enter OTP</Label>
+                    <Input id="otp" type="text" value={otp} onChange={(e) => setOtp(e.target.value)} />
+                </div>
+                <Button onClick={onOtpSubmit} className="w-full">Confirm OTP</Button>
+            </div>
+          ) : (
+            <form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="phoneNumber">Phone Number</Label>
+                <Input id="phoneNumber" type="tel" {...phoneForm.register('phoneNumber')} placeholder="+1 123 456 7890" />
+                {phoneForm.formState.errors.phoneNumber && <p className="text-destructive text-sm">{phoneForm.formState.errors.phoneNumber.message}</p>}
+              </div>
+              <div id="recaptcha-container"></div>
+              <Button type="submit" className="w-full">Send OTP</Button>
+            </form>
+          )}
+
+          <div className="mt-4 text-center text-sm">
+            Don't have an account?{' '}
+            <Link href="/register" className="underline">
+              Register here
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export default LoginPage;
