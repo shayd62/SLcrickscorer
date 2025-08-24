@@ -19,9 +19,9 @@ import { doc, getDoc, onSnapshot } from "firebase/firestore";
 
 function BottomNav() {
   const navItems = [
-    { name: 'Home', icon: HomeIcon, href: '/', active: false },
-    { name: 'Scorecard', icon: BarChart3, href: '#', active: true },
-    { name: 'Matches', icon: Trophy, href: '#', active: false },
+    { name: 'Home', icon: HomeIcon, href: '/matches', active: false },
+    { name: 'Scorecard', icon: BarChart3, href: '/matches', active: true },
+    { name: 'Matches', icon: Trophy, href: '/matches', active: false },
   ];
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg md:hidden z-20">
@@ -70,7 +70,7 @@ function ScoringPage() {
           description: "This match may have been deleted.",
           variant: "destructive"
         });
-        router.push('/');
+        router.push('/matches');
       }
     });
 
@@ -102,7 +102,7 @@ function ScoringPage() {
     <div className="min-h-screen bg-gray-50 text-foreground font-sans flex flex-col">
        <div className="w-full max-w-md mx-auto bg-background flex-grow flex flex-col pb-20 md:pb-0">
         <header className="py-3 px-2 flex items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="flex-shrink-0">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/matches')} className="flex-shrink-0">
             <ArrowLeft className="h-6 w-6" />
           </Button>
           <div className="flex-grow text-center overflow-hidden px-2">

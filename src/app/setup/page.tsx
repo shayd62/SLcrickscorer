@@ -11,9 +11,9 @@ import { cn } from '@/lib/utils';
 
 function BottomNav() {
   const navItems = [
-    { name: 'Home', icon: HomeIcon, href: '/', active: false },
-    { name: 'Scorecard', icon: BarChart3, href: '#', active: false },
-    { name: 'Matches', icon: Trophy, href: '#', active: false },
+    { name: 'Home', icon: HomeIcon, href: '/matches', active: false },
+    { name: 'Scorecard', icon: BarChart3, href: '/matches', active: false },
+    { name: 'Matches', icon: Trophy, href: '/matches', active: false },
   ];
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg md:hidden z-20">
@@ -50,7 +50,7 @@ function SetupPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-500 text-foreground font-body flex flex-col">
        <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
-         <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
+         <Button variant="ghost" size="icon" onClick={() => router.push('/matches')}>
             <ArrowLeft className="h-6 w-6" />
           </Button>
           <div className='flex flex-col items-center'>
