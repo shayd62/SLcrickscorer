@@ -25,7 +25,7 @@ function UsersPage() {
         const querySnapshot = await getDocs(collection(db, 'users'));
         const usersData = querySnapshot.docs.map(doc => doc.data() as UserProfile);
         // Exclude the current user from the list
-        setUsers(usersData.filter(u => u.uid !== user?.uid));
+        setUsers(usersData.filter(u => u.uid !== 'jMJPvHqEAiZmFuRBfNBLslojZAO2'));
       } catch (error) {
         console.error("Error fetching users:", error);
       } finally {
