@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Plus, ArrowLeft, Shield, Trash2, Pencil, Share2 } from 'lucide-react';
 import type { Tournament } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, query, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -22,17 +23,21 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { useAuth } from '@/contexts/auth-context';
 
 function TournamentsPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const fetchTournaments = async () => {
+    if (!user) return;
     setLoading(true);
     try {
-      const querySnapshot = await getDocs(collection(db, "tournaments"));
+      const q = query(collection(db, "tournaments"), where("userId", "==", user.uid));
+      const querySnapshot = await getDocs(q);
       const tournamentData = querySnapshot.docs.map(doc => ({ ...doc.data() as Tournament, id: doc.id }));
       setTournaments(tournamentData);
     } catch (e) {
@@ -44,7 +49,7 @@ function TournamentsPage() {
 
   useEffect(() => {
     fetchTournaments();
-  }, []);
+  }, [user]);
 
   const handleDeleteTournament = async (tournamentId: string) => {
     try {

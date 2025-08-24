@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -20,8 +21,9 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Team, Tournament } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, getDoc, query, where } from 'firebase/firestore';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/auth-context';
 
 const tournamentSchema = z.object({
   name: z.string().min(1, 'Tournament name is required.'),
@@ -50,6 +52,7 @@ function EditTournamentPage() {
   const { toast } = useToast();
   const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
   const tournamentId = params.tournamentId as string;
+  const { user } = useAuth();
 
   const form = useForm<TournamentFormValues>({
     resolver: zodResolver(tournamentSchema),
@@ -73,9 +76,11 @@ function EditTournamentPage() {
   });
 
   useEffect(() => {
+    if (!user) return;
     const fetchTeams = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "teams"));
+        const q = query(collection(db, "teams"), where("userId", "==", user.uid));
+        const querySnapshot = await getDocs(q);
         const teams = querySnapshot.docs.map(doc => doc.data() as Team);
         setAvailableTeams(teams);
       } catch (e) {
@@ -83,15 +88,20 @@ function EditTournamentPage() {
       }
     };
     fetchTeams();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    if (tournamentId) {
+    if (tournamentId && user) {
         const fetchTournament = async () => {
             const tournamentDocRef = doc(db, "tournaments", tournamentId);
             const docSnap = await getDoc(tournamentDocRef);
             if (docSnap.exists()) {
                 const tournamentData = docSnap.data() as Tournament;
+                if (tournamentData.userId !== user.uid) {
+                    toast({ title: "Unauthorized", description: "You cannot edit this tournament.", variant: "destructive" });
+                    router.push('/tournaments');
+                    return;
+                }
                 form.reset({
                     ...tournamentData,
                     startDate: new Date(tournamentData.startDate),
@@ -104,14 +114,16 @@ function EditTournamentPage() {
         };
         fetchTournament();
     }
-  }, [tournamentId, form, router, toast]);
+  }, [tournamentId, form, router, toast, user]);
 
   const onSubmit = async (data: TournamentFormValues) => {
+    if (!user) return;
     const tournamentData = {
       ...data,
       id: tournamentId,
       startDate: data.startDate.toISOString(),
       endDate: data.endDate.toISOString(),
+      userId: user.uid,
     };
 
     try {

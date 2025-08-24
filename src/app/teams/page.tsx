@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -21,16 +22,20 @@ import {
 } from "@/components/ui/alert-dialog"
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, query, where } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
 
 function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const loadTeams = async () => {
+    if (!user) return;
      try {
-      const querySnapshot = await getDocs(collection(db, "teams"));
+      const q = query(collection(db, "teams"), where("userId", "==", user.uid));
+      const querySnapshot = await getDocs(q);
       const savedTeams = querySnapshot.docs.map(doc => doc.data() as Team);
       setTeams(savedTeams);
     } catch (e) {
@@ -40,7 +45,7 @@ function TeamsPage() {
   
   useEffect(() => {
     loadTeams();
-  }, []);
+  }, [user]);
 
   const handleDeleteTeam = async (teamName: string) => {
     const teamKey = `team-${teamName.replace(/\s/g, '-')}`;

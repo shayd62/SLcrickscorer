@@ -9,8 +9,9 @@ import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyAvGJjesDrzXYt_28tpUF9HsvjKFZ3jpyM",
+  apiKey: "AIzaSyALLCGa032vNGAnVnghL-D4QeO-UkmSmiA",
   authDomain: "slcricscorer-9141a.firebaseapp.com",
+  databaseURL: "https://slcricscorer-9141a-default-rtdb.firebaseio.com",
   projectId: "slcricscorer-9141a",
   storageBucket: "slcricscorer-9141a.firebasestorage.app",
   messagingSenderId: "745177563751",

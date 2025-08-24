@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/auth-context';
 
 
 const teamSchema = z.object({
@@ -71,7 +72,7 @@ const defaultValues: Partial<SetupFormValues> = {
   wideBall: { enabled: true, reball: true, run: 1 },
 };
 
-const createInitialState = (config: MatchConfig): MatchState => {
+const createInitialState = (config: MatchConfig, userId?: string | null): MatchState => {
   const { team1, team2, toss, opening, oversPerInnings } = config;
   
   const battingTeamKey = (toss.winner === 'team1' && toss.decision === 'bat') || (toss.winner === 'team2' && toss.decision === 'bowl') ? 'team1' : 'team2';
@@ -108,7 +109,8 @@ const createInitialState = (config: MatchConfig): MatchState => {
     nonStrikeId: opening.nonStrikerId,
     currentBowlerId: opening.bowlerId,
     matchOver: false,
-    resultText: 'Match in progress...'
+    resultText: 'Match in progress...',
+    userId: userId || undefined,
   };
 };
 
@@ -116,6 +118,7 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (conf
   const [step, setStep] = useState(1);
   const [savedTeams, setSavedTeams] = useState<Team[]>([]);
   const router = useRouter();
+  const { user } = useAuth();
   const form = useForm<SetupFormValues>({
     resolver: zodResolver(setupSchema),
     defaultValues,
@@ -233,7 +236,7 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (conf
       wideBall: data.wideBall || { enabled: true, reball: true, run: 1 },
     };
 
-    const initialState = createInitialState(finalConfig);
+    const initialState = createInitialState(finalConfig, user?.uid);
     const matchId = `${finalConfig.team1.name.replace(/\s/g, '-')}-vs-${finalConfig.team2.name.replace(/\s/g, '-')}`;
     
     try {

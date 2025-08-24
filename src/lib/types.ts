@@ -12,6 +12,7 @@ export interface Team {
   captainId?: string;
   wicketKeeperId?: string;
   twelfthManId?: string;
+  userId?: string;
 }
 
 export interface PointsPolicy {
@@ -35,6 +36,7 @@ export interface Tournament {
   ballType?: string;
   pitchType?: string;
   tournamentFormat?: string;
+  userId?: string;
 }
 
 export interface TournamentPoints {
@@ -151,6 +153,7 @@ export interface MatchState {
   id?: string;
   activeTicker?: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | null;
   revisedOvers?: number;
+  userId?: string;
 }
 
 export interface UserProfile {

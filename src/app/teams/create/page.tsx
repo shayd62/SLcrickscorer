@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from "firebase/firestore";
+import { useAuth } from '@/contexts/auth-context';
 
 const playerSchema = z.object({
   id: z.string(),
@@ -31,6 +32,7 @@ type TeamFormValues = z.infer<typeof teamSchema>;
 function CreateTeamPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
   const form = useForm<TeamFormValues>({
     resolver: zodResolver(teamSchema),
     defaultValues: {
@@ -49,9 +51,14 @@ function CreateTeamPage() {
   });
 
   const onSubmit = async (data: TeamFormValues) => {
+    if (!user) {
+        toast({ title: "Not Authenticated", description: "You must be logged in to create a team.", variant: "destructive" });
+        return;
+    }
     const teamKey = `team-${data.name.replace(/\s/g, '-')}`;
+    const teamDataWithUser = { ...data, userId: user.uid };
     try {
-        await setDoc(doc(db, "teams", teamKey), data);
+        await setDoc(doc(db, "teams", teamKey), teamDataWithUser);
         toast({
             title: "Team Saved!",
             description: `Team "${data.name}" has been saved successfully.`,

@@ -101,33 +101,24 @@ function HomePage() {
     useEffect(() => {
         if (!user) return;
 
-        const fetchMatches = async () => {
-            setLoading(true);
-            try {
-                // Assuming matches are public or you have rules to allow reads
-                const q = query(collection(db, "matches"));
-                const unsubscribe = onSnapshot(q, (querySnapshot) => {
-                    const matches = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
-                    
-                    // Simple filter for demo - you might filter by user ID here later
-                    const userMatches = matches;
+        setLoading(true);
+        const q = query(collection(db, "matches"), where("userId", "==", user.uid));
+        
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const matches = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
+            
+            const active = matches.filter(m => !m.matchOver);
+            const completed = matches.filter(m => m.matchOver);
+            
+            setActiveMatches(active);
+            setCompletedMatches(completed);
+            setLoading(false);
+        }, (error) => {
+            console.error("Failed to fetch matches:", error);
+            setLoading(false);
+        });
 
-                    const active = userMatches.filter(m => !m.matchOver);
-                    const completed = userMatches.filter(m => m.matchOver);
-                    
-                    setActiveMatches(active);
-                    setCompletedMatches(completed);
-                    setLoading(false);
-                });
-                return () => unsubscribe();
-
-            } catch(e) {
-                console.error("Failed to parse matches from firestore", e);
-                setLoading(false);
-            }
-        };
-
-        fetchMatches();
+        return () => unsubscribe();
 
     }, [user]);
 

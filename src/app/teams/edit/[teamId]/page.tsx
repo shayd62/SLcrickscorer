@@ -17,6 +17,7 @@ import Link from 'next/link';
 import type { Team } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
 
 const playerSchema = z.object({
   id: z.string(),
@@ -34,6 +35,7 @@ function EditTeamPage() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
+  const { user } = useAuth();
   
   const teamId = params.teamId as string;
   const originalTeamName = teamId.replace(/-/g, ' ');
@@ -55,6 +57,11 @@ function EditTeamPage() {
             const docSnap = await getDoc(teamDocRef);
             if (docSnap.exists()) {
                 const teamData = docSnap.data() as Team;
+                if (teamData.userId && user && teamData.userId !== user.uid) {
+                    toast({ title: "Unauthorized", description: "You do not have permission to edit this team.", variant: "destructive" });
+                    router.push('/teams');
+                    return;
+                }
                 form.reset(teamData);
             } else {
                 toast({ title: "Error", description: "Team not found.", variant: "destructive" });
@@ -63,7 +70,7 @@ function EditTeamPage() {
         };
         fetchTeam();
     }
-  }, [teamId, form, router, toast]);
+  }, [teamId, form, router, toast, user]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -71,14 +78,19 @@ function EditTeamPage() {
   });
 
   const onSubmit = async (data: TeamFormValues) => {
+    if (!user) {
+        toast({ title: "Not Authenticated", description: "You must be logged in to edit a team.", variant: "destructive" });
+        return;
+    }
     const oldTeamKey = `team-${originalTeamName.replace(/\s/g, '-')}`;
     const newTeamKey = `team-${data.name.replace(/\s/g, '-')}`;
+    const teamDataWithUser = { ...data, userId: user.uid };
 
     try {
         if (oldTeamKey !== newTeamKey) {
             await deleteDoc(doc(db, "teams", oldTeamKey));
         }
-        await setDoc(doc(db, "teams", newTeamKey), data);
+        await setDoc(doc(db, "teams", newTeamKey), teamDataWithUser);
         toast({
             title: "Team Updated!",
             description: `Team "${data.name}" has been updated successfully.`,

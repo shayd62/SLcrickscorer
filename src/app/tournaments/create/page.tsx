@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -20,7 +21,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Team, Tournament } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, query, where } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
 
 const tournamentSchema = z.object({
   name: z.string().min(1, 'Tournament name is required.'),
@@ -47,6 +49,7 @@ function CreateTournamentPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
+  const { user } = useAuth();
 
   const form = useForm<TournamentFormValues>({
     resolver: zodResolver(tournamentSchema),
@@ -70,9 +73,11 @@ function CreateTournamentPage() {
   });
 
   useEffect(() => {
+    if (!user) return;
     const fetchTeams = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "teams"));
+        const q = query(collection(db, "teams"), where("userId", "==", user.uid));
+        const querySnapshot = await getDocs(q);
         const teams = querySnapshot.docs.map(doc => doc.data() as Team);
         setAvailableTeams(teams);
       } catch (e) {
@@ -80,15 +85,20 @@ function CreateTournamentPage() {
       }
     };
     fetchTeams();
-  }, []);
+  }, [user]);
 
   const onSubmit = async (data: TournamentFormValues) => {
+    if (!user) {
+        toast({ title: "Not Authenticated", description: "You must be logged in to create a tournament.", variant: "destructive" });
+        return;
+    }
     const tournamentId = `tourn-${data.name.replace(/\s/g, '-')}-${Date.now()}`;
     const tournamentData = {
       ...data,
       id: tournamentId,
       startDate: data.startDate.toISOString(),
       endDate: data.endDate.toISOString(),
+      userId: user.uid,
     };
 
     try {
