@@ -2,7 +2,6 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from '@/contexts/auth-context';
 import { Suspense } from 'react';
 
 export const metadata: Metadata = {
@@ -24,11 +23,9 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       </head>
       <body className={`font-body antialiased`}>
-        <AuthProvider>
             <Suspense fallback={<div>Loading...</div>}>
               {children}
             </Suspense>
-        </AuthProvider>
         <Toaster />
       </body>
     </html>
