@@ -437,7 +437,7 @@ export default function LiveViewPage() {
     });
 
     return () => unsub();
-  }, [matchId, router]);
+  }, [matchId]);
   
   const activeTickerContent = useMemo(() => {
     if (!match) return null;
@@ -579,3 +579,5 @@ export default function LiveViewPage() {
     </div>
   );
 }
+
+    
