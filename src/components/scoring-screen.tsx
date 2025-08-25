@@ -864,14 +864,15 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
   }, [initialMatchState]);
 
   const persistState = useCallback(async (stateToSave: MatchState) => {
-    if (stateToSave?.id) {
+    if (initialMatchState?.id) {
       try {
-        await setDoc(doc(db, "matches", stateToSave.id), stateToSave);
+        const stateWithId = { ...stateToSave, id: initialMatchState.id };
+        await setDoc(doc(db, "matches", stateWithId.id), stateWithId);
       } catch (error) {
         console.error("Failed to save match state to Firestore:", error);
       }
     }
-  }, []);
+  }, [initialMatchState?.id]);
 
   const updateState = (action: Action) => {
     const newState = matchReducer(state, action);
