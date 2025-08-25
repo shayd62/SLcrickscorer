@@ -864,10 +864,9 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
   }, [initialMatchState]);
 
   const persistState = useCallback(async (stateToSave: MatchState) => {
-    if (stateToSave?.config?.team1?.name && stateToSave?.config?.team2?.name) {
-      const matchId = `${stateToSave.config.team1.name.replace(/\s/g, '-')}-vs-${stateToSave.config.team2.name.replace(/\s/g, '-')}`;
+    if (stateToSave?.id) {
       try {
-        await setDoc(doc(db, "matches", matchId), stateToSave);
+        await setDoc(doc(db, "matches", stateToSave.id), stateToSave);
       } catch (error) {
         console.error("Failed to save match state to Firestore:", error);
       }
@@ -920,7 +919,7 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
   };
   
   const handleGoHome = () => {
-    router.push('/');
+    router.push('/matches');
   }
 
 
@@ -1058,12 +1057,9 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
         <div>
           <h3 className="text-sm font-semibold text-muted-foreground mb-2 px-1">Runs</h3>
           <div className="grid grid-cols-4 gap-3">
-            {[0, 1, 2, 3].map(runs => (
+            {[0, 1, 2, 3, 4, 5, 6].map(runs => (
               <ScoreButton key={runs} runs={runs} onClick={() => handleScore(runs)} />
             ))}
-            <ScoreButton runs={4} className="bg-cyan-400/20 text-cyan-600 border-cyan-500" onClick={() => handleScore(4)} />
-            <ScoreButton runs={5} className="bg-yellow-400/20 text-yellow-600 border-yellow-500" onClick={() => handleScore(5)} />
-            <ScoreButton runs={6} className="bg-rose-400/20 text-rose-600 border-rose-500" onClick={() => handleScore(6)} />
           </div>
         </div>
 

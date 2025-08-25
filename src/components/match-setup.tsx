@@ -72,7 +72,7 @@ const defaultValues: Partial<SetupFormValues> = {
   wideBall: { enabled: true, reball: true, run: 1 },
 };
 
-const createInitialState = (config: MatchConfig, userId?: string | null): MatchState => {
+const createInitialState = (config: MatchConfig, userId?: string | null, matchId?: string): MatchState => {
   const { team1, team2, toss, opening, oversPerInnings } = config;
   
   const battingTeamKey = (toss.winner === 'team1' && toss.decision === 'bat') || (toss.winner === 'team2' && toss.decision === 'bowl') ? 'team1' : 'team2';
@@ -102,6 +102,7 @@ const createInitialState = (config: MatchConfig, userId?: string | null): MatchS
   };
 
   return {
+    id: matchId,
     config,
     innings1: createInnings(battingTeamKey, bowlingTeamKey),
     currentInnings: 'innings1',
@@ -114,7 +115,7 @@ const createInitialState = (config: MatchConfig, userId?: string | null): MatchS
   };
 };
 
-export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (config: MatchConfig) => void; }) {
+export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matchId: string) => void; }) {
   const [step, setStep] = useState(1);
   const [savedTeams, setSavedTeams] = useState<Team[]>([]);
   const router = useRouter();
@@ -200,7 +201,8 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (conf
     const selectedTeam = savedTeams.find(t => t.name === teamName);
     if (selectedTeam) {
       form.setValue(`${teamKey}.name`, selectedTeam.name);
-      form.setValue(`${teamKey}.players`, selectedTeam.players);
+      const players = selectedTeam.players.map(p => ({name: p.name}));
+      form.setValue(`${teamKey}.players`, players as any);
       form.setValue('playersPerSide', selectedTeam.players.length);
     }
   };
@@ -235,13 +237,13 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (conf
       noBall: data.noBall || { enabled: true, reball: true, run: 1 },
       wideBall: data.wideBall || { enabled: true, reball: true, run: 1 },
     };
-
-    const initialState = createInitialState(finalConfig, user?.uid);
-    const matchId = `${finalConfig.team1.name.replace(/\s/g, '-')}-vs-${finalConfig.team2.name.replace(/\s/g, '-')}`;
+    
+    const matchId = `${finalConfig.team1.name.replace(/\s+/g, '-')}-vs-${finalConfig.team2.name.replace(/\s+/g, '-')}-${Date.now()}`;
+    const initialState = createInitialState(finalConfig, user?.uid, matchId);
     
     try {
         await setDoc(doc(db, "matches", matchId), initialState);
-        onSetupComplete(finalConfig);
+        onSetupComplete(matchId);
     } catch (e) {
         console.error("Error adding document: ", e);
     }
@@ -623,5 +625,3 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (conf
     </div>
   );
 }
-
-    

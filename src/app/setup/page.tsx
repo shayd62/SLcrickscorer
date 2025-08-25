@@ -40,10 +40,7 @@ function BottomNav() {
 function SetupPage() {
   const router = useRouter();
 
-  const handleSetupComplete = (config: MatchConfig) => {
-    // This will be used to create the initial state and save it
-    // For now, it navigates to scoring page
-    const matchId = `${config.team1.name.replace(/\s/g, '-')}-vs-${config.team2.name.replace(/\s/g, '-')}`;
+  const handleSetupComplete = (matchId: string) => {
     router.push(`/scoring/${matchId}`);
   };
 

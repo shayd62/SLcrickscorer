@@ -48,7 +48,10 @@ function TournamentsPage() {
   };
 
   useEffect(() => {
-    fetchTournaments();
+    if (user) {
+      fetchTournaments();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const handleDeleteTournament = async (tournamentId: string) => {
@@ -82,7 +85,7 @@ function TournamentsPage() {
   return (
     <div className="min-h-screen bg-gray-50 text-foreground font-body">
       <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
+        <Button variant="ghost" size="icon" onClick={() => router.push('/matches')}>
           <ArrowLeft className="h-6 w-6" />
         </Button>
         <div className='flex flex-col items-center'>
