@@ -3,21 +3,28 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowLeft, Users } from 'lucide-react';
+import { ArrowLeft, CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Tournament, TournamentGroup } from '@/lib/types';
+import type { Tournament, TournamentGroup, TournamentMatch } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
 
 export default function AddMatchPage() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [selectedGroup, setSelectedGroup] = useState<TournamentGroup | null>(null);
     const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+    const [matchDate, setMatchDate] = useState<Date | undefined>();
+    const [matchTime, setMatchTime] = useState<string>('');
     const [loading, setLoading] = useState(true);
     
     const params = useParams();
@@ -47,7 +54,7 @@ export default function AddMatchPage() {
     const handleGroupSelect = (groupName: string) => {
         const group = tournament?.groups?.find(g => g.name === groupName) || null;
         setSelectedGroup(group);
-        setSelectedTeams([]); // Reset team selection when group changes
+        setSelectedTeams([]);
     };
 
     const handleTeamSelect = (teamName: string) => {
@@ -67,22 +74,45 @@ export default function AddMatchPage() {
         });
     };
     
-    const handleProceed = () => {
+    const handleScheduleMatch = async () => {
         if (selectedTeams.length !== 2) {
-             toast({
-                title: "Selection Error",
-                description: "Please select exactly two teams to proceed.",
-                variant: "destructive"
-            });
+             toast({ title: "Selection Error", description: "Please select exactly two teams.", variant: "destructive" });
             return;
         }
-        const query = new URLSearchParams({
-            group: selectedGroup!.name,
+        if (!matchDate) {
+            toast({ title: "Date Missing", description: "Please select a date for the match.", variant: "destructive" });
+            return;
+        }
+        if (!matchTime) {
+            toast({ title: "Time Missing", description: "Please enter a time for the match.", variant: "destructive" });
+            return;
+        }
+
+        const [hours, minutes] = matchTime.split(':').map(Number);
+        const finalMatchDate = new Date(matchDate);
+        finalMatchDate.setHours(hours, minutes);
+
+        const newMatch: TournamentMatch = {
+            id: `match-${selectedTeams[0].replace(/\s/g, '')}-vs-${selectedTeams[1].replace(/\s/g, '')}-${Date.now()}`,
+            groupName: selectedGroup!.name,
             team1: selectedTeams[0],
             team2: selectedTeams[1],
-        }).toString();
-
-        router.push(`/tournaments/${tournamentId}/game-details?${query}`);
+            status: 'Upcoming',
+            date: finalMatchDate.toISOString(),
+            venue: tournament?.location || 'TBD',
+        };
+        
+        try {
+            const tournamentRef = doc(db, "tournaments", tournamentId);
+            await updateDoc(tournamentRef, {
+                matches: arrayUnion(newMatch)
+            });
+            toast({ title: "Match Scheduled!", description: "The new match has been added to the tournament." });
+            router.push(`/tournaments/${tournamentId}`);
+        } catch (e) {
+            console.error("Error scheduling match: ", e);
+            toast({ title: "Error", description: "Could not schedule the match.", variant: 'destructive' });
+        }
     }
 
     if (loading) {
@@ -103,12 +133,12 @@ export default function AddMatchPage() {
             <main className="p-4 md:p-8 flex justify-center">
                 <Card className="w-full max-w-lg">
                     <CardHeader>
-                        <CardTitle>Step 1: Select Teams</CardTitle>
-                        <CardDescription>Choose a group and then select the two teams that will play the match.</CardDescription>
+                        <CardTitle>Schedule a New Match</CardTitle>
+                        <CardDescription>Choose a group, select two teams, and set the date and time.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Select Group</label>
+                            <Label>Select Group</Label>
                             <Select onValueChange={handleGroupSelect} disabled={!tournament?.groups || tournament.groups.length === 0}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Choose a group" />
@@ -143,9 +173,28 @@ export default function AddMatchPage() {
                                 </div>
                             </div>
                         )}
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !matchDate && "text-muted-foreground")}>
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {matchDate ? format(matchDate, "PPP") : <span>Pick a date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={matchDate} onSelect={setMatchDate} initialFocus /></PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor='time'>Time</Label>
+                                <Input id="time" type="time" value={matchTime} onChange={(e) => setMatchTime(e.target.value)} />
+                            </div>
+                        </div>
                         
-                        <Button onClick={handleProceed} disabled={selectedTeams.length !== 2} className="w-full">
-                            Next: Add Game Details
+                        <Button onClick={handleScheduleMatch} disabled={selectedTeams.length !== 2 || !matchDate || !matchTime} className="w-full">
+                            Schedule Match
                         </Button>
                     </CardContent>
                 </Card>
