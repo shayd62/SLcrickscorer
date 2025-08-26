@@ -7,24 +7,30 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Shield, Users, Calendar, Trophy, Plus, ListChecks, MapPin, Sun, Circle, GitBranch } from 'lucide-react';
+import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Tournament, Team } from '@/lib/types';
+import type { Tournament, Team, TournamentPoints } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayUnion, collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 function JoinTournamentCard({ tournament, onTeamAdded }: { tournament: Tournament, onTeamAdded: () => void }) {
     const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
     const [selectedTeam, setSelectedTeam] = useState<string>('');
     const { toast } = useToast();
+    const { user } = useAuth();
 
     const fetchTeams = useCallback(async () => {
-        const querySnapshot = await getDocs(collection(db, "teams"));
+        if (!user) return;
+        const q = query(collection(db, "teams"), where("userId", "==", user.uid));
+        const querySnapshot = await getDocs(q);
         const allTeams = querySnapshot.docs.map(doc => doc.data() as Team);
         const participating = tournament.participatingTeams || [];
         const notYetJoined = allTeams.filter(team => !participating.includes(team.name));
         setAvailableTeams(notYetJoined);
-    }, [tournament]);
+    }, [tournament, user]);
 
     useEffect(() => {
         fetchTeams();
@@ -86,6 +92,42 @@ function JoinTournamentCard({ tournament, onTeamAdded }: { tournament: Tournamen
     )
 }
 
+function PointsTable({ teams }: { teams: TournamentPoints[] }) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Points Table</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Team</TableHead>
+                            <TableHead className="text-center">Played</TableHead>
+                            <TableHead className="text-center">Won</TableHead>
+                            <TableHead className="text-center">Lost</TableHead>
+                            <TableHead className="text-center">Points</TableHead>
+                            <TableHead className="text-right">NRR</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {teams.map((team) => (
+                            <TableRow key={team.teamName}>
+                                <TableCell className="font-medium">{team.teamName}</TableCell>
+                                <TableCell className="text-center">{team.matchesPlayed}</TableCell>
+                                <TableCell className="text-center">{team.wins}</TableCell>
+                                <TableCell className="text-center">{team.losses}</TableCell>
+                                <TableCell className="text-center">{team.points}</TableCell>
+                                <TableCell className="text-right">{team.netRunRate.toFixed(2)}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+}
+
 function TournamentDetailsPage() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
@@ -122,6 +164,16 @@ function TournamentDetailsPage() {
         return <div className="flex items-center justify-center min-h-screen">Tournament not found.</div>;
     }
 
+    const pointsTableData: TournamentPoints[] = (tournament.participatingTeams || []).map(teamName => ({
+        teamName,
+        matchesPlayed: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        points: 0,
+        netRunRate: 0.00
+    }));
+
     return (
         <div className="min-h-screen bg-gray-50 text-foreground font-body">
             <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
@@ -130,88 +182,72 @@ function TournamentDetailsPage() {
                 </Button>
                 <div className='flex flex-col items-center text-center'>
                     <h1 className="text-2xl font-bold truncate max-w-sm">{tournament.name}</h1>
-                    <p className="text-sm text-muted-foreground">Tournament Details</p>
+                    <p className="text-sm text-muted-foreground">Tournament Dashboard</p>
                 </div>
                 <div className="w-10"></div>
             </header>
 
-            <main className="p-4 md:p-8 max-w-4xl mx-auto space-y-8">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Trophy className="text-primary h-6 w-6"/> Tournament Info</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div className="flex items-center gap-2">
-                            <Shield className="h-5 w-5 text-muted-foreground" />
-                            <span>{tournament.oversPerInnings} overs per side</span>
+            <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+                 <Tabs defaultValue="teams" className="w-full">
+                    <TabsList className="grid w-full grid-cols-4">
+                        <TabsTrigger value="teams"><Users className="mr-2 h-4 w-4"/>Teams</TabsTrigger>
+                        <TabsTrigger value="matches"><ShieldCheck className="mr-2 h-4 w-4"/>Matches</TabsTrigger>
+                        <TabsTrigger value="leaderboard"><BarChart2 className="mr-2 h-4 w-4"/>Leaderboard</TabsTrigger>
+                        <TabsTrigger value="points"><ListOrdered className="mr-2 h-4 w-4"/>Points Table</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="teams" className="mt-6">
+                        <div className="grid md:grid-cols-2 gap-8">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="h-6 w-6 text-primary"/>
+                                            <span>Participating Teams ({tournament.participatingTeams?.length || 0})</span>
+                                        </div>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                {tournament.participatingTeams?.length > 0 ? (
+                                        <ul className="space-y-2">
+                                            {tournament.participatingTeams.map(teamName => (
+                                                <li key={teamName} className="p-2 bg-secondary rounded-md">{teamName}</li>
+                                            ))}
+                                        </ul>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground text-center py-4">No teams have joined yet.</p>
+                                )}
+                                </CardContent>
+                            </Card>
+                            <JoinTournamentCard tournament={tournament} onTeamAdded={() => { /* Real-time listener handles this */ }}/>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Calendar className="h-5 w-5 text-muted-foreground" />
-                            <span>Dates: {new Date(tournament.startDate).toLocaleDateString()} - {new Date(tournament.endDate).toLocaleDateString()}</span>
-                        </div>
-                        {tournament.tournamentFormat && (
-                            <div className="flex items-center gap-2">
-                                <GitBranch className="h-5 w-5 text-muted-foreground" />
-                                <span>Format: {tournament.tournamentFormat}</span>
-                            </div>
-                         )}
-                         <div className="flex items-center gap-2">
-                            <ListChecks className="h-5 w-5 text-muted-foreground" />
-                            <span>Points: Win - {tournament.pointsPolicy?.win ?? 0}, Draw - {tournament.pointsPolicy?.draw ?? 0}, Loss - {tournament.pointsPolicy?.loss ?? 0}</span>
-                        </div>
-                         {tournament.prize && (
-                            <div className="flex items-center gap-2">
-                                <Trophy className="h-5 w-5 text-muted-foreground" />
-                                <span>Prize: {tournament.prize}</span>
-                            </div>
-                         )}
-                         {tournament.venue && (
-                            <div className="flex items-center gap-2">
-                                <MapPin className="h-5 w-5 text-muted-foreground" />
-                                <span>Venue: {tournament.venue}</span>
-                            </div>
-                         )}
-                         {tournament.ballType && (
-                            <div className="flex items-center gap-2">
-                                <Circle className="h-5 w-5 text-muted-foreground" />
-                                <span>Ball: {tournament.ballType}</span>
-                            </div>
-                         )}
-                         {tournament.pitchType && (
-                            <div className="flex items-center gap-2">
-                                <Sun className="h-5 w-5 text-muted-foreground" />
-                                <span>Pitch: {tournament.pitchType}</span>
-                            </div>
-                         )}
-                    </CardContent>
-                </Card>
-                
-                <div className="grid md:grid-cols-2 gap-8">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                    <Users className="h-6 w-6 text-primary"/>
-                                    <span>Participating Teams ({tournament.participatingTeams?.length || 0})</span>
-                                </div>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                           {tournament.participatingTeams?.length > 0 ? (
-                                <ul className="space-y-2">
-                                    {tournament.participatingTeams.map(teamName => (
-                                        <li key={teamName} className="p-2 bg-secondary rounded-md">{teamName}</li>
-                                    ))}
-                                </ul>
-                           ) : (
-                               <p className="text-sm text-muted-foreground text-center py-4">No teams have joined yet.</p>
-                           )}
-                        </CardContent>
-                    </Card>
-
-                    <JoinTournamentCard tournament={tournament} onTeamAdded={() => { /* Real-time listener handles this */ }}/>
-                </div>
-                
+                    </TabsContent>
+                    <TabsContent value="matches" className="mt-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Matches</CardTitle>
+                                <CardDescription>Live, upcoming, and past matches will be shown here.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="text-center py-12 text-muted-foreground">
+                                <p>Match functionality coming soon.</p>
+                                <Button className="mt-4"><Plus className="mr-2 h-4 w-4"/>Add Match</Button>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                    <TabsContent value="leaderboard" className="mt-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Leaderboard</CardTitle>
+                                <CardDescription>Top performers in the tournament.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="text-center py-12 text-muted-foreground">
+                                <p>Leaderboard functionality coming soon.</p>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                    <TabsContent value="points" className="mt-6">
+                       <PointsTable teams={pointsTableData} />
+                    </TabsContent>
+                </Tabs>
             </main>
         </div>
     );
