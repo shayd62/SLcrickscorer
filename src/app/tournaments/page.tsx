@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -152,10 +151,10 @@ function TournamentsPage() {
                 </CardHeader>
                 <CardContent className="flex-grow flex flex-col justify-between">
                     <div>
-                        <p className="text-sm font-medium">{tournament.participatingTeams.length} teams participating</p>
+                        <p className="text-sm font-medium">{(tournament.participatingTeams?.length || 0)} teams participating</p>
                         <ul className="text-sm text-muted-foreground list-disc pl-5 mt-1">
-                            {tournament.participatingTeams.slice(0, 3).map(t => <li key={t}>{t}</li>)}
-                            {tournament.participatingTeams.length > 3 && <li>...and more</li>}
+                            {(tournament.participatingTeams || []).slice(0, 3).map(t => <li key={t}>{t}</li>)}
+                            {(tournament.participatingTeams?.length || 0) > 3 && <li>...and more</li>}
                         </ul>
                     </div>
                     <Button variant="outline" className="w-full mt-4" onClick={() => handleShareTournament(tournament.id)}>

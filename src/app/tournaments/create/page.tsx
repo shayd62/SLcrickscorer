@@ -53,6 +53,7 @@ export default function CreateTournamentPage() {
         startDate: data.startDate.toISOString(),
         endDate: data.endDate.toISOString(),
         userId: user.uid,
+        participatingTeams: [], // Initialize with an empty array
     };
 
     try {
