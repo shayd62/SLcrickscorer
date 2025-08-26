@@ -25,6 +25,9 @@ export interface PointsPolicy {
 export interface Tournament {
   id: string;
   name: string;
+  location?: string;
+  description?: string;
+  numberOfTeams?: string;
   logoUrl?: string;
   startDate: string;
   endDate: string;
