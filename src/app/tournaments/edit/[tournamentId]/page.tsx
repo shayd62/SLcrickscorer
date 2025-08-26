@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -41,7 +40,7 @@ const tournamentSchema = z.object({
   venue: z.string().optional(),
   ballType: z.string().optional(),
   pitchType: z.string().optional(),
-  tournamentFormat: z.string().optional(),
+  tournamentFormat: z.enum(['Round Robin', 'Knockout', 'League']).optional(),
 });
 
 type TournamentFormValues = z.infer<typeof tournamentSchema>;
@@ -70,7 +69,7 @@ function EditTournamentPage() {
       venue: '',
       ballType: '',
       pitchType: '',
-      tournamentFormat: '',
+      tournamentFormat: undefined,
     },
     mode: 'onChange',
   });
@@ -132,7 +131,7 @@ function EditTournamentPage() {
         title: "Tournament Updated!",
         description: `The tournament "${data.name}" has been updated successfully.`,
       });
-      router.push('/tournaments');
+      router.push(`/tournaments/${tournamentId}`);
     } catch (e) {
       console.error("Error updating document: ", e);
       toast({ title: "Error", description: "Could not update the tournament.", variant: "destructive" });

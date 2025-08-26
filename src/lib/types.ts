@@ -1,5 +1,4 @@
 
-
 export interface Player {
   id: string;
   name: string;
@@ -22,6 +21,25 @@ export interface PointsPolicy {
   bonus?: number;
 }
 
+export interface TournamentGroup {
+  name: string;
+  teams: string[];
+}
+
+export interface TournamentMatch {
+    id: string;
+    groupName: string;
+    team1: string;
+    team2: string;
+    status: 'Upcoming' | 'Live' | 'Completed';
+    matchId?: string; // Links to the actual match document in the 'matches' collection
+    result?: {
+        winner: string;
+        loser: string;
+        method: string; // e.g. "by 5 wickets"
+    }
+}
+
 export interface Tournament {
   id: string;
   name: string;
@@ -38,8 +56,10 @@ export interface Tournament {
   venue?: string;
   ballType?: string;
   pitchType?: string;
-  tournamentFormat?: string;
+  tournamentFormat?: 'Round Robin' | 'Knockout' | 'League';
   userId?: string;
+  groups?: TournamentGroup[];
+  matches?: TournamentMatch[];
 }
 
 export interface TournamentPoints {

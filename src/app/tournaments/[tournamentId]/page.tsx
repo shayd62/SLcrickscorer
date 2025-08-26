@@ -1,20 +1,24 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Gamepad2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Tournament, Team, TournamentPoints } from '@/lib/types';
+import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayUnion, collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, onSnapshot, collection, query, where, getDocs, arrayRemove } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Checkbox } from '@/components/ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 function JoinTournamentCard({ tournament, onTeamAdded }: { tournament: Tournament, onTeamAdded: () => void }) {
     const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
@@ -93,6 +97,14 @@ function JoinTournamentCard({ tournament, onTeamAdded }: { tournament: Tournamen
 }
 
 function PointsTable({ teams }: { teams: TournamentPoints[] }) {
+    // Sort teams by points (desc), then NRR (desc)
+    const sortedTeams = [...teams].sort((a, b) => {
+        if (b.points !== a.points) {
+            return b.points - a.points;
+        }
+        return b.netRunRate - a.netRunRate;
+    });
+
     return (
         <Card>
             <CardHeader>
@@ -106,18 +118,20 @@ function PointsTable({ teams }: { teams: TournamentPoints[] }) {
                             <TableHead className="text-center">Played</TableHead>
                             <TableHead className="text-center">Won</TableHead>
                             <TableHead className="text-center">Lost</TableHead>
+                            <TableHead className="text-center">Draw</TableHead>
                             <TableHead className="text-center">Points</TableHead>
                             <TableHead className="text-right">NRR</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {teams.map((team) => (
+                        {sortedTeams.map((team) => (
                             <TableRow key={team.teamName}>
                                 <TableCell className="font-medium">{team.teamName}</TableCell>
                                 <TableCell className="text-center">{team.matchesPlayed}</TableCell>
                                 <TableCell className="text-center">{team.wins}</TableCell>
                                 <TableCell className="text-center">{team.losses}</TableCell>
-                                <TableCell className="text-center">{team.points}</TableCell>
+                                <TableCell className="text-center">{team.draws}</TableCell>
+                                <TableCell className="text-center font-bold">{team.points}</TableCell>
                                 <TableCell className="text-right">{team.netRunRate.toFixed(2)}</TableCell>
                             </TableRow>
                         ))}
@@ -126,6 +140,161 @@ function PointsTable({ teams }: { teams: TournamentPoints[] }) {
             </CardContent>
         </Card>
     );
+}
+
+function GroupsAndFixtures({ tournament, onUpdate }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void> }) {
+  const [newGroupName, setNewGroupName] = useState('');
+  const { toast } = useToast();
+
+  const handleAddGroup = () => {
+    if (!newGroupName.trim()) {
+      toast({ title: 'Group name cannot be empty', variant: 'destructive' });
+      return;
+    }
+    const updatedGroups = [...(tournament.groups || []), { name: newGroupName, teams: [] }];
+    onUpdate({ groups: updatedGroups });
+    setNewGroupName('');
+  };
+
+  const handleRemoveGroup = (groupNameToRemove: string) => {
+    const updatedGroups = (tournament.groups || []).filter(g => g.name !== groupNameToRemove);
+    // Also remove matches of that group
+    const updatedMatches = (tournament.matches || []).filter(m => m.groupName !== groupNameToRemove);
+    onUpdate({ groups: updatedGroups, matches: updatedMatches });
+  };
+  
+  const handleTeamSelection = (groupName: string, teamName: string, checked: boolean) => {
+    const updatedGroups = (tournament.groups || []).map(group => {
+      if (group.name === groupName) {
+        const teams = checked
+          ? [...group.teams, teamName]
+          : group.teams.filter(t => t !== teamName);
+        return { ...group, teams };
+      }
+      return group;
+    });
+    onUpdate({ groups: updatedGroups });
+  };
+
+  const generateFixtures = (group: TournamentGroup) => {
+    const teams = group.teams;
+    if (teams.length < 2) {
+      toast({ title: 'Not enough teams', description: `Group ${group.name} needs at least 2 teams to generate fixtures.`, variant: 'destructive'});
+      return;
+    }
+
+    const newMatches: TournamentMatch[] = [];
+    for (let i = 0; i < teams.length; i++) {
+      for (let j = i + 1; j < teams.length; j++) {
+        newMatches.push({
+          id: `match-${group.name.replace(/\s/g, '-')}-${teams[i].replace(/\s/g, '-')}-vs-${teams[j].replace(/\s/g, '-')}-${Date.now()}`,
+          groupName: group.name,
+          team1: teams[i],
+          team2: teams[j],
+          status: 'Upcoming',
+        });
+      }
+    }
+    
+    // Remove old fixtures for this group and add new ones
+    const otherGroupMatches = (tournament.matches || []).filter(m => m.groupName !== group.name);
+    onUpdate({ matches: [...otherGroupMatches, ...newMatches] });
+    toast({ title: 'Fixtures Generated!', description: `Matches for Group ${group.name} have been created.`});
+  };
+
+  const assignedTeams = useMemo(() => {
+    return (tournament.groups || []).flatMap(g => g.teams);
+  }, [tournament.groups]);
+  
+  const unassignedTeams = useMemo(() => {
+    return (tournament.participatingTeams || []).filter(t => !assignedTeams.includes(t));
+  }, [tournament.participatingTeams, assignedTeams]);
+  
+  return (
+    <div className="space-y-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>Create Groups</CardTitle>
+        </CardHeader>
+        <CardContent className="flex gap-2">
+          <Input 
+            value={newGroupName} 
+            onChange={(e) => setNewGroupName(e.target.value)} 
+            placeholder="e.g., Group A"
+          />
+          <Button onClick={handleAddGroup}>
+            <Plus className="mr-2 h-4 w-4" /> Add Group
+          </Button>
+        </CardContent>
+      </Card>
+      
+      <div className="grid md:grid-cols-2 gap-8">
+          {unassignedTeams.length > 0 && (
+               <Card>
+                  <CardHeader>
+                    <CardTitle>Unassigned Teams</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2">
+                        {unassignedTeams.map(team => (
+                            <li key={team} className="p-2 bg-secondary rounded-md">{team}</li>
+                        ))}
+                    </ul>
+                  </CardContent>
+              </Card>
+          )}
+
+          {(tournament.groups || []).map(group => (
+              <Card key={group.name}>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>{group.name}</CardTitle>
+                       <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                           <Button variant="ghost" size="icon">
+                              <Trash2 className="h-5 w-5 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will delete Group {group.name} and all its generated fixtures. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleRemoveGroup(group.name)}>Delete</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                          <h4 className="font-semibold">Add Teams to Group</h4>
+                          {tournament.participatingTeams.map(teamName => (
+                              <div key={teamName} className="flex items-center space-x-2">
+                                  <Checkbox
+                                      id={`${group.name}-${teamName}`}
+                                      checked={group.teams.includes(teamName)}
+                                      onCheckedChange={(checked) => handleTeamSelection(group.name, teamName, !!checked)}
+                                      disabled={!group.teams.includes(teamName) && assignedTeams.includes(teamName)}
+                                  />
+                                  <label
+                                      htmlFor={`${group.name}-${teamName}`}
+                                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                      {teamName}
+                                  </label>
+                              </div>
+                          ))}
+                      </div>
+                       <Button onClick={() => generateFixtures(group)} className="w-full">Generate Fixtures</Button>
+                  </CardContent>
+              </Card>
+          ))}
+      </div>
+    </div>
+  )
 }
 
 function TournamentDetailsPage() {
@@ -155,6 +324,66 @@ function TournamentDetailsPage() {
         return () => unsubscribe && unsubscribe();
     }, [fetchTournamentAndListen]);
 
+    const handleUpdateTournament = async (data: Partial<Tournament>) => {
+      try {
+        const tournamentRef = doc(db, "tournaments", tournamentId);
+        await updateDoc(tournamentRef, data);
+      } catch (e) {
+        console.error("Error updating tournament: ", e);
+        toast({ title: "Error", description: "Could not update tournament details.", variant: 'destructive' });
+      }
+    };
+
+
+    const calculatePointsTable = useMemo(() => {
+        if (!tournament || !tournament.participatingTeams) return [];
+        
+        const pointsData: { [teamName: string]: TournamentPoints } = {};
+        
+        (tournament.participatingTeams || []).forEach(teamName => {
+            pointsData[teamName] = {
+                teamName,
+                matchesPlayed: 0,
+                wins: 0,
+                losses: 0,
+                draws: 0,
+                points: 0,
+                netRunRate: 0.00
+            };
+        });
+
+        (tournament.matches || []).forEach(match => {
+            if (match.status === 'Completed' && match.result) {
+                const { winner, loser, method } = match.result;
+                
+                // Increment matches played for both teams
+                if (pointsData[match.team1]) pointsData[match.team1].matchesPlayed++;
+                if (pointsData[match.team2]) pointsData[match.team2].matchesPlayed++;
+                
+                if (method.toLowerCase().includes('draw') || method.toLowerCase().includes('tie')) {
+                    if (pointsData[match.team1]) {
+                        pointsData[match.team1].draws++;
+                        pointsData[match.team1].points += tournament.pointsPolicy?.draw || 1;
+                    }
+                    if (pointsData[match.team2]) {
+                        pointsData[match.team2].draws++;
+                        pointsData[match.team2].points += tournament.pointsPolicy?.draw || 1;
+                    }
+                } else {
+                     if (pointsData[winner]) {
+                        pointsData[winner].wins++;
+                        pointsData[winner].points += tournament.pointsPolicy?.win || 2;
+                    }
+                    if (pointsData[loser]) {
+                        pointsData[loser].losses++;
+                        pointsData[loser].points += tournament.pointsPolicy?.loss || 0;
+                    }
+                }
+            }
+        });
+
+        return Object.values(pointsData);
+    }, [tournament]);
 
     if (loading) {
         return <div className="flex items-center justify-center min-h-screen">Loading tournament...</div>;
@@ -163,16 +392,8 @@ function TournamentDetailsPage() {
     if (!tournament) {
         return <div className="flex items-center justify-center min-h-screen">Tournament not found.</div>;
     }
-
-    const pointsTableData: TournamentPoints[] = (tournament.participatingTeams || []).map(teamName => ({
-        teamName,
-        matchesPlayed: 0,
-        wins: 0,
-        losses: 0,
-        draws: 0,
-        points: 0,
-        netRunRate: 0.00
-    }));
+    
+    const groupNames = tournament.groups?.map(g => g.name) || [];
 
     return (
         <div className="min-h-screen bg-gray-50 text-foreground font-body">
@@ -189,8 +410,9 @@ function TournamentDetailsPage() {
 
             <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
                  <Tabs defaultValue="teams" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-5">
                         <TabsTrigger value="teams"><Users className="mr-2 h-4 w-4"/>Teams</TabsTrigger>
+                        <TabsTrigger value="groups"><Gamepad2 className="mr-2 h-4 w-4"/>Groups & Fixtures</TabsTrigger>
                         <TabsTrigger value="matches"><ShieldCheck className="mr-2 h-4 w-4"/>Matches</TabsTrigger>
                         <TabsTrigger value="leaderboard"><BarChart2 className="mr-2 h-4 w-4"/>Leaderboard</TabsTrigger>
                         <TabsTrigger value="points"><ListOrdered className="mr-2 h-4 w-4"/>Points Table</TabsTrigger>
@@ -221,15 +443,40 @@ function TournamentDetailsPage() {
                             <JoinTournamentCard tournament={tournament} onTeamAdded={() => { /* Real-time listener handles this */ }}/>
                         </div>
                     </TabsContent>
+                     <TabsContent value="groups" className="mt-6">
+                        <GroupsAndFixtures tournament={tournament} onUpdate={handleUpdateTournament} />
+                    </TabsContent>
                     <TabsContent value="matches" className="mt-6">
                         <Card>
                             <CardHeader>
                                 <CardTitle>Matches</CardTitle>
                                 <CardDescription>Live, upcoming, and past matches will be shown here.</CardDescription>
                             </CardHeader>
-                            <CardContent className="text-center py-12 text-muted-foreground">
-                                <p>Match functionality coming soon.</p>
-                                <Button className="mt-4"><Plus className="mr-2 h-4 w-4"/>Add Match</Button>
+                            <CardContent className="space-y-4">
+                                <Accordion type="multiple" defaultValue={groupNames} className="w-full">
+                                    {(tournament.groups || []).map(group => (
+                                        <AccordionItem value={group.name} key={group.name}>
+                                            <AccordionTrigger className="text-xl font-bold">{group.name}</AccordionTrigger>
+                                            <AccordionContent>
+                                                <div className="space-y-2">
+                                                    {(tournament.matches || []).filter(m => m.groupName === group.name).length === 0 ? (
+                                                        <p className="text-muted-foreground text-center py-4">No fixtures generated for this group.</p>
+                                                    ) : (
+                                                        (tournament.matches || []).filter(m => m.groupName === group.name).map(match => (
+                                                            <div key={match.id} className="flex justify-between items-center p-3 bg-secondary rounded-lg">
+                                                                <div className="font-semibold">{match.team1} vs {match.team2}</div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm px-2 py-1 bg-background rounded-full">{match.status}</span>
+                                                                    <Button size="sm" variant="outline">Score Match</Button>
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    ))}
+                                </Accordion>
                             </CardContent>
                         </Card>
                     </TabsContent>
@@ -245,7 +492,7 @@ function TournamentDetailsPage() {
                         </Card>
                     </TabsContent>
                     <TabsContent value="points" className="mt-6">
-                       <PointsTable teams={pointsTableData} />
+                       <PointsTable teams={calculatePointsTable} />
                     </TabsContent>
                 </Tabs>
             </main>
