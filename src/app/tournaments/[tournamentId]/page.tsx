@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Gamepad2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Gamepad2, Trash2, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch } from '@/lib/types';
 import { db } from '@/lib/firebase';
@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
 
 function JoinTournamentCard({ tournament, onTeamAdded }: { tournament: Tournament, onTeamAdded: () => void }) {
     const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
@@ -211,87 +212,92 @@ function GroupsAndFixtures({ tournament, onUpdate }: { tournament: Tournament, o
   }, [tournament.participatingTeams, assignedTeams]);
   
   return (
-    <div className="space-y-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Create Groups</CardTitle>
-        </CardHeader>
-        <CardContent className="flex gap-2">
-          <Input 
-            value={newGroupName} 
-            onChange={(e) => setNewGroupName(e.target.value)} 
-            placeholder="e.g., Group A"
-          />
-          <Button onClick={handleAddGroup}>
-            <Plus className="mr-2 h-4 w-4" /> Add Group
-          </Button>
-        </CardContent>
-      </Card>
-      
-      <div className="grid md:grid-cols-2 gap-8">
-          {unassignedTeams.length > 0 && (
-               <Card>
-                  <CardHeader>
-                    <CardTitle>Unassigned Teams</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2">
-                        {unassignedTeams.map(team => (
-                            <li key={team} className="p-2 bg-secondary rounded-md">{team}</li>
-                        ))}
-                    </ul>
-                  </CardContent>
-              </Card>
-          )}
+    <div className="space-y-8 mt-6 border-t pt-6">
+       <div className="grid md:grid-cols-2 gap-8">
+            <div>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Create Groups</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex gap-2">
+                    <Input 
+                        value={newGroupName} 
+                        onChange={(e) => setNewGroupName(e.target.value)} 
+                        placeholder="e.g., Group A"
+                    />
+                    <Button onClick={handleAddGroup}>
+                        <Plus className="mr-2 h-4 w-4" /> Add
+                    </Button>
+                    </CardContent>
+                </Card>
+                 {unassignedTeams.length > 0 && (
+                    <Card className="mt-8">
+                        <CardHeader>
+                            <CardTitle>Unassigned Teams</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ul className="space-y-2">
+                                {unassignedTeams.map(team => (
+                                    <li key={team} className="p-2 bg-secondary rounded-md">{team}</li>
+                                ))}
+                            </ul>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
 
-          {(tournament.groups || []).map(group => (
-              <Card key={group.name}>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle>{group.name}</CardTitle>
-                       <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                           <Button variant="ghost" size="icon">
-                              <Trash2 className="h-5 w-5 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will delete Group {group.name} and all its generated fixtures. This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleRemoveGroup(group.name)}>Delete</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                          <h4 className="font-semibold">Add Teams to Group</h4>
-                          {tournament.participatingTeams.map(teamName => (
-                              <div key={teamName} className="flex items-center space-x-2">
-                                  <Checkbox
-                                      id={`${group.name}-${teamName}`}
-                                      checked={group.teams.includes(teamName)}
-                                      onCheckedChange={(checked) => handleTeamSelection(group.name, teamName, !!checked)}
-                                      disabled={!group.teams.includes(teamName) && assignedTeams.includes(teamName)}
-                                  />
-                                  <label
-                                      htmlFor={`${group.name}-${teamName}`}
-                                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                  >
-                                      {teamName}
-                                  </label>
-                              </div>
-                          ))}
-                      </div>
-                       <Button onClick={() => generateFixtures(group)} className="w-full">Generate Fixtures</Button>
-                  </CardContent>
-              </Card>
-          ))}
+            <div className="space-y-8">
+                {(tournament.groups || []).map(group => (
+                    <Card key={group.name}>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>{group.name}</CardTitle>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                    <Trash2 className="h-5 w-5 text-destructive" />
+                                </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                    This will delete Group {group.name} and all its generated fixtures. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleRemoveGroup(group.name)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <h4 className="font-semibold">Assign Teams</h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {tournament.participatingTeams.map(teamName => (
+                                        <div key={teamName} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`${group.name}-${teamName}`}
+                                                checked={group.teams.includes(teamName)}
+                                                onCheckedChange={(checked) => handleTeamSelection(group.name, teamName, !!checked)}
+                                                disabled={!group.teams.includes(teamName) && assignedTeams.includes(teamName)}
+                                            />
+                                            <label
+                                                htmlFor={`${group.name}-${teamName}`}
+                                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                            >
+                                                {teamName}
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <Button onClick={() => generateFixtures(group)} className="w-full">Generate Fixtures for {group.name}</Button>
+                        </CardContent>
+                    </Card>
+                ))}
+             </div>
       </div>
     </div>
   )
@@ -300,6 +306,7 @@ function GroupsAndFixtures({ tournament, onUpdate }: { tournament: Tournament, o
 function TournamentDetailsPage() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
+    const [showFixtureManagement, setShowFixtureManagement] = useState(false);
     const params = useParams();
     const router = useRouter();
     const { toast } = useToast();
@@ -370,11 +377,11 @@ function TournamentDetailsPage() {
                         pointsData[match.team2].points += tournament.pointsPolicy?.draw || 1;
                     }
                 } else {
-                     if (pointsData[winner]) {
+                     if (winner && pointsData[winner]) {
                         pointsData[winner].wins++;
                         pointsData[winner].points += tournament.pointsPolicy?.win || 2;
                     }
-                    if (pointsData[loser]) {
+                    if (loser && pointsData[loser]) {
                         pointsData[loser].losses++;
                         pointsData[loser].points += tournament.pointsPolicy?.loss || 0;
                     }
@@ -405,54 +412,37 @@ function TournamentDetailsPage() {
                     <h1 className="text-2xl font-bold truncate max-w-sm">{tournament.name}</h1>
                     <p className="text-sm text-muted-foreground">Tournament Dashboard</p>
                 </div>
-                <div className="w-10"></div>
+                <Button variant="ghost" size="icon" onClick={() => router.push(`/tournaments/edit/${tournament.id}`)}>
+                    <Settings className="h-6 w-6" />
+                </Button>
             </header>
 
             <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
-                 <Tabs defaultValue="teams" className="w-full">
-                    <TabsList className="grid w-full grid-cols-5">
-                        <TabsTrigger value="teams"><Users className="mr-2 h-4 w-4"/>Teams</TabsTrigger>
-                        <TabsTrigger value="groups"><Gamepad2 className="mr-2 h-4 w-4"/>Groups & Fixtures</TabsTrigger>
+                 <Tabs defaultValue="matches" className="w-full">
+                    <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="matches"><ShieldCheck className="mr-2 h-4 w-4"/>Matches</TabsTrigger>
+                        <TabsTrigger value="teams"><Users className="mr-2 h-4 w-4"/>Teams</TabsTrigger>
                         <TabsTrigger value="leaderboard"><BarChart2 className="mr-2 h-4 w-4"/>Leaderboard</TabsTrigger>
                         <TabsTrigger value="points"><ListOrdered className="mr-2 h-4 w-4"/>Points Table</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="teams" className="mt-6">
-                        <div className="grid md:grid-cols-2 gap-8">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2">
-                                            <Users className="h-6 w-6 text-primary"/>
-                                            <span>Participating Teams ({tournament.participatingTeams?.length || 0})</span>
-                                        </div>
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                {tournament.participatingTeams?.length > 0 ? (
-                                        <ul className="space-y-2">
-                                            {tournament.participatingTeams.map(teamName => (
-                                                <li key={teamName} className="p-2 bg-secondary rounded-md">{teamName}</li>
-                                            ))}
-                                        </ul>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground text-center py-4">No teams have joined yet.</p>
-                                )}
-                                </CardContent>
-                            </Card>
-                            <JoinTournamentCard tournament={tournament} onTeamAdded={() => { /* Real-time listener handles this */ }}/>
-                        </div>
-                    </TabsContent>
-                     <TabsContent value="groups" className="mt-6">
-                        <GroupsAndFixtures tournament={tournament} onUpdate={handleUpdateTournament} />
-                    </TabsContent>
-                    <TabsContent value="matches" className="mt-6">
+                    
+                     <TabsContent value="matches" className="mt-6">
                         <Card>
-                            <CardHeader>
-                                <CardTitle>Matches</CardTitle>
-                                <CardDescription>Live, upcoming, and past matches will be shown here.</CardDescription>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                               <div>
+                                 <CardTitle>Matches & Fixtures</CardTitle>
+                                 <CardDescription>Manage groups and view match schedules.</CardDescription>
+                               </div>
+                               <div className="flex items-center gap-2">
+                                 <label htmlFor="manage-fixtures" className="text-sm font-medium">Manage Fixtures</label>
+                                 <Switch id="manage-fixtures" checked={showFixtureManagement} onCheckedChange={setShowFixtureManagement} />
+                               </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
+                                {showFixtureManagement && tournament.tournamentFormat === 'Round Robin' && (
+                                     <GroupsAndFixtures tournament={tournament} onUpdate={handleUpdateTournament} />
+                                )}
+
                                 <Accordion type="multiple" defaultValue={groupNames} className="w-full">
                                     {(tournament.groups || []).map(group => (
                                         <AccordionItem value={group.name} key={group.name}>
@@ -476,10 +466,51 @@ function TournamentDetailsPage() {
                                             </AccordionContent>
                                         </AccordionItem>
                                     ))}
+                                     {(tournament.groups || []).length === 0 && (
+                                        <p className="text-muted-foreground text-center py-8">No groups created yet. Enable "Manage Fixtures" to get started.</p>
+                                    )}
                                 </Accordion>
                             </CardContent>
                         </Card>
                     </TabsContent>
+                    
+                    <TabsContent value="teams" className="mt-6">
+                        <div className="grid md:grid-cols-2 gap-8">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="h-6 w-6 text-primary"/>
+                                            <span>Participating Teams ({tournament.participatingTeams?.length || 0})</span>
+                                        </div>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                {tournament.participatingTeams?.length > 0 ? (
+                                        <ul className="space-y-2">
+                                            {tournament.participatingTeams.map(teamName => (
+                                                <li key={teamName} className="flex items-center justify-between p-2 bg-secondary rounded-md">
+                                                    <span>{teamName}</span>
+                                                    <Button variant="ghost" size="icon" onClick={async () => {
+                                                        const tournamentRef = doc(db, "tournaments", tournament.id);
+                                                        await updateDoc(tournamentRef, {
+                                                            participatingTeams: arrayRemove(teamName)
+                                                        });
+                                                    }}>
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground text-center py-4">No teams have joined yet.</p>
+                                )}
+                                </CardContent>
+                            </Card>
+                            <JoinTournamentCard tournament={tournament} onTeamAdded={() => { /* Real-time listener handles this */ }}/>
+                        </div>
+                    </TabsContent>
+                    
                     <TabsContent value="leaderboard" className="mt-6">
                         <Card>
                             <CardHeader>
@@ -501,3 +532,6 @@ function TournamentDetailsPage() {
 }
 
 export default TournamentDetailsPage;
+
+
+    
