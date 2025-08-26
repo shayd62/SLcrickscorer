@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import { ArrowLeft, CalendarIcon, Gamepad2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Tournament, TournamentMatch } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -42,11 +42,34 @@ export default function GameDetailsPage() {
     const groupName = searchParams.get('group');
     const team1 = searchParams.get('team1');
     const team2 = searchParams.get('team2');
+    const isEditMode = searchParams.get('edit') === 'true';
+    const matchId = searchParams.get('matchId');
     
     const form = useForm<GameDetailsFormValues>({
         resolver: zodResolver(gameDetailsSchema),
         defaultValues: { overs: 20 },
     });
+    
+    const fetchAndSetMatchData = useCallback(async () => {
+        if (isEditMode && matchId) {
+            const tourneyDoc = await getDoc(doc(db, "tournaments", tournamentId));
+            if (tourneyDoc.exists()) {
+                const tourneyData = tourneyDoc.data() as Tournament;
+                const matchToEdit = tourneyData.matches?.find(m => m.id === matchId);
+                if (matchToEdit) {
+                    form.reset({
+                        ...matchToEdit,
+                        date: matchToEdit.date ? new Date(matchToEdit.date) : new Date(),
+                    });
+                }
+            }
+        }
+    }, [isEditMode, matchId, tournamentId, form]);
+
+    useEffect(() => {
+        fetchAndSetMatchData();
+    }, [fetchAndSetMatchData]);
+
 
     useEffect(() => {
         if (!groupName || !team1 || !team2) {
@@ -56,28 +79,50 @@ export default function GameDetailsPage() {
     }, [groupName, team1, team2, tournamentId, router, toast]);
 
     const onSubmit = async (data: GameDetailsFormValues) => {
-        const newMatch: TournamentMatch = {
-            id: `match-${team1!.replace(/\s/g, '')}-vs-${team2!.replace(/\s/g, '')}-${Date.now()}`,
-            groupName: groupName!,
-            team1: team1!,
-            team2: team2!,
-            status: 'Upcoming',
-            date: data.date.toISOString(),
-            venue: data.venue,
-            overs: data.overs,
-            matchType: data.matchType,
-        };
+        const tournamentRef = doc(db, "tournaments", tournamentId);
 
-        try {
-            const tournamentRef = doc(db, "tournaments", tournamentId);
-            await updateDoc(tournamentRef, {
-                matches: arrayUnion(newMatch)
-            });
-            toast({ title: "Match Added!", description: "The new match has been scheduled." });
-            router.push(`/tournaments/${tournamentId}`);
-        } catch (e) {
-            console.error("Error adding match: ", e);
-            toast({ title: "Error", description: "Could not save the match.", variant: 'destructive' });
+        if (isEditMode && matchId) {
+            // Logic to update an existing match
+            const tourneyDoc = await getDoc(tournamentRef);
+            if (tourneyDoc.exists()) {
+                const tourneyData = tourneyDoc.data() as Tournament;
+                const existingMatches = tourneyData.matches || [];
+                const updatedMatches = existingMatches.map(m => {
+                    if (m.id === matchId) {
+                        return {
+                            ...m,
+                            ...data,
+                            date: data.date.toISOString(),
+                        };
+                    }
+                    return m;
+                });
+                await updateDoc(tournamentRef, { matches: updatedMatches });
+                toast({ title: "Match Updated!", description: "The match details have been updated." });
+                router.push(`/tournaments/${tournamentId}`);
+            }
+        } else {
+            // Logic to add a new match
+            const newMatch: TournamentMatch = {
+                id: `match-${team1!.replace(/\s/g, '')}-vs-${team2!.replace(/\s/g, '')}-${Date.now()}`,
+                groupName: groupName!,
+                team1: team1!,
+                team2: team2!,
+                status: 'Upcoming',
+                ...data,
+                date: data.date.toISOString(),
+            };
+
+            try {
+                await updateDoc(tournamentRef, {
+                    matches: arrayUnion(newMatch)
+                });
+                toast({ title: "Match Added!", description: "The new match has been scheduled." });
+                router.push(`/tournaments/${tournamentId}`);
+            } catch (e) {
+                console.error("Error adding match: ", e);
+                toast({ title: "Error", description: "Could not save the match.", variant: 'destructive' });
+            }
         }
     };
     
@@ -86,7 +131,7 @@ export default function GameDetailsPage() {
              <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
                 <Button variant="ghost" size="icon" onClick={() => router.back()}><ArrowLeft className="h-6 w-6" /></Button>
                 <div className='flex flex-col items-center text-center'>
-                    <h1 className="text-2xl font-bold">Game Details</h1>
+                    <h1 className="text-2xl font-bold">{isEditMode ? 'Edit Game Details' : 'Game Details'}</h1>
                     <p className="text-sm text-muted-foreground">{team1} vs {team2}</p>
                 </div>
                 <div className="w-10"></div>
@@ -106,7 +151,7 @@ export default function GameDetailsPage() {
                                         control={form.control}
                                         name="matchType"
                                         render={({ field }) => (
-                                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                          <Select onValueChange={field.onChange} value={field.value}>
                                             <SelectTrigger><SelectValue placeholder="Select Type" /></SelectTrigger>
                                             <SelectContent>
                                               <SelectItem value="T20">T20</SelectItem>
@@ -160,7 +205,7 @@ export default function GameDetailsPage() {
                             
                             <Button type="submit" className="w-full text-lg py-6">
                                 <Gamepad2 className="mr-2 h-5 w-5" />
-                                Save Match
+                                {isEditMode ? 'Update Match' : 'Save Match'}
                             </Button>
                         </form>
                     </CardContent>

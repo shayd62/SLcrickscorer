@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2 } from 'lucide-react';
+import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch } from '@/lib/types';
 import { db } from '@/lib/firebase';
@@ -268,6 +268,7 @@ function TournamentDetailsPage() {
     const upcomingMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Upcoming'), [tournament?.matches]);
     const pastMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Completed'), [tournament?.matches]);
 
+
     const fetchTournamentAndListen = useCallback(() => {
         if (!tournamentId) return;
         const unsub = onSnapshot(doc(db, "tournaments", tournamentId), (doc) => {
@@ -295,6 +296,23 @@ function TournamentDetailsPage() {
         console.error("Error updating tournament: ", e);
         toast({ title: "Error", description: "Could not update tournament details.", variant: 'destructive' });
       }
+    };
+    
+    const handleDeleteMatch = async (matchId: string) => {
+        if (!tournament || !tournament.matches) return;
+        const matchToRemove = tournament.matches.find(m => m.id === matchId);
+        if (matchToRemove) {
+            try {
+                const tournamentRef = doc(db, "tournaments", tournamentId);
+                await updateDoc(tournamentRef, {
+                    matches: arrayRemove(matchToRemove)
+                });
+                toast({ title: "Match Deleted", description: "The match has been removed from the schedule." });
+            } catch (e) {
+                console.error("Error deleting match: ", e);
+                toast({ title: "Error", description: "Could not delete the match.", variant: 'destructive' });
+            }
+        }
     };
     
     const calculatePointsForGroup = useCallback((groupName: string): TournamentPoints[] => {
@@ -383,7 +401,29 @@ function TournamentDetailsPage() {
                                             <p className="font-bold">{match.team1} vs {match.team2}</p>
                                             <p className="text-sm text-muted-foreground">{new Date(match.date!).toLocaleString()} at {match.venue}</p>
                                         </div>
-                                        <Button>Start Match</Button>
+                                        <div className="flex items-center gap-2">
+                                            <Button>Start Match</Button>
+                                            <Link href={`/tournaments/${tournamentId}/game-details?group=${match.groupName}&team1=${match.team1}&team2=${match.team2}&edit=true&matchId=${match.id}`}>
+                                                <Button variant="outline" size="icon"><Pencil className="h-4 w-4"/></Button>
+                                            </Link>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4"/></Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Delete Match?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                          This will permanently delete the match between {match.team1} and {match.team2}. This action cannot be undone.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDeleteMatch(match.id)}>Delete</AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
                                     </CardContent>
                                 </Card>
                             )) : <p className="text-muted-foreground text-center py-8">No upcoming matches scheduled.</p>}
