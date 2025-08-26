@@ -53,7 +53,14 @@ export default function CreateTournamentPage() {
         startDate: data.startDate.toISOString(),
         endDate: data.endDate.toISOString(),
         userId: user.uid,
-        participatingTeams: [], // Initialize with an empty array
+        participatingTeams: [],
+        pointsPolicy: {
+            win: 2,
+            loss: 0,
+            draw: 1,
+            bonus: 0,
+        },
+        oversPerInnings: 20, // Default value
     };
 
     try {

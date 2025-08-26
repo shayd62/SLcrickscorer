@@ -157,7 +157,7 @@ function TournamentDetailsPage() {
                          )}
                          <div className="flex items-center gap-2">
                             <ListChecks className="h-5 w-5 text-muted-foreground" />
-                            <span>Points: Win - {tournament.pointsPolicy.win}, Draw - {tournament.pointsPolicy.draw}, Loss - {tournament.pointsPolicy.loss}</span>
+                            <span>Points: Win - {tournament.pointsPolicy?.win ?? 0}, Draw - {tournament.pointsPolicy?.draw ?? 0}, Loss - {tournament.pointsPolicy?.loss ?? 0}</span>
                         </div>
                          {tournament.prize && (
                             <div className="flex items-center gap-2">
