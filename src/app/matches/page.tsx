@@ -3,17 +3,29 @@
 import withAuth from "@/components/with-auth";
 import { useAuth } from "@/contexts/auth-context";
 import type { MatchState } from "@/lib/types";
-import { collection, getDocs, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Plus, User, LogOut, Home as HomeIcon, BarChart3, Trophy, Users as UsersIcon } from "lucide-react";
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
+import { Plus, User, LogOut, Home as HomeIcon, BarChart3, Trophy, Users as UsersIcon, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
-function ActiveMatchCard({ match }: { match: MatchState }) {
+function ActiveMatchCard({ match, onDelete }: { match: MatchState, onDelete: (matchId: string) => void }) {
   const router = useRouter();
   const { config } = match;
 
@@ -40,26 +52,64 @@ function ActiveMatchCard({ match }: { match: MatchState }) {
         <Button onClick={handleResume} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg">
           Resume
         </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="icon" className="rounded-lg">
+              <Trash2 className="h-5 w-5" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the match.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onDelete(match.id!)}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Card>
   );
 }
 
-function RecentResultCard({ match }: { match: MatchState }) {
+function RecentResultCard({ match, onDelete }: { match: MatchState, onDelete: (matchId: string) => void }) {
     const { config, resultText } = match;
+    const router = useRouter();
+    
     return (
-        <Link href={`/scorecard/${match.id}`} className="block">
-            <Card className="p-4 bg-secondary/50 rounded-2xl transition-all hover:bg-secondary/70">
-                <div className="flex justify-between items-start">
-                    <div className="flex-grow space-y-2">
-                        <h3 className="font-semibold text-foreground">{config.team1.name} vs {config.team2.name}</h3>
-                        <div className="text-sm text-muted-foreground">
-                            <p><span className='font-medium text-foreground'>{resultText}</span></p>
-                        </div>
+        <Card className="p-4 bg-secondary/50 rounded-2xl transition-all hover:bg-secondary/70">
+            <div className="flex justify-between items-start">
+                <div className="flex-grow space-y-2 cursor-pointer" onClick={() => router.push(`/scorecard/${match.id}`)}>
+                    <h3 className="font-semibold text-foreground">{config.team1.name} vs {config.team2.name}</h3>
+                    <div className="text-sm text-muted-foreground">
+                        <p><span className='font-medium text-foreground'>{resultText}</span></p>
                     </div>
                 </div>
-            </Card>
-        </Link>
+                 <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                          <Trash2 className="h-5 w-5 text-destructive" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete this match record.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onDelete(match.id!)}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+            </div>
+        </Card>
     );
 }
 
@@ -97,6 +147,7 @@ function HomePage() {
     const [completedMatches, setCompletedMatches] = useState<MatchState[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
+    const { toast } = useToast();
 
     useEffect(() => {
         if (!user) return;
@@ -122,6 +173,23 @@ function HomePage() {
 
     }, [user]);
 
+    const handleDeleteMatch = async (matchId: string) => {
+      try {
+        await deleteDoc(doc(db, 'matches', matchId));
+        toast({
+          title: "Match Deleted",
+          description: "The match has been successfully deleted.",
+        });
+      } catch (error) {
+        console.error("Error deleting match: ", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete the match. Please try again.",
+          variant: "destructive",
+        });
+      }
+    };
+
     if (!user) {
         return (
           <div className="flex items-center justify-center min-h-screen">
@@ -139,6 +207,11 @@ function HomePage() {
                         <span className="font-semibold">{user.displayName || user.email || 'User'}</span>
                     </div>
                     <div className="flex items-center gap-2">
+                         <Link href="/tournaments">
+                            <Button variant="ghost" size="icon">
+                                <Trophy className="h-6 w-6" />
+                            </Button>
+                        </Link>
                         <Button variant="ghost" size="icon" onClick={logout}>
                             <LogOut className="h-6 w-6" />
                         </Button>
@@ -170,7 +243,7 @@ function HomePage() {
                             </Card>
                         )}
                         {activeMatches.map(match => (
-                            <ActiveMatchCard key={match.id} match={match} />
+                            <ActiveMatchCard key={match.id} match={match} onDelete={handleDeleteMatch} />
                         ))}
                     </div>
 
@@ -182,7 +255,7 @@ function HomePage() {
                             </Card>
                         )}
                         {completedMatches.map(match => (
-                            <RecentResultCard key={match.id} match={match}/>
+                            <RecentResultCard key={match.id} match={match} onDelete={handleDeleteMatch} />
                         ))}
                     </div>
                 </main>
@@ -193,3 +266,5 @@ function HomePage() {
 }
 
 export default withAuth(HomePage);
+
+    
