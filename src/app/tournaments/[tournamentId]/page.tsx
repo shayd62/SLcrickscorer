@@ -20,81 +20,90 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
-function JoinTournamentCard({ tournament, onTeamAdded }: { tournament: Tournament, onTeamAdded: () => void }) {
-    const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
-    const [selectedTeam, setSelectedTeam] = useState<string>('');
-    const { toast } = useToast();
-    const { user } = useAuth();
+function GroupManagement({ tournament, onUpdate }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void> }) {
+  const [newGroupName, setNewGroupName] = useState('');
+  const { toast } = useToast();
 
-    const fetchTeams = useCallback(async () => {
-        if (!user) return;
-        const q = query(collection(db, "teams"), where("userId", "==", user.uid));
-        const querySnapshot = await getDocs(q);
-        const allTeams = querySnapshot.docs.map(doc => doc.data() as Team);
-        const participating = tournament.participatingTeams || [];
-        const notYetJoined = allTeams.filter(team => !participating.includes(team.name));
-        setAvailableTeams(notYetJoined);
-    }, [tournament, user]);
+  const handleAddGroup = () => {
+    if (!newGroupName.trim()) {
+      toast({ title: 'Group name cannot be empty', variant: 'destructive' });
+      return;
+    }
+    const updatedGroups = [...(tournament.groups || []), { name: newGroupName, teams: [] }];
+    onUpdate({ groups: updatedGroups });
+    setNewGroupName('');
+  };
 
-    useEffect(() => {
-        fetchTeams();
-    }, [fetchTeams]);
-
-    const handleJoin = async () => {
-        if (!selectedTeam) {
-            toast({ title: "No team selected", description: "Please select a team to add.", variant: 'destructive' });
-            return;
-        }
-
-        try {
-            const tournamentRef = doc(db, "tournaments", tournament.id);
-            await updateDoc(tournamentRef, {
-                participatingTeams: arrayUnion(selectedTeam)
-            });
-            toast({ title: "Team Added!", description: `"${selectedTeam}" has joined the tournament.` });
-            setSelectedTeam('');
-            onTeamAdded(); // Callback to refresh parent state
-        } catch (e) {
-            console.error("Error joining tournament: ", e);
-            toast({ title: "Error", description: "Could not add team to the tournament.", variant: 'destructive' });
-        }
-    };
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Join Tournament</CardTitle>
-                <CardDescription>Add one of your saved teams to this tournament.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {availableTeams.length > 0 ? (
-                    <>
-                    <Select onValueChange={setSelectedTeam} value={selectedTeam}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a team to add" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {availableTeams.map(team => (
-                                <SelectItem key={team.name} value={team.name}>{team.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button onClick={handleJoin} disabled={!selectedTeam} className="w-full">
-                        <Plus className="mr-2 h-4 w-4" /> Add Team to Tournament
-                    </Button>
-                    </>
-                ) : (
-                    <p className="text-sm text-muted-foreground text-center">All your saved teams have already joined this tournament.</p>
-                )}
-                 <Link href="/teams/create" className='block'>
-                    <Button variant="outline" className='w-full'>
-                        <Plus className="mr-2 h-4 w-4" /> Create a New Team
-                    </Button>
-                </Link>
-            </CardContent>
+  const handleRemoveGroup = (groupNameToRemove: string) => {
+    const updatedGroups = (tournament.groups || []).filter(g => g.name !== groupNameToRemove);
+    const updatedMatches = (tournament.matches || []).filter(m => m.groupName !== groupNameToRemove);
+    onUpdate({ groups: updatedGroups, matches: updatedMatches });
+  };
+  
+  const handleTeamSelection = (groupName: string, teamName: string, checked: boolean) => {
+    const updatedGroups = (tournament.groups || []).map(group => {
+      if (group.name === groupName) {
+        const teams = checked ? [...group.teams, teamName] : group.teams.filter(t => t !== teamName);
+        return { ...group, teams };
+      }
+      return group;
+    });
+    onUpdate({ groups: updatedGroups });
+  };
+  
+  const assignedTeams = useMemo(() => (tournament.groups || []).flatMap(g => g.teams), [tournament.groups]);
+  const unassignedTeams = useMemo(() => (tournament.participatingTeams || []).filter(t => !assignedTeams.includes(t)), [tournament.participatingTeams, assignedTeams]);
+  
+  return (
+    <div className="space-y-6 border-t pt-6 mt-6">
+       <Card>
+          <CardHeader>
+            <CardTitle>Create & Manage Groups</CardTitle>
+          </CardHeader>
+           <CardContent className="flex gap-2">
+            <Input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="e.g., Group A" />
+            <Button onClick={handleAddGroup}><Plus className="mr-2 h-4 w-4" /> Add Group</Button>
+          </CardContent>
         </Card>
-    )
+      <div className="grid md:grid-cols-2 gap-8">
+        {(tournament.groups || []).length > 0 ? (tournament.groups || []).map(group => (
+          <Card key={group.name}>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>{group.name}</CardTitle>
+              <AlertDialog>
+                  <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-5 w-5 text-destructive" /></Button></AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will delete Group {group.name} and all its fixtures. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveGroup(group.name)}>Delete</AlertDialogAction></AlertDialogFooter>
+                  </AlertDialogContent>
+              </AlertDialog>
+            </CardHeader>
+            <CardContent>
+              <h4 className="font-semibold mb-2">Assign Teams</h4>
+              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                {tournament.participatingTeams.map(teamName => (
+                  <div key={teamName} className="flex items-center space-x-2">
+                    <Checkbox id={`${group.name}-${teamName}`} checked={group.teams.includes(teamName)} onCheckedChange={(checked) => handleTeamSelection(group.name, teamName, !!checked)} disabled={!group.teams.includes(teamName) && assignedTeams.includes(teamName)} />
+                    <label htmlFor={`${group.name}-${teamName}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{teamName}</label>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )) : <p className="text-muted-foreground text-center md:col-span-2">No groups created yet. Add a group to start assigning teams.</p>}
+      </div>
+       {unassignedTeams.length > 0 && (
+          <Card className="mt-8">
+            <CardHeader><CardTitle>Unassigned Teams</CardTitle></CardHeader>
+            <CardContent>
+              <ul className="space-y-2">{unassignedTeams.map(team => <li key={team} className="p-2 bg-secondary rounded-md">{team}</li>)}</ul>
+            </CardContent>
+          </Card>
+        )}
+    </div>
+  );
 }
+
 
 function PointsTable({ teams, title = "Points Table" }: { teams: TournamentPoints[], title?: string }) {
     const sortedTeams = [...teams].sort((a, b) => {
@@ -143,131 +152,107 @@ function PointsTable({ teams, title = "Points Table" }: { teams: TournamentPoint
     );
 }
 
-function GroupManagement({ tournament, onUpdate }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void> }) {
-  const [newGroupName, setNewGroupName] = useState('');
-  const { toast } = useToast();
+function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void> }) {
+    const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
+    const [selectedTeam, setSelectedTeam] = useState<string>('');
+    const { toast } = useToast();
+    const { user } = useAuth();
 
-  const handleAddGroup = () => {
-    if (!newGroupName.trim()) {
-      toast({ title: 'Group name cannot be empty', variant: 'destructive' });
-      return;
-    }
-    const updatedGroups = [...(tournament.groups || []), { name: newGroupName, teams: [] }];
-    onUpdate({ groups: updatedGroups });
-    setNewGroupName('');
-  };
+    const fetchTeams = useCallback(async () => {
+        if (!user) return;
+        const q = query(collection(db, "teams"), where("userId", "==", user.uid));
+        const querySnapshot = await getDocs(q);
+        const allTeams = querySnapshot.docs.map(doc => doc.data() as Team);
+        const participating = tournament.participatingTeams || [];
+        const notYetJoined = allTeams.filter(team => !participating.includes(team.name));
+        setAvailableTeams(notYetJoined);
+    }, [tournament, user]);
 
-  const handleRemoveGroup = (groupNameToRemove: string) => {
-    const updatedGroups = (tournament.groups || []).filter(g => g.name !== groupNameToRemove);
-    const updatedMatches = (tournament.matches || []).filter(m => m.groupName !== groupNameToRemove);
-    onUpdate({ groups: updatedGroups, matches: updatedMatches });
-  };
-  
-  const handleTeamSelection = (groupName: string, teamName: string, checked: boolean) => {
-    const updatedGroups = (tournament.groups || []).map(group => {
-      if (group.name === groupName) {
-        const teams = checked ? [...group.teams, teamName] : group.teams.filter(t => t !== teamName);
-        return { ...group, teams };
-      }
-      return group;
-    });
-    onUpdate({ groups: updatedGroups });
-  };
-  
-  const assignedTeams = useMemo(() => (tournament.groups || []).flatMap(g => g.teams), [tournament.groups]);
-  const unassignedTeams = useMemo(() => (tournament.participatingTeams || []).filter(t => !assignedTeams.includes(t)), [tournament.participatingTeams, assignedTeams]);
-  
-  return (
-    <div className="grid md:grid-cols-2 gap-8 mt-6 border-t pt-6">
-      <div>
+    useEffect(() => {
+        fetchTeams();
+    }, [fetchTeams]);
+
+    const handleJoin = async () => {
+        if (!selectedTeam) {
+            toast({ title: "No team selected", description: "Please select a team to add.", variant: 'destructive' });
+            return;
+        }
+
+        try {
+            await onUpdate({ participatingTeams: arrayUnion(selectedTeam) });
+            toast({ title: "Team Added!", description: `"${selectedTeam}" has joined the tournament.` });
+            setSelectedTeam('');
+            // The onSnapshot listener will handle the UI update.
+        } catch (e) {
+            console.error("Error joining tournament: ", e);
+            toast({ title: "Error", description: "Could not add team to the tournament.", variant: 'destructive' });
+        }
+    };
+
+    const handleRemoveTeam = async (teamName: string) => {
+        await onUpdate({ participatingTeams: arrayRemove(teamName) });
+        // Also remove from any groups
+        const updatedGroups = (tournament.groups || []).map(g => ({
+            ...g,
+            teams: g.teams.filter(t => t !== teamName)
+        }));
+        await onUpdate({ groups: updatedGroups });
+    };
+
+    return (
         <Card>
-          <CardHeader><CardTitle>Create Groups</CardTitle></CardHeader>
-          <CardContent className="flex gap-2">
-            <Input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="e.g., Group A" />
-            <Button onClick={handleAddGroup}><Plus className="mr-2 h-4 w-4" /> Add</Button>
-          </CardContent>
-        </Card>
-        {unassignedTeams.length > 0 && (
-          <Card className="mt-8">
-            <CardHeader><CardTitle>Unassigned Teams</CardTitle></CardHeader>
-            <CardContent>
-              <ul className="space-y-2">{unassignedTeams.map(team => <li key={team} className="p-2 bg-secondary rounded-md">{team}</li>)}</ul>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-      <div className="space-y-8">
-        {(tournament.groups || []).map(group => (
-          <Card key={group.name}>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{group.name}</CardTitle>
-              <AlertDialog>
-                  <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-5 w-5 text-destructive" /></Button></AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will delete Group {group.name} and all its fixtures. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveGroup(group.name)}>Delete</AlertDialogAction></AlertDialogFooter>
-                  </AlertDialogContent>
-              </AlertDialog>
+            <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2"><Users className="h-6 w-6 text-primary"/><span>Participating Teams ({tournament.participatingTeams?.length || 0})</span></div>
+                </CardTitle>
             </CardHeader>
             <CardContent>
-              <h4 className="font-semibold mb-2">Assign Teams</h4>
-              <div className="grid grid-cols-2 gap-2">
-                {tournament.participatingTeams.map(teamName => (
-                  <div key={teamName} className="flex items-center space-x-2">
-                    <Checkbox id={`${group.name}-${teamName}`} checked={group.teams.includes(teamName)} onCheckedChange={(checked) => handleTeamSelection(group.name, teamName, !!checked)} disabled={!group.teams.includes(teamName) && assignedTeams.includes(teamName)} />
-                    <label htmlFor={`${group.name}-${teamName}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{teamName}</label>
-                  </div>
-                ))}
-              </div>
+                {tournament.participatingTeams?.length > 0 ? (
+                    <ul className="space-y-2 max-h-48 overflow-y-auto">
+                        {tournament.participatingTeams.map(teamName => (
+                            <li key={teamName} className="flex items-center justify-between p-2 bg-secondary rounded-md">
+                                <span>{teamName}</span>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader><AlertDialogTitle>Remove Team?</AlertDialogTitle><AlertDialogDescription>This will remove "{teamName}" from the tournament and any groups it's in. Are you sure?</AlertDialogDescription></AlertDialogHeader>
+                                        <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveTeam(teamName)}>Remove</AlertDialogAction></AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </li>
+                        ))}
+                    </ul>
+                ) : <p className="text-sm text-muted-foreground text-center py-4">No teams have joined yet.</p>}
+
+                <div className="mt-4 space-y-2 border-t pt-4">
+                     {availableTeams.length > 0 ? (
+                        <>
+                        <Select onValueChange={setSelectedTeam} value={selectedTeam}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a team to add" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {availableTeams.map(team => (
+                                    <SelectItem key={team.name} value={team.name}>{team.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Button onClick={handleJoin} disabled={!selectedTeam} className="w-full">
+                            <Plus className="mr-2 h-4 w-4" /> Add Saved Team
+                        </Button>
+                        </>
+                    ) : (
+                        <p className="text-sm text-muted-foreground text-center">All your saved teams have already joined this tournament.</p>
+                    )}
+                     <Link href="/teams/create" className='block'>
+                        <Button variant="outline" className='w-full'>
+                            <Plus className="mr-2 h-4 w-4" /> Create a New Team
+                        </Button>
+                    </Link>
+                </div>
             </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FixtureGeneration({ tournament, onUpdate }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void> }) {
-  const { toast } = useToast();
-
-  const generateFixtures = () => {
-    if (!tournament.groups || tournament.groups.length === 0) {
-      toast({ title: 'No Groups Found', description: 'Please create groups and assign teams before generating fixtures.', variant: 'destructive'});
-      return;
-    }
-
-    let allNewMatches: TournamentMatch[] = [];
-    tournament.groups.forEach(group => {
-      const teams = group.teams;
-      if (teams.length < 2) return;
-
-      for (let i = 0; i < teams.length; i++) {
-        for (let j = i + 1; j < teams.length; j++) {
-          allNewMatches.push({
-            id: `match-${group.name.replace(/\s/g, '-')}-${teams[i].replace(/\s/g, '-')}-vs-${teams[j].replace(/\s/g, '-')}-${Date.now()}`,
-            groupName: group.name,
-            team1: teams[i],
-            team2: teams[j],
-            status: 'Upcoming',
-          });
-        }
-      }
-    });
-
-    onUpdate({ matches: allNewMatches });
-    toast({ title: 'Fixtures Generated!', description: 'All matches for all groups have been created.'});
-  };
-
-  return (
-    <div className="mt-6 border-t pt-6">
-      <Card>
-        <CardHeader><CardTitle>Generate Fixtures</CardTitle><CardDescription>Automatically create matches for all teams in their respective groups.</CardDescription></CardHeader>
-        <CardContent>
-          <Button onClick={generateFixtures} className="w-full"><Gamepad2 className="mr-2 h-4 w-4" /> Generate All Fixtures</Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
+        </Card>
+    );
 }
 
 
@@ -309,7 +294,7 @@ function TournamentDetailsPage() {
     };
     
     const calculatePointsForGroup = useCallback((groupName: string): TournamentPoints[] => {
-      if (!tournament || !tournament.groups || !tournament.matches) return [];
+      if (!tournament || !tournament.groups || !tournament.matches || !tournament.pointsPolicy) return [];
       
       const group = tournament.groups.find(g => g.name === groupName);
       if (!group) return [];
@@ -331,8 +316,8 @@ function TournamentDetailsPage() {
             if (pointsData[match.team1]) { pointsData[match.team1].draws++; pointsData[match.team1].points += tournament.pointsPolicy?.draw || 1; }
             if (pointsData[match.team2]) { pointsData[match.team2].draws++; pointsData[match.team2].points += tournament.pointsPolicy?.draw || 1; }
           } else {
-            if (winner && pointsData[winner]) { pointsData[winner].wins++; pointsData[winner].points += tournament.pointsPolicy?.win || 2; }
-            if (loser && pointsData[loser]) { pointsData[loser].losses++; pointsData[loser].points += tournament.pointsPolicy?.loss || 0; }
+            if (winner && pointsData[winner]) { pointsData[winner].wins++; pointsData[winner].points += tournament.pointsPolicy.win; }
+            if (loser && pointsData[loser]) { pointsData[loser].losses++; pointsData[loser].points += tournament.pointsPolicy.loss; }
           }
         }
       });
@@ -344,6 +329,10 @@ function TournamentDetailsPage() {
     if (!tournament) return <div className="flex items-center justify-center min-h-screen">Tournament not found.</div>;
 
     const groupNames = tournament.groups?.map(g => g.name) || [];
+    
+    const liveMatches = useMemo(() => (tournament.matches || []).filter(m => m.status === 'Live'), [tournament.matches]);
+    const upcomingMatches = useMemo(() => (tournament.matches || []).filter(m => m.status === 'Upcoming'), [tournament.matches]);
+    const pastMatches = useMemo(() => (tournament.matches || []).filter(m => m.status === 'Completed'), [tournament.matches]);
 
     return (
         <div className="min-h-screen bg-gray-50 text-foreground font-body">
@@ -353,7 +342,7 @@ function TournamentDetailsPage() {
                 <Button variant="ghost" size="icon" onClick={() => router.push(`/tournaments/edit/${tournament.id}`)}><Settings className="h-6 w-6" /></Button>
             </header>
 
-            <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+            <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 relative">
                 <Tabs defaultValue="teams" className="w-full">
                     <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="teams"><Users className="mr-2 h-4 w-4"/>Teams & Groups</TabsTrigger>
@@ -364,59 +353,45 @@ function TournamentDetailsPage() {
                     
                     <TabsContent value="teams" className="mt-6">
                       <div className="grid md:grid-cols-2 gap-8">
-                          <Card>
-                              <CardHeader><CardTitle className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Users className="h-6 w-6 text-primary"/><span>Participating Teams ({tournament.participatingTeams?.length || 0})</span></div></CardTitle></CardHeader>
-                              <CardContent>
-                                {tournament.participatingTeams?.length > 0 ? (
-                                  <ul className="space-y-2">
-                                    {tournament.participatingTeams.map(teamName => (
-                                      <li key={teamName} className="flex items-center justify-between p-2 bg-secondary rounded-md">
-                                        <span>{teamName}</span>
-                                        <AlertDialog>
-                                          <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
-                                          <AlertDialogContent>
-                                            <AlertDialogHeader><AlertDialogTitle>Remove Team?</AlertDialogTitle><AlertDialogDescription>This will remove "{teamName}" from the tournament. Are you sure?</AlertDialogDescription></AlertDialogHeader>
-                                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={async () => await updateDoc(doc(db, "tournaments", tournament.id), { participatingTeams: arrayRemove(teamName) })}>Remove</AlertDialogAction></AlertDialogFooter>
-                                          </AlertDialogContent>
-                                        </AlertDialog>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                ) : <p className="text-sm text-muted-foreground text-center py-4">No teams have joined yet.</p>}
-                              </CardContent>
-                          </Card>
-                          <JoinTournamentCard tournament={tournament} onTeamAdded={() => {}}/>
+                          <ParticipatingTeamsCard tournament={tournament} onUpdate={handleUpdateTournament} />
+                          {tournament.tournamentFormat === 'Round Robin' ? (
+                            <GroupManagement tournament={tournament} onUpdate={handleUpdateTournament} />
+                          ) : (
+                             <Card>
+                                <CardHeader><CardTitle>Group Management</CardTitle></CardHeader>
+                                <CardContent><p className="text-muted-foreground text-center py-4">Group management is only available for Round Robin tournaments.</p></CardContent>
+                             </Card>
+                          )}
                       </div>
-                      {tournament.tournamentFormat === 'Round Robin' && <GroupManagement tournament={tournament} onUpdate={handleUpdateTournament} />}
                     </TabsContent>
                     
                     <TabsContent value="matches" className="mt-6">
-                      {tournament.tournamentFormat === 'Round Robin' && <FixtureGeneration tournament={tournament} onUpdate={handleUpdateTournament} />}
-                      <Accordion type="multiple" defaultValue={groupNames} className="w-full mt-6">
-                          {(tournament.groups || []).map(group => (
-                              <AccordionItem value={group.name} key={group.name}>
-                                  <AccordionTrigger className="text-xl font-bold">{group.name}</AccordionTrigger>
-                                  <AccordionContent>
-                                      <div className="space-y-2">
-                                          {(tournament.matches || []).filter(m => m.groupName === group.name).length === 0 ? (
-                                              <p className="text-muted-foreground text-center py-4">No fixtures generated for this group.</p>
-                                          ) : (
-                                              (tournament.matches || []).filter(m => m.groupName === group.name).map(match => (
-                                                  <div key={match.id} className="flex justify-between items-center p-3 bg-secondary rounded-lg">
-                                                      <div className="font-semibold">{match.team1} vs {match.team2}</div>
-                                                      <div className="flex items-center gap-2">
-                                                          <span className="text-sm px-2 py-1 bg-background rounded-full">{match.status}</span>
-                                                          <Button size="sm" variant="outline">Score Match</Button>
-                                                      </div>
-                                                  </div>
-                                              ))
-                                          )}
-                                      </div>
-                                  </AccordionContent>
-                              </AccordionItem>
-                          ))}
-                          {(tournament.groups || []).length === 0 && <p className="text-muted-foreground text-center py-8">No groups created yet. Go to the "Teams & Groups" tab to get started.</p>}
-                      </Accordion>
+                      <Tabs defaultValue="upcoming" className="w-full">
+                        <TabsList>
+                            <TabsTrigger value="live">Live</TabsTrigger>
+                            <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+                            <TabsTrigger value="past">Past</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="live" className="mt-4">
+                            {liveMatches.length > 0 ? liveMatches.map(match => <div key={match.id}>{match.team1} vs {match.team2}</div>) : <p className="text-muted-foreground text-center py-8">No live matches right now.</p>}
+                        </TabsContent>
+                         <TabsContent value="upcoming" className="mt-4">
+                            {upcomingMatches.length > 0 ? upcomingMatches.map(match => (
+                                <Card key={match.id} className="mb-4">
+                                    <CardContent className="p-4 flex justify-between items-center">
+                                        <div>
+                                            <p className="font-bold">{match.team1} vs {match.team2}</p>
+                                            <p className="text-sm text-muted-foreground">{new Date(match.date!).toLocaleString()} at {match.venue}</p>
+                                        </div>
+                                        <Button>Start Match</Button>
+                                    </CardContent>
+                                </Card>
+                            )) : <p className="text-muted-foreground text-center py-8">No upcoming matches scheduled.</p>}
+                        </TabsContent>
+                         <TabsContent value="past" className="mt-4">
+                            {pastMatches.length > 0 ? pastMatches.map(match => <div key={match.id}>{match.team1} vs {match.team2}</div>) : <p className="text-muted-foreground text-center py-8">No past matches found.</p>}
+                        </TabsContent>
+                      </Tabs>
                     </TabsContent>
 
                     <TabsContent value="leaderboard" className="mt-6">
@@ -429,10 +404,15 @@ function TournamentDetailsPage() {
                            <PointsTable key={group.name} teams={calculatePointsForGroup(group.name)} title={`Points Table - ${group.name}`} />
                          ))
                        ) : (
-                         <Card><CardHeader><CardTitle>Points Table</CardTitle></CardHeader><CardContent><p className="text-muted-foreground text-center py-4">No groups available. Create groups and generate matches to see the points table.</p></CardContent></Card>
+                         <Card><CardHeader><CardTitle>Points Table</CardTitle></CardHeader><CardContent><p className="text-muted-foreground text-center py-4">No groups available. Create groups and play matches to see the points table.</p></CardContent></Card>
                        )}
                     </TabsContent>
                 </Tabs>
+                <Link href={`/tournaments/${tournamentId}/add-match`} passHref>
+                    <Button className="fixed bottom-8 right-8 rounded-full h-16 w-16 shadow-lg">
+                        <Plus className="h-8 w-8" />
+                    </Button>
+                </Link>
             </main>
         </div>
     );

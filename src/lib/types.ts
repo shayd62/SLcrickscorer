@@ -1,4 +1,5 @@
 
+
 export interface Player {
   id: string;
   name: string;
@@ -38,6 +39,10 @@ export interface TournamentMatch {
         loser: string;
         method: string; // e.g. "by 5 wickets"
     }
+    date?: string;
+    venue?: string;
+    overs?: number;
+    matchType?: string;
 }
 
 export interface Tournament {
