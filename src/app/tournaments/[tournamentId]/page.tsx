@@ -264,6 +264,10 @@ function TournamentDetailsPage() {
     const { toast } = useToast();
     const tournamentId = params.tournamentId as string;
 
+    const liveMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Live'), [tournament?.matches]);
+    const upcomingMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Upcoming'), [tournament?.matches]);
+    const pastMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Completed'), [tournament?.matches]);
+
     const fetchTournamentAndListen = useCallback(() => {
         if (!tournamentId) return;
         const unsub = onSnapshot(doc(db, "tournaments", tournamentId), (doc) => {
@@ -329,10 +333,6 @@ function TournamentDetailsPage() {
     if (!tournament) return <div className="flex items-center justify-center min-h-screen">Tournament not found.</div>;
 
     const groupNames = tournament.groups?.map(g => g.name) || [];
-    
-    const liveMatches = useMemo(() => (tournament.matches || []).filter(m => m.status === 'Live'), [tournament.matches]);
-    const upcomingMatches = useMemo(() => (tournament.matches || []).filter(m => m.status === 'Upcoming'), [tournament.matches]);
-    const pastMatches = useMemo(() => (tournament.matches || []).filter(m => m.status === 'Completed'), [tournament.matches]);
 
     return (
         <div className="min-h-screen bg-gray-50 text-foreground font-body">
