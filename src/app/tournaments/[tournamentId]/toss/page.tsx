@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { CricketBallIcon, CricketBatIcon, Swords, Trophy } from 'lucide-react';
+import { CricketBallIcon, CricketBatIcon } from '@/components/icons';
+import { Swords, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { MatchConfig } from '@/lib/types';
 
