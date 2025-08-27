@@ -86,6 +86,27 @@ export interface TournamentPoints {
     netRunRate: number;
 }
 
+export interface BatterLeaderboardStat {
+    playerId: string;
+    playerName: string;
+    teamName: string;
+    matches: number;
+    runs: number;
+    balls: number;
+    strikeRate: number;
+}
+
+export interface BowlerLeaderboardStat {
+    playerId: string;
+    playerName: string;
+    teamName: string;
+    matches: number;
+    overs: string;
+    wickets: number;
+    runsConceded: number;
+    economy: number;
+}
+
 export interface MatchConfig {
   team1: Team;
   team2: Team;
