@@ -140,14 +140,13 @@ function MatchDetailsContent() {
         setSquad(currentSquad => {
             if (isSelected) {
                 const playerToAdd = originalTeam?.players.find(p => p.id === playerId);
-                // Avoid adding duplicates
                 if (playerToAdd && !currentSquad.some(p => p.id === playerId)) {
                     return [...currentSquad, playerToAdd];
                 }
             } else {
                 return currentSquad.filter(p => p.id !== playerId);
             }
-            return currentSquad; // Return current state if no change
+            return currentSquad;
         });
     };
     
