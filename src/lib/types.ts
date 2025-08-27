@@ -117,6 +117,17 @@ export interface FielderLeaderboardStat {
     stumpings: number;
 }
 
+export interface AllRounderLeaderboardStat {
+    playerId: string;
+    playerName: string;
+    teamName: string;
+    matches: number;
+    runs: number;
+    wickets: number;
+    points: number;
+}
+
+
 export interface MatchConfig {
   team1: Team;
   team2: Team;

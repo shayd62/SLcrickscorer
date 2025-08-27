@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil, Radio, Star, ShieldAlert, User, Award, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, Innings, FielderLeaderboardStat, Player } from '@/lib/types';
+import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, Innings, FielderLeaderboardStat, Player, AllRounderLeaderboardStat } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, arrayUnion, onSnapshot, collection, query, where, getDocs, arrayRemove } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
@@ -429,12 +429,45 @@ function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
     );
 }
 
+function AllRounderLeaderboard({ stats }: { stats: AllRounderLeaderboardStat[] }) {
+    if (stats.length === 0) {
+        return <p className="text-muted-foreground text-center py-8">No all-rounder data available yet. Complete some matches to see the leaderboard.</p>;
+    }
+    
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Player</TableHead>
+                    <TableHead className="text-center">Matches</TableHead>
+                    <TableHead className="text-center">Runs</TableHead>
+                    <TableHead className="text-center">Wickets</TableHead>
+                    <TableHead className="text-right">Points</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {stats.map(player => (
+                    <TableRow key={player.playerId}>
+                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="text-center">{player.matches}</TableCell>
+                        <TableCell className="text-center">{player.runs}</TableCell>
+                        <TableCell className="text-center">{player.wickets}</TableCell>
+                        <TableCell className="text-right font-bold">{player.points}</TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+}
+
+
 function TournamentDetailsPage() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
     const [batterStats, setBatterStats] = useState<BatterLeaderboardStat[]>([]);
     const [bowlerStats, setBowlerStats] = useState<BowlerLeaderboardStat[]>([]);
     const [fielderStats, setFielderStats] = useState<FielderLeaderboardStat[]>([]);
+    const [allRounderStats, setAllRounderStats] = useState<AllRounderLeaderboardStat[]>([]);
 
     const params = useParams();
     const router = useRouter();
@@ -558,6 +591,32 @@ function TournamentDetailsPage() {
             }))
             .sort((a, b) => (b.catches + b.runOuts + b.stumpings) - (a.catches + a.runOuts + a.stumpings));
         setFielderStats(newFielderStats);
+
+        const allPlayers: { [playerId: string]: { name: string; team: string; matches: Set<string> } } = {};
+        Object.values(batterPlayerStats).forEach(p => { if (!allPlayers[p.name]) allPlayers[p.name] = { name: p.name, team: p.team, matches: p.matches }});
+        Object.values(bowlerPlayerStats).forEach(p => { if (!allPlayers[p.name]) allPlayers[p.name] = { name: p.name, team: p.team, matches: p.matches }});
+        Object.values(fielderPlayerStats).forEach(p => { if (!allPlayers[p.name]) allPlayers[p.name] = { name: p.name, team: p.team, matches: p.matches }});
+
+        const newAllRounderStats: AllRounderLeaderboardStat[] = Object.values(allPlayers)
+            .map(player => {
+                const batting = Object.values(batterPlayerStats).find(p => p.name === player.name) || { runs: 0 };
+                const bowling = Object.values(bowlerPlayerStats).find(p => p.name === player.name) || { wickets: 0 };
+                const fielding = Object.values(fielderPlayerStats).find(p => p.name === player.name) || { catches: 0, runOuts: 0, stumpings: 0 };
+                
+                const points = (batting.runs * 1) + (bowling.wickets * 20) + ((fielding.catches + fielding.runOuts + fielding.stumpings) * 10);
+
+                return {
+                    playerId: player.name, // Using name as ID for simplicity here, would need consistent IDs
+                    playerName: player.name,
+                    teamName: player.team,
+                    matches: player.matches.size,
+                    runs: batting.runs,
+                    wickets: bowling.wickets,
+                    points: points,
+                };
+            })
+            .sort((a, b) => b.points - a.points);
+        setAllRounderStats(newAllRounderStats);
 
     }, []);
 
@@ -747,7 +806,7 @@ function TournamentDetailsPage() {
                                         <BowlerLeaderboard stats={bowlerStats} />
                                     </TabsContent>
                                     <TabsContent value="all-rounder" className="mt-4">
-                                        <p className="text-muted-foreground text-center py-8">All-rounder leaderboard coming soon.</p>
+                                        <AllRounderLeaderboard stats={allRounderStats} />
                                     </TabsContent>
                                     <TabsContent value="fielder" className="mt-4">
                                         <FielderLeaderboard stats={fielderStats} />
