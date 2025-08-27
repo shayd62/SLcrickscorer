@@ -302,7 +302,7 @@ function MatchDetailsContent() {
     const editingSquadData = editingTeam === 'team1' ? squad1 : squad2;
 
     return (
-        <div className="min-h-screen bg-gray-50 text-foreground font-body">
+        <div className="min-h-screen bg-background text-foreground font-body">
             <form onSubmit={form.handleSubmit(handleStartMatch)}>
                 <header className="p-4 bg-gray-800 text-white">
                     <div className="flex items-center justify-between">
@@ -449,7 +449,7 @@ function MatchDetailsContent() {
                         />
                     </div>
                 </main>
-                <footer className="p-4 sticky bottom-0 bg-white border-t">
+                <footer className="p-4 sticky bottom-0 bg-background border-t">
                     <Button type="submit" size="lg" className="w-full">Start Now</Button>
                 </footer>
             </form>
