@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil, Radio, Star, ShieldAlert, User, Award } from 'lucide-react';
+import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil, Radio, Star, ShieldAlert, User, Award, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, Innings, FielderLeaderboardStat, Player } from '@/lib/types';
 import { db } from '@/lib/firebase';
@@ -66,6 +66,33 @@ function LiveMatchCard({ match, tournamentId }: { match: TournamentMatch, tourna
                         <p className="text-sm text-muted-foreground">({formatOvers(currentInnings.balls, liveData.config.ballsPerOver)} ov)</p>
                         {liveData.target && <p className="text-xs text-destructive">Target: {liveData.target}</p>}
                     </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function PastMatchCard({ match }: { match: TournamentMatch }) {
+    const router = useRouter();
+
+    if (!match.result) return null;
+
+    const handleClick = () => {
+        if (match.matchId) {
+            router.push(`/scorecard/${match.matchId}`);
+        }
+    };
+
+    return (
+        <Card className="mb-4 cursor-pointer hover:bg-secondary/50" onClick={handleClick}>
+            <CardContent className="p-4">
+                <div className="flex justify-between items-center">
+                    <div className="space-y-1">
+                        <p className="font-bold text-lg">{match.team1} vs {match.team2}</p>
+                        <p className="text-sm text-green-600 font-semibold">{match.result.winner} won</p>
+                        <p className="text-xs text-muted-foreground">{match.result.method}</p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </div>
             </CardContent>
         </Card>
@@ -694,7 +721,7 @@ function TournamentDetailsPage() {
                             )) : <p className="text-muted-foreground text-center py-8">No upcoming matches scheduled.</p>}
                         </TabsContent>
                          <TabsContent value="past" className="mt-4">
-                            {pastMatches.length > 0 ? pastMatches.map(match => <div key={match.id}>{match.team1} vs {match.team2}</div>) : <p className="text-muted-foreground text-center py-8">No past matches found.</p>}
+                            {pastMatches.length > 0 ? pastMatches.map(match => <PastMatchCard key={match.id} match={match} />) : <p className="text-muted-foreground text-center py-8">No past matches found.</p>}
                         </TabsContent>
                       </Tabs>
                     </TabsContent>
