@@ -2,22 +2,85 @@
 'use client';
 
 import { Suspense, useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Calendar, MapPin } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ArrowLeft, Calendar, MapPin, Users, Shield } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, collection, query, where, addDoc } from 'firebase/firestore';
+import type { Team, MatchConfig, MatchState, Innings, Player } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/auth-context';
+
+function createInitialState(config: MatchConfig, userId?: string | null, matchId?: string): MatchState {
+  const { team1, team2, toss, opening, oversPerInnings } = config;
+  
+  const battingTeamKey = (toss.winner === 'team1' && toss.decision === 'bat') || (toss.winner === 'team2' && toss.decision === 'bowl') ? 'team1' : 'team2';
+  const bowlingTeamKey = battingTeamKey === 'team1' ? 'team2' : 'team1';
+
+  const createInnings = (bTKey: 'team1' | 'team2', boTKey: 'team1' | 'team2'): Innings => {
+    const bTeam = bTKey === 'team1' ? team1 : team2;
+    const boTeam = boTKey === 'team1' ? team1 : team2;
+    return {
+      battingTeam: bTKey,
+      bowlingTeam: boTKey,
+      score: 0,
+      wickets: 0,
+      overs: 0,
+      balls: 0,
+      timeline: [],
+      batsmen: bTeam.players.reduce((acc, p) => ({ ...acc, [p.id]: { ...p, runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false } }), {}),
+      bowlers: boTeam.players.reduce((acc, p) => ({ ...acc, [p.id]: { ...p, overs: 0, balls: 0, maidens: 0, runsConceded: 0, wickets: 0 } }), {}),
+      currentPartnership: {
+        batsman1Id: opening.strikerId,
+        batsman2Id: opening.nonStrikerId,
+        runs: 0,
+        balls: 0,
+      },
+      fallOfWickets: []
+    }
+  };
+
+  return {
+    id: matchId,
+    config,
+    innings1: createInnings(battingTeamKey, bowlingTeamKey),
+    currentInnings: 'innings1',
+    onStrikeId: opening.strikerId,
+    nonStrikeId: opening.nonStrikerId,
+    currentBowlerId: opening.bowlerId,
+    matchOver: false,
+    resultText: 'Match in progress...',
+    userId: userId || undefined,
+  };
+};
 
 
 function MatchDetailsContent() {
-    const searchParams = useSearchParams();
     const router = useRouter();
+    const params = useParams();
+    const searchParams = useSearchParams();
+    const { toast } = useToast();
+    const { user } = useAuth();
+
+    const [team1, setTeam1] = useState<Team | null>(null);
+    const [team2, setTeam2] = useState<Team | null>(null);
+    const [squad1, setSquad1] = useState<Player[]>([]);
+    const [squad2, setSquad2] = useState<Player[]>([]);
+    
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [editingTeam, setEditingTeam] = useState<'team1' | 'team2' | null>(null);
 
     const team1Name = searchParams.get('team1Name') || 'Team A';
     const team2Name = searchParams.get('team2Name') || 'Team B';
     const matchDateStr = searchParams.get('date');
     const venue = searchParams.get('venue') || 'TBD';
+    const tournamentId = params.tournamentId as string;
     
     const [formattedDate, setFormattedDate] = useState<string | null>(null);
 
@@ -29,6 +92,100 @@ function MatchDetailsContent() {
             setFormattedDate('Date not set');
         }
     }, [matchDateStr]);
+
+    useEffect(() => {
+        const fetchTeams = async () => {
+            if (!user) return;
+            try {
+                const teamsRef = collection(db, 'teams');
+                
+                const q1 = query(teamsRef, where("name", "==", team1Name), where("userId", "==", user.uid));
+                const snapshot1 = await getDocs(q1);
+                if (!snapshot1.empty) {
+                    const teamData = { id: snapshot1.docs[0].id, ...snapshot1.docs[0].data() } as Team;
+                    setTeam1(teamData);
+                    setSquad1(teamData.players);
+                }
+
+                const q2 = query(teamsRef, where("name", "==", team2Name), where("userId", "==", user.uid));
+                const snapshot2 = await getDocs(q2);
+                if (!snapshot2.empty) {
+                    const teamData = { id: snapshot2.docs[0].id, ...snapshot2.docs[0].data() } as Team;
+                    setTeam2(teamData);
+                    setSquad2(teamData.players);
+                }
+            } catch (error) {
+                console.error("Error fetching teams: ", error);
+                toast({ title: "Error", description: "Could not load team data.", variant: "destructive" });
+            }
+        };
+        fetchTeams();
+    }, [team1Name, team2Name, user, toast]);
+
+    const handleSquadSelect = (teamKey: 'team1' | 'team2') => {
+        setEditingTeam(teamKey);
+        setDialogOpen(true);
+    };
+
+    const handlePlayerSelection = (playerId: string, isSelected: boolean) => {
+        const currentSquad = editingTeam === 'team1' ? squad1 : squad2;
+        const setSquad = editingTeam === 'team1' ? setSquad1 : setSquad2;
+        const originalTeam = editingTeam === 'team1' ? team1 : team2;
+
+        if (isSelected) {
+            const playerToAdd = originalTeam?.players.find(p => p.id === playerId);
+            if(playerToAdd) setSquad([...currentSquad, playerToAdd]);
+        } else {
+            setSquad(currentSquad.filter(p => p.id !== playerId));
+        }
+    };
+    
+    const handleStartMatch = async () => {
+        if (!team1 || !team2 || squad1.length < 2 || squad2.length < 2) {
+            toast({ title: "Squad Error", description: "Both teams must have at least 2 players selected.", variant: 'destructive' });
+            return;
+        }
+
+        const team1WithIds = { ...team1, players: squad1.map((p, i) => ({ ...p, id: `t1p${i+1}` })) };
+        const team2WithIds = { ...team2, players: squad2.map((p, i) => ({ ...p, id: `t2p${i+1}` })) };
+
+        const config: MatchConfig = {
+            team1: team1WithIds,
+            team2: team2WithIds,
+            oversPerInnings: 20, // Default or fetch from tournament
+            playersPerSide: squad1.length,
+            toss: { // Dummy toss, can be decided on scoring screen
+                winner: 'team1',
+                decision: 'bat',
+            },
+            opening: { // Dummy opening players, must be selected on scoring screen
+                strikerId: team1WithIds.players[0].id,
+                nonStrikerId: team1WithIds.players[1].id,
+                bowlerId: team2WithIds.players[0].id,
+            },
+            tournamentId,
+            venue: venue,
+            ballsPerOver: 6,
+            noBall: { enabled: true, reball: true, run: 1 },
+            wideBall: { enabled: true, reball: true, run: 1 },
+        };
+        
+        try {
+            const newMatchRef = await addDoc(collection(db, "matches"), {});
+            const initialState = createInitialState(config, user?.uid, newMatchRef.id);
+            await addDoc(collection(db, 'matches'), initialState);
+            
+            toast({ title: "Match Created!", description: "Redirecting to scoring..." });
+            router.push(`/scoring/${initialState.id}`);
+
+        } catch (error) {
+             console.error("Error creating match: ", error);
+             toast({ title: "Error", description: "Could not create the match.", variant: "destructive" });
+        }
+    };
+
+    const editingTeamData = editingTeam === 'team1' ? team1 : team2;
+    const editingSquadData = editingTeam === 'team1' ? squad1 : squad2;
 
     return (
         <div className="min-h-screen bg-gray-50 text-foreground font-body">
@@ -60,23 +217,46 @@ function MatchDetailsContent() {
                             <div className="flex flex-col items-center gap-2">
                                 <Image src="https://picsum.photos/100/100" alt="Team 1 Logo" width={60} height={60} className="rounded-full" data-ai-hint="cricket team" />
                                 <span className="font-semibold">{team1Name}</span>
-                                <Button variant="outline" size="sm">Select Squad</Button>
+                                <Button variant="outline" size="sm" onClick={() => handleSquadSelect('team1')} disabled={!team1}>Select Squad</Button>
                             </div>
                             <span className="text-2xl font-bold text-muted-foreground">VS</span>
                              <div className="flex flex-col items-center gap-2">
                                 <Image src="https://picsum.photos/100/100" alt="Team 2 Logo" width={60} height={60} className="rounded-full" data-ai-hint="cricket team" />
                                 <span className="font-semibold">{team2Name}</span>
-                                <Button variant="outline" size="sm">Select Squad</Button>
+                                <Button variant="outline" size="sm" onClick={() => handleSquadSelect('team2')} disabled={!team2}>Select Squad</Button>
                             </div>
                         </div>
 
                          <div className="flex justify-center gap-4 pt-6">
-                            <Button size="lg" variant="secondary" className="w-40">Schedule Match</Button>
-                            <Button size="lg" className="w-40">Start Now</Button>
+                            <Button size="lg" className="w-40" onClick={handleStartMatch}>Start Now</Button>
                         </div>
                     </CardContent>
                 </Card>
             </main>
+            
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Select Squad for {editingTeamData?.name}</DialogTitle>
+                        <DialogDescription>Select the players who will be playing in this match.</DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-80 overflow-y-auto space-y-2 p-1">
+                        {editingTeamData?.players.map(player => (
+                            <div key={player.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                    id={player.id}
+                                    checked={editingSquadData.some(p => p.id === player.id)}
+                                    onCheckedChange={(checked) => handlePlayerSelection(player.id, !!checked)}
+                                />
+                                <Label htmlFor={player.id}>{player.name}</Label>
+                            </div>
+                        ))}
+                    </div>
+                    <DialogFooter>
+                        <DialogClose asChild><Button onClick={() => setDialogOpen(false)}>Done</Button></DialogClose>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
@@ -89,4 +269,3 @@ export default function MatchDetailsPage() {
         </Suspense>
     )
 }
-
