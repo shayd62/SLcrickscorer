@@ -204,6 +204,11 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
             <CardHeader>
                 <CardTitle className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2"><Users className="h-6 w-6 text-primary"/><span>Participating Teams ({tournament.participatingTeams?.length || 0})</span></div>
+                    <Link href="/teams/create">
+                        <Button variant="ghost" size="icon">
+                            <Plus className="h-5 w-5" />
+                        </Button>
+                    </Link>
                 </CardTitle>
             </CardHeader>
             <CardContent>
@@ -244,11 +249,6 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
                     ) : (
                         <p className="text-sm text-muted-foreground text-center">All your saved teams have already joined this tournament.</p>
                     )}
-                     <Link href="/teams/create" className='block'>
-                        <Button variant="outline" className='w-full'>
-                            <Plus className="mr-2 h-4 w-4" /> Create a New Team
-                        </Button>
-                    </Link>
                 </div>
             </CardContent>
         </Card>
@@ -395,8 +395,10 @@ function TournamentDetailsPage() {
                                             <p className="text-sm text-muted-foreground">{new Date(match.date!).toLocaleString()} at {match.venue}</p>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Button>Start Match</Button>
-                                            <Link href={`/tournaments/${tournamentId}/game-details?group=${match.groupName}&team1=${match.team1}&team2=${match.team2}&edit=true&matchId=${match.id}`}>
+                                            <Link href={`/tournaments/${tournamentId}/match-details?team1Name=${encodeURIComponent(match.team1)}&team2Name=${encodeURIComponent(match.team2)}&date=${encodeURIComponent(match.date || '')}&venue=${encodeURIComponent(match.venue || '')}`}>
+                                              <Button>Start Match</Button>
+                                            </Link>
+                                            <Link href={`/tournaments/${tournamentId}/add-match?group=${match.groupName}&team1=${match.team1}&team2=${match.team2}&edit=true&matchId=${match.id}`}>
                                                 <Button variant="outline" size="icon"><Pencil className="h-4 w-4"/></Button>
                                             </Link>
                                             <AlertDialog>
