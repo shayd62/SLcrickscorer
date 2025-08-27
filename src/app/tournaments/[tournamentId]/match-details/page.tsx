@@ -67,7 +67,7 @@ function MatchDetailsContent() {
     const [editingTeam, setEditingTeam] = useState<'team1' | 'team2' | null>(null);
     const [newPlayerName, setNewPlayerName] = useState('');
     const [addingPlayer, setAddingPlayer] = useState(false);
-
+    
     const team1Name = searchParams.get('team1Name') || 'Team A';
     const team2Name = searchParams.get('team2Name') || 'Team B';
     const matchDateStr = searchParams.get('date');
@@ -87,7 +87,7 @@ function MatchDetailsContent() {
             pointsTable: true
         }
     });
-    
+
     useEffect(() => {
         if (matchDateStr) {
             const date = new Date(decodeURIComponent(matchDateStr));
@@ -157,10 +157,10 @@ function MatchDetailsContent() {
         const setSquad = editingTeam === 'team1' ? setSquad1 : setSquad2;
         const originalTeam = editingTeam === 'team1' ? team1 : team2;
         if (!originalTeam) return;
-    
+
         setSquad(currentSquad => {
             const playerInSquad = currentSquad.some(p => p.id === playerId);
-    
+
             if (isSelected && !playerInSquad) {
                 const playerToAdd = originalTeam.players.find(p => p.id === playerId);
                 if (playerToAdd) {
@@ -209,28 +209,28 @@ function MatchDetailsContent() {
         }
     };
     
-    const handleStartMatch = (data: MatchDetailsFormValues) => {
+    const handleProceedToToss = (data: MatchDetailsFormValues) => {
         if (!team1 || !team2 || squad1.length < 2 || squad2.length < 2) {
             toast({ title: "Squad Error", description: "Both teams must have at least 2 players selected.", variant: 'destructive' });
             return;
         }
 
-        const team1WithIds = { ...team1, players: squad1.map((p, i) => ({ ...p, id: `t1p${i+1}` })) };
-        const team2WithIds = { ...team2, players: squad2.map((p, i) => ({ ...p, id: `t2p${i+1}` })) };
+        const team1WithIds = { ...team1, players: squad1 };
+        const team2WithIds = { ...team2, players: squad2 };
 
         const config: MatchConfig = {
             team1: team1WithIds,
             team2: team2WithIds,
             oversPerInnings: data.overs,
             playersPerSide: squad1.length,
-            toss: { // Dummy toss, can be decided on scoring screen
+            toss: { // Dummy toss, will be decided on next page
                 winner: 'team1',
                 decision: 'bat',
             },
-            opening: { // Dummy opening players, must be selected on scoring screen
-                strikerId: team1WithIds.players[0].id,
-                nonStrikerId: team1WithIds.players[1].id,
-                bowlerId: team2WithIds.players[0].id,
+            opening: { // Dummy opening players, to be selected later
+                strikerId: '',
+                nonStrikerId: '',
+                bowlerId: '',
             },
             tournamentId,
             venue: venue,
@@ -240,62 +240,11 @@ function MatchDetailsContent() {
             ...data
         };
         
-        const matchId = `${config.team1.name.replace(/\s+/g, '-')}-vs-${config.team2.name.replace(/\s+/g, '-')}-${Date.now()}`;
-        
-        const createInitialState = (config: MatchConfig, userId?: string | null, matchId?: string): MatchState => {
-          const { team1, team2, toss, opening, oversPerInnings } = config;
-          
-          const battingTeamKey = (toss.winner === 'team1' && toss.decision === 'bat') || (toss.winner === 'team2' && toss.decision === 'bowl') ? 'team1' : 'team2';
-          const bowlingTeamKey = battingTeamKey === 'team1' ? 'team2' : 'team1';
+        const params = new URLSearchParams({
+            config: JSON.stringify(config),
+        });
 
-          const createInnings = (bTKey: 'team1' | 'team2', boTKey: 'team1' | 'team2'): Innings => {
-            const bTeam = bTKey === 'team1' ? team1 : team2;
-            const boTeam = boTKey === 'team1' ? team1 : team2;
-            return {
-              battingTeam: bTKey,
-              bowlingTeam: boTKey,
-              score: 0,
-              wickets: 0,
-              overs: 0,
-              balls: 0,
-              timeline: [],
-              batsmen: bTeam.players.reduce((acc, p) => ({ ...acc, [p.id]: { ...p, runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false } }), {}),
-              bowlers: boTeam.players.reduce((acc, p) => ({ ...acc, [p.id]: { ...p, overs: 0, balls: 0, maidens: 0, runsConceded: 0, wickets: 0 } }), {}),
-              currentPartnership: {
-                batsman1Id: opening.strikerId,
-                batsman2Id: opening.nonStrikerId,
-                runs: 0,
-                balls: 0,
-              },
-              fallOfWickets: []
-            }
-          };
-
-          return {
-            id: matchId,
-            config,
-            innings1: createInnings(battingTeamKey, bowlingTeamKey),
-            currentInnings: 'innings1',
-            onStrikeId: opening.strikerId,
-            nonStrikeId: opening.nonStrikerId,
-            currentBowlerId: opening.bowlerId,
-            matchOver: false,
-            resultText: 'Match in progress...',
-            userId: userId || undefined,
-          };
-        };
-        
-        const initialState = createInitialState(config, user?.uid, matchId);
-        
-        setDoc(doc(db, "matches", matchId), initialState)
-            .then(() => {
-                toast({ title: "Match Created!", description: "Redirecting to scoring..." });
-                router.push(`/scoring/${initialState.id}`);
-            })
-            .catch(error => {
-                 console.error("Error creating match: ", error);
-                 toast({ title: "Error", description: "Could not create the match.", variant: "destructive" });
-            });
+        router.push(`/tournaments/${tournamentId}/toss?${params.toString()}`);
     };
 
     const editingTeamData = editingTeam === 'team1' ? team1 : team2;
@@ -303,7 +252,7 @@ function MatchDetailsContent() {
 
     return (
         <div className="min-h-screen bg-background text-foreground font-body">
-            <form onSubmit={form.handleSubmit(handleStartMatch)}>
+            <form onSubmit={form.handleSubmit(handleProceedToToss)}>
                 <header className="p-4 bg-gray-800 text-white">
                     <div className="flex items-center justify-between">
                          <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-white hover:bg-gray-700"><ArrowLeft className="h-6 w-6" /></Button>
@@ -450,7 +399,7 @@ function MatchDetailsContent() {
                     </div>
                 </main>
                 <footer className="p-4 sticky bottom-0 bg-background border-t">
-                    <Button type="submit" size="lg" className="w-full">Start Now</Button>
+                    <Button type="submit" size="lg" className="w-full">Save & Proceed to Toss</Button>
                 </footer>
             </form>
             
@@ -503,5 +452,3 @@ export default function MatchDetailsPage() {
         </Suspense>
     )
 }
-
-    
