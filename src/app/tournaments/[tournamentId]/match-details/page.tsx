@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,16 @@ function MatchDetailsContent() {
     const matchDateStr = searchParams.get('date');
     const venue = searchParams.get('venue') || 'TBD';
     
-    const matchDate = matchDateStr ? new Date(decodeURIComponent(matchDateStr)) : null;
+    const [formattedDate, setFormattedDate] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (matchDateStr) {
+            const date = new Date(decodeURIComponent(matchDateStr));
+            setFormattedDate(date.toLocaleString());
+        } else {
+            setFormattedDate('Date not set');
+        }
+    }, [matchDateStr]);
 
     return (
         <div className="min-h-screen bg-gray-50 text-foreground font-body">
@@ -37,7 +46,7 @@ function MatchDetailsContent() {
                         <div className="text-center text-sm text-muted-foreground flex items-center justify-center gap-4 pt-2">
                              <div className='flex items-center gap-1.5'>
                                 <Calendar className="h-4 w-4"/>
-                                <span>{matchDate ? matchDate.toLocaleString() : 'Date not set'}</span>
+                                <span>{formattedDate || 'Loading date...'}</span>
                              </div>
                              <div className='flex items-center gap-1.5'>
                                 <MapPin className="h-4 w-4"/>
