@@ -1004,13 +1004,13 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
                     <TargetIcon className="w-4 h-4 text-red-500" />
                     <p className="text-sm font-medium text-red-500">Target: {state.target}</p>
                   </div>
-                  {state.matchOver ? (
-                    <p className="text-sm font-bold text-green-600 ml-1 mt-1">{state.resultText}</p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground ml-1">
-                      Need {runsNeeded} runs in {ballsRemaining} balls
-                    </p>
-                  )}
+                  <div className="text-xs text-muted-foreground ml-1">
+                    {state.matchOver ? (
+                      <p className="text-sm font-bold text-green-600 mt-1">{state.resultText}</p>
+                    ) : (
+                      <p>Need {runsNeeded} runs in {ballsRemaining} balls</p>
+                    )}
+                  </div>
                 </div>
               }
             </div>
