@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, addDoc, getDocs } from 'firebase/firestore';
+import { doc, collection, query, where, addDoc, getDocs, setDoc } from 'firebase/firestore';
 import type { Team, MatchConfig, MatchState, Innings, Player } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
@@ -99,7 +99,7 @@ function MatchDetailsContent() {
             try {
                 const teamsRef = collection(db, 'teams');
                 
-                const q1 = query(teamsRef, where("name", "==", team1Name), where("userId", "==", user.uid));
+                const q1 = query(teamsRef, where("name", "==", team1Name));
                 const snapshot1 = await getDocs(q1);
                 if (!snapshot1.empty) {
                     const teamData = { id: snapshot1.docs[0].id, ...snapshot1.docs[0].data() } as Team;
@@ -107,7 +107,7 @@ function MatchDetailsContent() {
                     setSquad1(teamData.players);
                 }
 
-                const q2 = query(teamsRef, where("name", "==", team2Name), where("userId", "==", user.uid));
+                const q2 = query(teamsRef, where("name", "==", team2Name));
                 const snapshot2 = await getDocs(q2);
                 if (!snapshot2.empty) {
                     const teamData = { id: snapshot2.docs[0].id, ...snapshot2.docs[0].data() } as Team;
@@ -171,9 +171,9 @@ function MatchDetailsContent() {
         };
         
         try {
-            const newMatchRef = await addDoc(collection(db, "matches"), {});
-            const initialState = createInitialState(config, user?.uid, newMatchRef.id);
-            await addDoc(collection(db, 'matches'), initialState);
+            const matchId = `${config.team1.name.replace(/\s+/g, '-')}-vs-${config.team2.name.replace(/\s+/g, '-')}-${Date.now()}`;
+            const initialState = createInitialState(config, user?.uid, matchId);
+            await setDoc(doc(db, "matches", matchId), initialState);
             
             toast({ title: "Match Created!", description: "Redirecting to scoring..." });
             router.push(`/scoring/${initialState.id}`);
@@ -213,7 +213,7 @@ function MatchDetailsContent() {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <Separator />
-                        <div className="w-full max-w-lg flex justify-around items-center">
+                        <div className="w-full max-w-lg mx-auto flex justify-around items-center">
                             <div className="flex flex-col items-center gap-2">
                                 <Image src="https://picsum.photos/100/100" alt="Team 1 Logo" width={60} height={60} className="rounded-full" data-ai-hint="cricket team" />
                                 <span className="font-semibold">{team1Name}</span>
@@ -269,3 +269,5 @@ export default function MatchDetailsPage() {
         </Suspense>
     )
 }
+
+    
