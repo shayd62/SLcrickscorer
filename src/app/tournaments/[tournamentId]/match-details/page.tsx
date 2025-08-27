@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
@@ -6,16 +7,17 @@ import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Calendar, MapPin } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Plus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { db } from '@/lib/firebase';
-import { doc, collection, query, where, addDoc, getDocs, setDoc } from 'firebase/firestore';
+import { doc, collection, query, where, addDoc, getDocs, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import type { Team, MatchConfig, MatchState, Innings, Player } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
+import { Input } from '@/components/ui/input';
 
 function createInitialState(config: MatchConfig, userId?: string | null, matchId?: string): MatchState {
   const { team1, team2, toss, opening, oversPerInnings } = config;
@@ -75,6 +77,8 @@ function MatchDetailsContent() {
     
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingTeam, setEditingTeam] = useState<'team1' | 'team2' | null>(null);
+    const [newPlayerName, setNewPlayerName] = useState('');
+    const [addingPlayer, setAddingPlayer] = useState(false);
 
     const team1Name = searchParams.get('team1Name') || 'Team A';
     const team2Name = searchParams.get('team2Name') || 'Team B';
@@ -93,40 +97,42 @@ function MatchDetailsContent() {
         }
     }, [matchDateStr]);
 
-    useEffect(() => {
-        const fetchTeams = async () => {
-            if (!user) return;
-            try {
-                const teamsRef = collection(db, 'teams');
-                
-                const fetchTeamData = async (name: string) => {
-                    const q = query(teamsRef, where("name", "==", name), where("userId", "==", user.uid));
-                    const snapshot = await getDocs(q);
-                    if (!snapshot.empty) {
-                        return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Team;
-                    }
-                    return null;
+    const fetchTeams = useCallback(async () => {
+        if (!user) return;
+        try {
+            const teamsRef = collection(db, 'teams');
+            
+            const fetchTeamData = async (name: string) => {
+                const q = query(teamsRef, where("name", "==", name), where("userId", "==", user.uid));
+                const snapshot = await getDocs(q);
+                if (!snapshot.empty) {
+                    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Team;
                 }
-
-                const team1Data = await fetchTeamData(team1Name);
-                if (team1Data) {
-                    setTeam1(team1Data);
-                    setSquad1(team1Data.players);
-                }
-
-                const team2Data = await fetchTeamData(team2Name);
-                 if (team2Data) {
-                    setTeam2(team2Data);
-                    setSquad2(team2Data.players);
-                }
-
-            } catch (error) {
-                console.error("Error fetching teams: ", error);
-                toast({ title: "Error", description: "Could not load team data.", variant: "destructive" });
+                return null;
             }
-        };
-        fetchTeams();
+
+            const team1Data = await fetchTeamData(team1Name);
+            if (team1Data) {
+                setTeam1(team1Data);
+                setSquad1(team1Data.players);
+            }
+
+            const team2Data = await fetchTeamData(team2Name);
+             if (team2Data) {
+                setTeam2(team2Data);
+                setSquad2(team2Data.players);
+            }
+
+        } catch (error) {
+            console.error("Error fetching teams: ", error);
+            toast({ title: "Error", description: "Could not load team data.", variant: "destructive" });
+        }
     }, [team1Name, team2Name, user, toast]);
+
+    useEffect(() => {
+        fetchTeams();
+    }, [fetchTeams]);
+
 
     const handleSquadSelect = (teamKey: 'team1' | 'team2') => {
         setEditingTeam(teamKey);
@@ -136,17 +142,16 @@ function MatchDetailsContent() {
     const handlePlayerSelection = (playerId: string, isSelected: boolean) => {
         const setSquad = editingTeam === 'team1' ? setSquad1 : setSquad2;
         const originalTeam = editingTeam === 'team1' ? team1 : team2;
-
         if (!originalTeam) return;
 
         setSquad(currentSquad => {
+            const player = originalTeam.players.find(p => p.id === playerId);
+            if (!player) return currentSquad;
+
             if (isSelected) {
                 // Add player if not already in squad
                 if (!currentSquad.some(p => p.id === playerId)) {
-                    const playerToAdd = originalTeam.players.find(p => p.id === playerId);
-                    if (playerToAdd) {
-                        return [...currentSquad, playerToAdd];
-                    }
+                    return [...currentSquad, player];
                 }
             } else {
                 // Remove player from squad
@@ -155,6 +160,42 @@ function MatchDetailsContent() {
             // Return current squad if no change
             return currentSquad;
         });
+    };
+
+    const handleAddNewPlayer = async () => {
+        if (!newPlayerName.trim()) {
+            toast({ title: "Player name is empty", variant: "destructive" });
+            return;
+        }
+
+        const teamToUpdate = editingTeam === 'team1' ? team1 : team2;
+        const setTeamState = editingTeam === 'team1' ? setTeam1 : setTeam2;
+        const setSquadState = editingTeam === 'team1' ? setSquad1 : setSquad2;
+        
+        if (!teamToUpdate) return;
+        
+        const newPlayer: Player = {
+            id: `player-${Date.now()}`,
+            name: newPlayerName.trim(),
+        };
+
+        const updatedPlayers = [...teamToUpdate.players, newPlayer];
+        const updatedTeamData = { ...teamToUpdate, players: updatedPlayers };
+
+        try {
+            const teamRef = doc(db, 'teams', teamToUpdate.id);
+            await updateDoc(teamRef, { players: arrayUnion({id: newPlayer.id, name: newPlayer.name}) });
+            
+            setTeamState(updatedTeamData);
+            setSquadState(squad => [...squad, newPlayer]); // Also add to current squad
+            
+            toast({ title: "Player Added!", description: `${newPlayer.name} has been added to ${teamToUpdate.name}.` });
+            setNewPlayerName('');
+            setAddingPlayer(false);
+        } catch (error) {
+            console.error("Error adding new player: ", error);
+            toast({ title: "Error", description: "Could not add player.", variant: "destructive" });
+        }
     };
     
     const handleStartMatch = async () => {
@@ -269,7 +310,21 @@ function MatchDetailsContent() {
                             </div>
                         ))}
                     </div>
-                    <DialogFooter>
+                     {addingPlayer && (
+                        <div className="flex items-center gap-2 mt-4">
+                            <Input 
+                                placeholder="New player name" 
+                                value={newPlayerName}
+                                onChange={(e) => setNewPlayerName(e.target.value)}
+                            />
+                            <Button onClick={handleAddNewPlayer} size="sm">Save</Button>
+                            <Button onClick={() => setAddingPlayer(false)} size="sm" variant="ghost">Cancel</Button>
+                        </div>
+                    )}
+                    <DialogFooter className="sm:justify-between items-center mt-4">
+                        <Button variant="outline" onClick={() => setAddingPlayer(true)} disabled={addingPlayer}>
+                            <Plus className="mr-2 h-4 w-4" /> Add Player
+                        </Button>
                         <DialogClose asChild><Button onClick={() => setDialogOpen(false)}>Done</Button></DialogClose>
                     </DialogFooter>
                 </DialogContent>
