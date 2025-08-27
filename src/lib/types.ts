@@ -7,12 +7,21 @@ export interface Player {
 }
 
 export interface Team {
+  id: string;
   name:string;
+  shortName: string;
   players: Player[];
   captainId?: string;
   wicketKeeperId?: string;
   twelfthManId?: string;
   userId?: string;
+}
+
+export interface Group {
+    id: string;
+    name: string;
+    teamIds: string[];
+    userId?: string;
 }
 
 export interface PointsPolicy {
