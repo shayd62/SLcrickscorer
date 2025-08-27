@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil, Radio, Star, ShieldAlert, UserCog, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState } from '@/lib/types';
+import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState, Batsman } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, arrayUnion, onSnapshot, collection, query, where, getDocs, arrayRemove } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
@@ -21,6 +21,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 const formatOvers = (balls: number, ballsPerOver: number = 6) => `${Math.floor(balls / ballsPerOver)}.${balls % ballsPerOver}`;
+
+interface BatterLeaderboardStat {
+    playerId: string;
+    playerName: string;
+    teamName: string;
+    matches: number;
+    runs: number;
+    balls: number;
+    strikeRate: number;
+}
 
 function LiveMatchCard({ match, tournamentId }: { match: TournamentMatch, tournamentId: string }) {
     const [liveData, setLiveData] = useState<MatchState | null>(null);
@@ -306,10 +316,43 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
     );
 }
 
+function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
+    if (stats.length === 0) {
+        return <p className="text-muted-foreground text-center py-8">No batting data available yet. Complete some matches to see the leaderboard.</p>;
+    }
+    
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Player</TableHead>
+                    <TableHead className="text-center">Matches</TableHead>
+                    <TableHead className="text-center">Runs</TableHead>
+                    <TableHead className="text-center">Balls</TableHead>
+                    <TableHead className="text-right">SR</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {stats.map(player => (
+                    <TableRow key={player.playerId}>
+                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="text-center">{player.matches}</TableCell>
+                        <TableCell className="text-center font-bold">{player.runs}</TableCell>
+                        <TableCell className="text-center">{player.balls}</TableCell>
+                        <TableCell className="text-right">{player.strikeRate.toFixed(2)}</TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+}
+
 
 function TournamentDetailsPage() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
+    const [batterStats, setBatterStats] = useState<BatterLeaderboardStat[]>([]);
+
     const params = useParams();
     const router = useRouter();
     const { toast } = useToast();
@@ -319,12 +362,62 @@ function TournamentDetailsPage() {
     const upcomingMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Upcoming'), [tournament?.matches]);
     const pastMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Completed'), [tournament?.matches]);
 
+    const calculateLeaderboards = useCallback(async (completedMatches: TournamentMatch[]) => {
+        const playerStats: { [playerId: string]: { name: string; team: string; runs: number; balls: number; matches: Set<string> } } = {};
+
+        for (const match of completedMatches) {
+            if (!match.matchId) continue;
+            
+            const matchDoc = await getDoc(doc(db, 'matches', match.matchId));
+            if (!matchDoc.exists()) continue;
+
+            const matchData = matchDoc.data() as MatchState;
+            
+            const processInnings = (innings: any, teamName: string) => {
+                if (!innings || !innings.batsmen) return;
+                for (const batsman of Object.values(innings.batsmen) as Batsman[]) {
+                    if (batsman.balls > 0 || batsman.isOut) {
+                        if (!playerStats[batsman.id]) {
+                            playerStats[batsman.id] = { name: batsman.name, team: teamName, runs: 0, balls: 0, matches: new Set() };
+                        }
+                        playerStats[batsman.id].runs += batsman.runs;
+                        playerStats[batsman.id].balls += batsman.balls;
+                        playerStats[batsman.id].matches.add(match.id);
+                    }
+                }
+            };
+            
+            processInnings(matchData.innings1, matchData.config.team1.name);
+            if (matchData.innings2) {
+                processInnings(matchData.innings2, matchData.config.team2.name);
+            }
+        }
+        
+        const leaderboardStats: BatterLeaderboardStat[] = Object.entries(playerStats)
+            .map(([playerId, data]) => ({
+                playerId,
+                playerName: data.name,
+                teamName: data.team,
+                matches: data.matches.size,
+                runs: data.runs,
+                balls: data.balls,
+                strikeRate: data.balls > 0 ? (data.runs / data.balls) * 100 : 0
+            }))
+            .sort((a, b) => b.runs - a.runs); // Sort by runs descending
+
+        setBatterStats(leaderboardStats);
+    }, []);
 
     const fetchTournamentAndListen = useCallback(() => {
         if (!tournamentId) return;
         const unsub = onSnapshot(doc(db, "tournaments", tournamentId), (doc) => {
             if (doc.exists()) {
-                setTournament({ ...doc.data() as Tournament, id: doc.id });
+                const tournamentData = { ...doc.data() as Tournament, id: doc.id };
+                setTournament(tournamentData);
+                const completed = (tournamentData.matches || []).filter(m => m.status === 'Completed');
+                if (completed.length > 0) {
+                    calculateLeaderboards(completed);
+                }
             } else {
                 toast({ title: "Error", description: "Tournament not found.", variant: "destructive" });
                 router.push('/tournaments');
@@ -332,7 +425,7 @@ function TournamentDetailsPage() {
             setLoading(false);
         });
         return unsub;
-    }, [tournamentId, router, toast]);
+    }, [tournamentId, router, toast, calculateLeaderboards]);
 
     useEffect(() => {
         const unsubscribe = fetchTournamentAndListen();
@@ -495,7 +588,7 @@ function TournamentDetailsPage() {
                                         <TabsTrigger value="fielder"><User className="mr-2 h-4 w-4" />Fielder</TabsTrigger>
                                     </TabsList>
                                     <TabsContent value="batter" className="mt-4">
-                                        <p className="text-muted-foreground text-center py-8">Batter leaderboard coming soon.</p>
+                                        <BatterLeaderboard stats={batterStats} />
                                     </TabsContent>
                                     <TabsContent value="bowler" className="mt-4">
                                         <p className="text-muted-foreground text-center py-8">Bowler leaderboard coming soon.</p>
@@ -532,5 +625,3 @@ function TournamentDetailsPage() {
 }
 
 export default TournamentDetailsPage;
-
-    
