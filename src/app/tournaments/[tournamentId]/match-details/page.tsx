@@ -137,15 +137,22 @@ function MatchDetailsContent() {
         const setSquad = editingTeam === 'team1' ? setSquad1 : setSquad2;
         const originalTeam = editingTeam === 'team1' ? team1 : team2;
 
+        if (!originalTeam) return;
+
         setSquad(currentSquad => {
             if (isSelected) {
-                const playerToAdd = originalTeam?.players.find(p => p.id === playerId);
-                if (playerToAdd && !currentSquad.some(p => p.id === playerId)) {
-                    return [...currentSquad, playerToAdd];
+                // Add player if not already in squad
+                if (!currentSquad.some(p => p.id === playerId)) {
+                    const playerToAdd = originalTeam.players.find(p => p.id === playerId);
+                    if (playerToAdd) {
+                        return [...currentSquad, playerToAdd];
+                    }
                 }
             } else {
+                // Remove player from squad
                 return currentSquad.filter(p => p.id !== playerId);
             }
+            // Return current squad if no change
             return currentSquad;
         });
     };
