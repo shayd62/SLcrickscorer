@@ -7,9 +7,9 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil } from 'lucide-react';
+import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil, Radio } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch } from '@/lib/types';
+import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, arrayUnion, onSnapshot, collection, query, where, getDocs, arrayRemove } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
@@ -19,6 +19,57 @@ import { Input } from '@/components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+
+const formatOvers = (balls: number, ballsPerOver: number = 6) => `${Math.floor(balls / ballsPerOver)}.${balls % ballsPerOver}`;
+
+function LiveMatchCard({ match, tournamentId }: { match: TournamentMatch, tournamentId: string }) {
+    const [liveData, setLiveData] = useState<MatchState | null>(null);
+    const router = useRouter();
+
+    useEffect(() => {
+        if (match.matchId) {
+            const unsub = onSnapshot(doc(db, "matches", match.matchId), (doc) => {
+                if (doc.exists()) {
+                    setLiveData(doc.data() as MatchState);
+                }
+            });
+            return () => unsub();
+        }
+    }, [match.matchId]);
+
+    if (!liveData) return null;
+
+    const currentInnings = liveData.currentInnings === 'innings1' ? liveData.innings1 : liveData.innings2;
+    if (!currentInnings) return null;
+
+    const battingTeamConfig = currentInnings.battingTeam === 'team1' ? liveData.config.team1 : liveData.config.team2;
+    const battingTeamName = battingTeamConfig.name;
+
+    const handleClick = () => {
+      router.push(`/scorecard/${match.matchId}`);
+    };
+
+    return (
+        <Card className="mb-4 cursor-pointer hover:bg-secondary/50" onClick={handleClick}>
+            <CardContent className="p-4">
+                <div className="flex justify-between items-center">
+                    <div className="space-y-1">
+                        <p className="font-bold text-lg">{match.team1} vs {match.team2}</p>
+                        <div className="flex items-center gap-2 text-sm text-green-500 font-semibold">
+                            <Radio className="h-4 w-4 animate-pulse"/>
+                            <span>LIVE</span>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <p className="font-bold text-xl">{battingTeamName}: {currentInnings.score}/{currentInnings.wickets}</p>
+                        <p className="text-sm text-muted-foreground">({formatOvers(currentInnings.balls, liveData.config.ballsPerOver)} ov)</p>
+                        {liveData.target && <p className="text-xs text-destructive">Target: {liveData.target}</p>}
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
 
 function GroupManagement({ tournament, onUpdate }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void> }) {
   const [newGroupName, setNewGroupName] = useState('');
@@ -384,7 +435,7 @@ function TournamentDetailsPage() {
                             <TabsTrigger value="past">Past</TabsTrigger>
                         </TabsList>
                         <TabsContent value="live" className="mt-4">
-                            {liveMatches.length > 0 ? liveMatches.map(match => <div key={match.id}>{match.team1} vs {match.team2}</div>) : <p className="text-muted-foreground text-center py-8">No live matches right now.</p>}
+                            {liveMatches.length > 0 ? liveMatches.map(match => <LiveMatchCard key={match.id} match={match} tournamentId={tournamentId} />) : <p className="text-muted-foreground text-center py-8">No live matches right now.</p>}
                         </TabsContent>
                          <TabsContent value="upcoming" className="mt-4">
                             {upcomingMatches.length > 0 ? upcomingMatches.map(match => (
