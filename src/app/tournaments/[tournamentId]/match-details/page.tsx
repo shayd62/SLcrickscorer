@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Calendar, MapPin } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
@@ -34,7 +34,7 @@ function MatchDetailsContent() {
                 <Card className="w-full max-w-2xl shadow-lg">
                     <CardHeader>
                         <CardTitle className="text-center text-2xl font-bold">{team1Name} vs {team2Name}</CardTitle>
-                        <CardDescription className="text-center text-muted-foreground flex items-center justify-center gap-4 pt-2">
+                        <div className="text-center text-sm text-muted-foreground flex items-center justify-center gap-4 pt-2">
                              <div className='flex items-center gap-1.5'>
                                 <Calendar className="h-4 w-4"/>
                                 <span>{matchDate ? matchDate.toLocaleString() : 'Date not set'}</span>
@@ -43,7 +43,7 @@ function MatchDetailsContent() {
                                 <MapPin className="h-4 w-4"/>
                                 <span>{venue}</span>
                              </div>
-                        </CardDescription>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <Separator />
@@ -80,3 +80,4 @@ export default function MatchDetailsPage() {
         </Suspense>
     )
 }
+
