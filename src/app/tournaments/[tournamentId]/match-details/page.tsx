@@ -99,21 +99,27 @@ function MatchDetailsContent() {
             try {
                 const teamsRef = collection(db, 'teams');
                 
-                const q1 = query(teamsRef, where("name", "==", team1Name));
-                const snapshot1 = await getDocs(q1);
-                if (!snapshot1.empty) {
-                    const teamData = { id: snapshot1.docs[0].id, ...snapshot1.docs[0].data() } as Team;
-                    setTeam1(teamData);
-                    setSquad1(teamData.players);
+                const fetchTeamData = async (name: string) => {
+                    const q = query(teamsRef, where("name", "==", name), where("userId", "==", user.uid));
+                    const snapshot = await getDocs(q);
+                    if (!snapshot.empty) {
+                        return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Team;
+                    }
+                    return null;
                 }
 
-                const q2 = query(teamsRef, where("name", "==", team2Name));
-                const snapshot2 = await getDocs(q2);
-                if (!snapshot2.empty) {
-                    const teamData = { id: snapshot2.docs[0].id, ...snapshot2.docs[0].data() } as Team;
-                    setTeam2(teamData);
-                    setSquad2(teamData.players);
+                const team1Data = await fetchTeamData(team1Name);
+                if (team1Data) {
+                    setTeam1(team1Data);
+                    setSquad1(team1Data.players);
                 }
+
+                const team2Data = await fetchTeamData(team2Name);
+                 if (team2Data) {
+                    setTeam2(team2Data);
+                    setSquad2(team2Data.players);
+                }
+
             } catch (error) {
                 console.error("Error fetching teams: ", error);
                 toast({ title: "Error", description: "Could not load team data.", variant: "destructive" });
@@ -128,16 +134,21 @@ function MatchDetailsContent() {
     };
 
     const handlePlayerSelection = (playerId: string, isSelected: boolean) => {
-        const currentSquad = editingTeam === 'team1' ? squad1 : squad2;
         const setSquad = editingTeam === 'team1' ? setSquad1 : setSquad2;
         const originalTeam = editingTeam === 'team1' ? team1 : team2;
 
-        if (isSelected) {
-            const playerToAdd = originalTeam?.players.find(p => p.id === playerId);
-            if(playerToAdd) setSquad([...currentSquad, playerToAdd]);
-        } else {
-            setSquad(currentSquad.filter(p => p.id !== playerId));
-        }
+        setSquad(currentSquad => {
+            if (isSelected) {
+                const playerToAdd = originalTeam?.players.find(p => p.id === playerId);
+                // Avoid adding duplicates
+                if (playerToAdd && !currentSquad.some(p => p.id === playerId)) {
+                    return [...currentSquad, playerToAdd];
+                }
+            } else {
+                return currentSquad.filter(p => p.id !== playerId);
+            }
+            return currentSquad; // Return current state if no change
+        });
     };
     
     const handleStartMatch = async () => {
