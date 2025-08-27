@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil, Radio } from 'lucide-react';
+import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil, Radio, Star, ShieldAlert, UserCog } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState } from '@/lib/types';
 import { db } from '@/lib/firebase';
@@ -481,7 +481,34 @@ function TournamentDetailsPage() {
                     </TabsContent>
 
                     <TabsContent value="leaderboard" className="mt-6">
-                        <Card><CardHeader><CardTitle>Leaderboard</CardTitle><CardDescription>Top performers in the tournament.</CardDescription></CardHeader><CardContent className="text-center py-12 text-muted-foreground"><p>Leaderboard functionality coming soon.</p></CardContent></Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Leaderboard</CardTitle>
+                                <CardDescription>Top performers in the tournament.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Tabs defaultValue="batter" className="w-full">
+                                    <TabsList className="grid w-full grid-cols-4">
+                                        <TabsTrigger value="batter"><Star className="mr-2 h-4 w-4" />Batter</TabsTrigger>
+                                        <TabsTrigger value="bowler"><ShieldAlert className="mr-2 h-4 w-4" />Bowler</TabsTrigger>
+                                        <TabsTrigger value="keeper"><UserCog className="mr-2 h-4 w-4" />Keeper</TabsTrigger>
+                                        <TabsTrigger value="fielder"><User className="mr-2 h-4 w-4" />Fielder</TabsTrigger>
+                                    </TabsList>
+                                    <TabsContent value="batter" className="mt-4">
+                                        <p className="text-muted-foreground text-center py-8">Batter leaderboard coming soon.</p>
+                                    </TabsContent>
+                                    <TabsContent value="bowler" className="mt-4">
+                                        <p className="text-muted-foreground text-center py-8">Bowler leaderboard coming soon.</p>
+                                    </TabsContent>
+                                    <TabsContent value="keeper" className="mt-4">
+                                        <p className="text-muted-foreground text-center py-8">Keeper leaderboard coming soon.</p>
+                                    </TabsContent>
+                                    <TabsContent value="fielder" className="mt-4">
+                                        <p className="text-muted-foreground text-center py-8">Fielder leaderboard coming soon.</p>
+                                    </TabsContent>
+                                </Tabs>
+                            </CardContent>
+                        </Card>
                     </TabsContent>
 
                     <TabsContent value="points" className="mt-6 space-y-6">
