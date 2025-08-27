@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil, Radio, Star, ShieldAlert, UserCog, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat } from '@/lib/types';
+import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, Innings, FielderLeaderboardStat, Player } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, arrayUnion, onSnapshot, collection, query, where, getDocs, arrayRemove } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
@@ -371,11 +371,43 @@ function BowlerLeaderboard({ stats }: { stats: BowlerLeaderboardStat[] }) {
     );
 }
 
+function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
+    if (stats.length === 0) {
+        return <p className="text-muted-foreground text-center py-8">No fielding data available yet. Complete some matches to see the leaderboard.</p>;
+    }
+    
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Player</TableHead>
+                    <TableHead className="text-center">Matches</TableHead>
+                    <TableHead className="text-center">Catches</TableHead>
+                    <TableHead className="text-center">Run Outs</TableHead>
+                    <TableHead className="text-right">Stumpings</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {stats.map(player => (
+                    <TableRow key={player.playerId}>
+                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="text-center">{player.matches}</TableCell>
+                        <TableCell className="text-center font-bold">{player.catches}</TableCell>
+                        <TableCell className="text-center">{player.runOuts}</TableCell>
+                        <TableCell className="text-right">{player.stumpings}</TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+}
+
 function TournamentDetailsPage() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
     const [batterStats, setBatterStats] = useState<BatterLeaderboardStat[]>([]);
     const [bowlerStats, setBowlerStats] = useState<BowlerLeaderboardStat[]>([]);
+    const [fielderStats, setFielderStats] = useState<FielderLeaderboardStat[]>([]);
 
     const params = useParams();
     const router = useRouter();
@@ -389,6 +421,7 @@ function TournamentDetailsPage() {
     const calculateLeaderboards = useCallback(async (completedMatches: TournamentMatch[]) => {
         const batterPlayerStats: { [playerId: string]: { name: string; team: string; runs: number; balls: number; matches: Set<string> } } = {};
         const bowlerPlayerStats: { [playerId: string]: { name: string; team: string; balls: number; runsConceded: number; wickets: number; matches: Set<string> } } = {};
+        const fielderPlayerStats: { [playerId: string]: { name: string; team: string; catches: number; runOuts: number; stumpings: number; matches: Set<string> } } = {};
 
         for (const match of completedMatches) {
             if (!match.matchId) continue;
@@ -398,7 +431,15 @@ function TournamentDetailsPage() {
 
             const matchData = matchDoc.data() as MatchState;
             
-            const processInnings = (innings: any, battingTeamName: string, bowlingTeamName: string) => {
+            const getPlayerTeam = (playerId: string, team1: Team, team2: Team): [Player | undefined, string] => {
+                const player1 = team1.players.find(p => p.id === playerId);
+                if (player1) return [player1, team1.name];
+                const player2 = team2.players.find(p => p.id === playerId);
+                if (player2) return [player2, team2.name];
+                return [undefined, ''];
+            }
+
+            const processInnings = (innings: Innings, battingTeamName: string, bowlingTeamName: string) => {
                 if (!innings) return;
                 // Batting Stats
                 if (innings.batsmen) {
@@ -410,6 +451,22 @@ function TournamentDetailsPage() {
                             batterPlayerStats[batsman.id].runs += batsman.runs;
                             batterPlayerStats[batsman.id].balls += batsman.balls;
                             batterPlayerStats[batsman.id].matches.add(match.id);
+                        }
+
+                        // Fielding stats from dismissals
+                        if (batsman.isOut && batsman.outInfo?.fielderId) {
+                            const { method, fielderId } = batsman.outInfo;
+                            const [fielder, fielderTeam] = getPlayerTeam(fielderId, matchData.config.team1, matchData.config.team2);
+
+                            if (fielder) {
+                                if (!fielderPlayerStats[fielder.id]) {
+                                    fielderPlayerStats[fielder.id] = { name: fielder.name, team: fielderTeam, catches: 0, runOuts: 0, stumpings: 0, matches: new Set() };
+                                }
+                                fielderPlayerStats[fielder.id].matches.add(match.id);
+                                if (method === 'Caught') fielderPlayerStats[fielder.id].catches++;
+                                else if (method === 'Run out') fielderPlayerStats[fielder.id].runOuts++;
+                                else if (method === 'Stumped') fielderPlayerStats[fielder.id].stumpings++;
+                            }
                         }
                     }
                 }
@@ -461,6 +518,19 @@ function TournamentDetailsPage() {
             }))
             .sort((a, b) => b.wickets - a.wickets || a.economy - b.economy);
         setBowlerStats(newBowlerStats);
+        
+        const newFielderStats: FielderLeaderboardStat[] = Object.entries(fielderPlayerStats)
+            .map(([playerId, data]) => ({
+                playerId,
+                playerName: data.name,
+                teamName: data.team,
+                matches: data.matches.size,
+                catches: data.catches,
+                runOuts: data.runOuts,
+                stumpings: data.stumpings
+            }))
+            .sort((a, b) => (b.catches + b.runOuts + b.stumpings) - (a.catches + a.runOuts + a.stumpings));
+        setFielderStats(newFielderStats);
 
     }, []);
 
@@ -653,7 +723,7 @@ function TournamentDetailsPage() {
                                         <p className="text-muted-foreground text-center py-8">Keeper leaderboard coming soon.</p>
                                     </TabsContent>
                                     <TabsContent value="fielder" className="mt-4">
-                                        <p className="text-muted-foreground text-center py-8">Fielder leaderboard coming soon.</p>
+                                        <FielderLeaderboard stats={fielderStats} />
                                     </TabsContent>
                                 </Tabs>
                             </CardContent>

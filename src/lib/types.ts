@@ -107,6 +107,16 @@ export interface BowlerLeaderboardStat {
     economy: number;
 }
 
+export interface FielderLeaderboardStat {
+    playerId: string;
+    playerName: string;
+    teamName: string;
+    matches: number;
+    catches: number;
+    runOuts: number;
+    stumpings: number;
+}
+
 export interface MatchConfig {
   team1: Team;
   team2: Team;
