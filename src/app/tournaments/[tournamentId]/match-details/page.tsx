@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
@@ -234,6 +235,7 @@ function MatchDetailsContent() {
             },
             tournamentId,
             venue: venue,
+            matchDate: matchDateStr ? decodeURIComponent(matchDateStr) : undefined,
             ballsPerOver: 6,
             noBall: { enabled: true, reball: true, run: 1 },
             wideBall: { enabled: true, reball: true, run: 1 },

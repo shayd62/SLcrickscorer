@@ -3,7 +3,7 @@
 'use client';
 
 import { useReducer, useState, useEffect, useMemo, useCallback } from 'react';
-import type { MatchState, Innings, BallEvent, Player, MatchConfig } from '@/lib/types';
+import type { MatchState, Innings, BallEvent, Player, MatchConfig, Tournament, TournamentMatch } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { TargetIcon, CricketBatIcon, CricketBallIcon } from './icons';
@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Undo, RefreshCw, ArrowRight, ArrowLeftRight, Settings2, Home, X, ArrowLeft } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { Input } from './ui/input';
 import ScorecardDisplay from './scorecard-display';
 
@@ -863,16 +863,64 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMatchState]);
 
+    const updateTournamentOnMatchEnd = useCallback(async (finalMatchState: MatchState) => {
+        const { config, id, resultText, winner } = finalMatchState;
+        if (!config.tournamentId || !id) return;
+
+        try {
+            const tournamentRef = doc(db, 'tournaments', config.tournamentId);
+            const tournamentSnap = await getDoc(tournamentRef);
+
+            if (!tournamentSnap.exists()) {
+                console.error("Tournament document not found!");
+                return;
+            }
+
+            const tournamentData = tournamentSnap.data() as Tournament;
+            const updatedMatches = tournamentData.matches?.map(m => {
+                // Heuristic to find the match: compare team names and start date. A more robust way would be to store the tournament match ID in the match document.
+                const matchDate = new Date(m.date || 0);
+                const configDate = new Date(config.matchDate || 1);
+                const isSameDay = matchDate.getFullYear() === configDate.getFullYear() &&
+                                  matchDate.getMonth() === configDate.getMonth() &&
+                                  matchDate.getDate() === configDate.getDate();
+
+                if (m.team1 === config.team1.name && m.team2 === config.team2.name && isSameDay) {
+                     const winnerTeamName = winner === 'team1' ? config.team1.name : winner === 'team2' ? config.team2.name : 'draw';
+                     const loserTeamName = winner === 'team1' ? config.team2.name : winner === 'team2' ? config.team1.name : 'draw';
+                    return {
+                        ...m,
+                        status: 'Completed',
+                        matchId: id,
+                        result: {
+                            winner: winnerTeamName,
+                            loser: loserTeamName,
+                            method: resultText,
+                        }
+                    } as TournamentMatch;
+                }
+                return m;
+            });
+            await updateDoc(tournamentRef, { matches: updatedMatches });
+
+        } catch (error) {
+            console.error("Failed to update tournament on match end:", error);
+        }
+    }, []);
+
   const persistState = useCallback(async (stateToSave: MatchState) => {
     if (initialMatchState?.id) {
       try {
         const stateWithId = { ...stateToSave, id: initialMatchState.id };
         await setDoc(doc(db, "matches", stateWithId.id), stateWithId);
+        if (stateWithId.matchOver) {
+            await updateTournamentOnMatchEnd(stateWithId);
+        }
       } catch (error) {
         console.error("Failed to save match state to Firestore:", error);
       }
     }
-  }, [initialMatchState?.id]);
+  }, [initialMatchState?.id, updateTournamentOnMatchEnd]);
 
   const updateState = (action: Action) => {
     const newState = matchReducer(state, action);
