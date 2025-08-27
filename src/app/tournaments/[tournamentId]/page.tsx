@@ -55,7 +55,7 @@ function GroupManagement({ tournament, onUpdate }: { tournament: Tournament, onU
   const unassignedTeams = useMemo(() => (tournament.participatingTeams || []).filter(t => !assignedTeams.includes(t)), [tournament.participatingTeams, assignedTeams]);
   
   return (
-    <div className="space-y-6 border-t pt-6 mt-6">
+    <div className="space-y-6">
        <Card>
           <CardHeader>
             <CardTitle>Create & Manage Groups</CardTitle>
@@ -372,14 +372,7 @@ function TournamentDetailsPage() {
                     <TabsContent value="teams" className="mt-6">
                       <div className="grid md:grid-cols-2 gap-8">
                           <ParticipatingTeamsCard tournament={tournament} onUpdate={handleUpdateTournament} />
-                          {tournament.tournamentFormat === 'Round Robin' ? (
-                            <GroupManagement tournament={tournament} onUpdate={handleUpdateTournament} />
-                          ) : (
-                             <Card>
-                                <CardHeader><CardTitle>Group Management</CardTitle></CardHeader>
-                                <CardContent><p className="text-muted-foreground text-center py-4">Group management is only available for Round Robin tournaments.</p></CardContent>
-                             </Card>
-                          )}
+                          <GroupManagement tournament={tournament} onUpdate={handleUpdateTournament} />
                       </div>
                     </TabsContent>
                     
@@ -459,5 +452,3 @@ function TournamentDetailsPage() {
 }
 
 export default TournamentDetailsPage;
-
-    
