@@ -11,9 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { CricketBallIcon, CricketBatIcon } from '@/components/icons';
-import type { MatchConfig, MatchState, Innings } from '@/lib/types';
+import type { MatchConfig, MatchState, Innings, Tournament } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -73,9 +73,11 @@ const createInitialState = (config: MatchConfig, userId?: string | null, matchId
 
 function OpeningPlayersPageContent() {
     const router = useRouter();
+    const params = useParams();
     const searchParams = useSearchParams();
     const { toast } = useToast();
     const { user } = useAuth();
+    const tournamentId = params.tournamentId as string;
     
     const matchConfig: MatchConfig | null = JSON.parse(searchParams.get('config') || 'null');
 
@@ -94,6 +96,39 @@ function OpeningPlayersPageContent() {
     const battingTeam = battingTeamKey === 'team1' ? team1 : team2;
     const bowlingTeam = bowlingTeamKey === 'team1' ? team1 : team2;
 
+    const updateTournamentMatchStatus = async (matchId: string) => {
+        if (!tournamentId) return;
+
+        try {
+            const tournamentRef = doc(db, 'tournaments', tournamentId);
+            const tournamentSnap = await getDoc(tournamentRef);
+
+            if (tournamentSnap.exists()) {
+                const tournamentData = tournamentSnap.data() as Tournament;
+                const updatedMatches = tournamentData.matches?.map(m => {
+                    const matchDate = new Date(m.date || 0);
+                    const configDate = new Date(matchConfig.matchDate || 1);
+                    const isSameDay = matchDate.getFullYear() === configDate.getFullYear() &&
+                                      matchDate.getMonth() === configDate.getMonth() &&
+                                      matchDate.getDate() === configDate.getDate();
+                    
+                    if (m.team1 === matchConfig.team1.name && m.team2 === matchConfig.team2.name && isSameDay && m.status === 'Upcoming') {
+                        return { ...m, status: 'Live', matchId: matchId };
+                    }
+                    return m;
+                });
+                await updateDoc(tournamentRef, { matches: updatedMatches });
+            }
+        } catch (error) {
+            console.error("Failed to update tournament match status:", error);
+            toast({
+                title: "Warning",
+                description: "Could not update the tournament status to Live. The match will proceed, but the tournament view might be out of sync.",
+                variant: "destructive"
+            });
+        }
+    };
+
     const onSubmit = async (data: OpeningPlayersFormValues) => {
         const finalConfig = {
             ...matchConfig,
@@ -109,6 +144,7 @@ function OpeningPlayersPageContent() {
         
         try {
             await setDoc(doc(db, "matches", matchId), initialState);
+            await updateTournamentMatchStatus(matchId);
             toast({ title: "Match Created!", description: "Let the game begin!" });
             router.push(`/scoring/${matchId}`);
         } catch (e) {
