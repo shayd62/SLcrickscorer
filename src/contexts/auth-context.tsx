@@ -3,8 +3,9 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useRouter } from 'next/navigation';
 import type { UserProfile } from '@/lib/types';
 
@@ -20,6 +21,7 @@ interface AuthContextType {
   confirmPhoneSignIn: (confirmationResult: ConfirmationResult, code: string) => Promise<any>;
   createUserProfile: (uid: string, data: Omit<UserProfile, 'uid'>) => Promise<void>;
   updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid'>>) => Promise<void>;
+  uploadProfilePicture: (uid: string, file: File) => Promise<string>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -92,6 +94,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(prev => prev ? { ...prev, ...data } : null);
   };
 
+  const uploadProfilePicture = async (uid: string, file: File) => {
+    const storageRef = ref(storage, `profile-pictures/${uid}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    return downloadURL;
+  };
+
   const value = {
     user,
     userProfile,
@@ -104,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     confirmPhoneSignIn,
     createUserProfile,
     updateUserProfile,
+    uploadProfilePicture,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

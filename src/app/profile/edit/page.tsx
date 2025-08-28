@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft } from 'lucide-react';
 import withAuth from '@/components/with-auth';
+import Image from 'next/image';
 
 const profileSchema = z.object({
   name: z.string().min(1, 'Name is required.'),
@@ -33,8 +34,11 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 
 function EditProfilePage() {
   const router = useRouter();
-  const { user, userProfile, updateUserProfile, loading } = useAuth();
+  const { user, userProfile, updateUserProfile, uploadProfilePicture, loading } = useAuth();
   const { toast } = useToast();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -64,9 +68,38 @@ function EditProfilePage() {
         isWicketKeeper: userProfile.isWicketKeeper,
         photoURL: userProfile.photoURL || '',
       });
+      if(userProfile.photoURL) {
+        setPreviewUrl(userProfile.photoURL);
+      }
     }
   }, [userProfile, form]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePictureUpload = async () => {
+    if (!selectedFile || !user) return;
+    setIsUploading(true);
+    try {
+      const photoURL = await uploadProfilePicture(user.uid, selectedFile);
+      await updateUserProfile(user.uid, { photoURL });
+      toast({ title: "Profile Picture Updated!", description: "Your new picture has been saved." });
+    } catch (error: any) {
+      toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+  
   const onSubmit = async (data: ProfileFormValues) => {
     if (!user) return;
     try {
@@ -102,6 +135,26 @@ function EditProfilePage() {
             </CardHeader>
             <CardContent>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <div className="flex flex-col items-center space-y-4">
+                    {previewUrl && (
+                        <Image 
+                            src={previewUrl}
+                            alt="Profile Preview"
+                            width={100}
+                            height={100}
+                            className="rounded-full border-4 border-primary"
+                        />
+                    )}
+                    <div className="space-y-2 w-full">
+                      <Label htmlFor="photo">Profile Picture</Label>
+                      <Input id="photo" type="file" onChange={handleFileChange} accept="image/*" />
+                    </div>
+                    <Button type="button" onClick={handlePictureUpload} disabled={!selectedFile || isUploading} className="w-full">
+                        {isUploading ? 'Uploading...' : 'Upload Picture'}
+                    </Button>
+                </div>
+
+
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                     <Label htmlFor="name">Full Name</Label>
@@ -112,12 +165,6 @@ function EditProfilePage() {
                     <Label htmlFor="shortName">Short Name</Label>
                     <Input id="shortName" {...form.register('shortName')} />
                     </div>
-                </div>
-
-                <div className="space-y-2">
-                    <Label htmlFor="photoURL">Profile Picture URL</Label>
-                    <Input id="photoURL" {...form.register('photoURL')} />
-                    {form.formState.errors.photoURL && <p className="text-destructive text-sm">{form.formState.errors.photoURL.message}</p>}
                 </div>
                 
                 <div className="space-y-2">
