@@ -4,7 +4,7 @@
 import MatchSetup from '@/components/match-setup';
 import type { MatchConfig } from '@/lib/types';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, BarChart3, Home as HomeIcon, Trophy } from 'lucide-react';
+import { ArrowLeft, BarChart3, Home as HomeIcon, Trophy, Gamepad2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ function BottomNav() {
   const navItems = [
     { name: 'Home', icon: HomeIcon, href: '/matches', active: false },
     { name: 'Scorecard', icon: BarChart3, href: '/matches', active: false },
+    { name: 'My Game', icon: Gamepad2, href: '#', active: false },
     { name: 'Matches', icon: Trophy, href: '/matches', active: false },
   ];
   return (

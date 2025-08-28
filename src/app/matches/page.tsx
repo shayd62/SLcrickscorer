@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
-import { Plus, User, LogOut, Home as HomeIcon, BarChart3, Trophy, Users as UsersIcon, Trash2 } from "lucide-react";
+import { Plus, User, LogOut, Home as HomeIcon, BarChart3, Trophy, Users as UsersIcon, Trash2, Gamepad2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -117,6 +117,7 @@ function BottomNav() {
   const navItems = [
     { name: 'Home', icon: HomeIcon, href: '/matches', active: true },
     { name: 'Scorecard', icon: BarChart3, href: '#', active: false },
+    { name: 'My Game', icon: Gamepad2, href: '#', active: false },
     { name: 'Matches', icon: Trophy, href: '#', active: false },
   ];
   return (
