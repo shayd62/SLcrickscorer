@@ -2,20 +2,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm, useFieldArray }_from_ 'react-hook-form';
-import { zodResolver } _from_ '@hookform/resolvers/zod';
-import *_as_ z _from_ 'zod';
-import { Button } _from_ '@/components/ui/button';
-import { Input } _from_ '@/components/ui/input';
-import { Label } _from_ '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } _from_ '@/components/ui/card';
-import { Plus, Trash2, Users, ArrowLeft, Layers } _from_ 'lucide-react';
-import { useRouter } _from_ 'next/navigation';
-import { useToast } _from_ '@/hooks/use-toast';
-import { db } _from_ '@/lib/firebase';
-import { collection, onSnapshot, doc, setDoc, addDoc } _from_ 'firebase/firestore';
-import { useAuth } _from_ '@/contexts/auth-context';
-import type { Team, Group } _from_ '@/lib/types';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Plus, Trash2, Users, ArrowLeft, Layers } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, doc, setDoc, addDoc } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
+import type { Team, Group } from '@/lib/types';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +25,7 @@ import {
   DialogFooter,
   DialogTrigger,
   DialogClose,
-} _from_ "@/components/ui/dialog";
+} from "@/components/ui/dialog";
 
 const playerSchema = z.object({
   id: z.string(),
@@ -315,4 +315,3 @@ export default function TeamsAndGroupsPage() {
         </div>
     );
 }
-
