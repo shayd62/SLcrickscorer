@@ -2,15 +2,15 @@
 'use client';
 import withAuth from "@/components/with-auth";
 import { useAuth } from "@/contexts/auth-context";
-import type { MatchState } from "@/lib/types";
-import { collection, onSnapshot, query, where, doc, deleteDoc } from "firebase/firestore";
+import type { MatchState, Tournament, TournamentMatch } from "@/lib/types";
+import { collection, onSnapshot, query, where, doc, deleteDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, User, LogOut, Home as HomeIcon, BarChart3, Trophy, Users as UsersIcon, Trash2, Gamepad2, Radio } from "lucide-react";
+import { Plus, User, LogOut, Home as HomeIcon, BarChart3, Trophy, Users as UsersIcon, Trash2, Gamepad2, Radio, Calendar, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -80,6 +80,33 @@ function ActiveMatchCard({ match, onDelete, currentUserId }: { match: MatchState
             </AlertDialogContent>
           </AlertDialog>
         )}
+      </div>
+    </Card>
+  );
+}
+
+function UpcomingMatchCard({ match, tournamentName }: { match: TournamentMatch, tournamentName: string }) {
+  const router = useRouter();
+
+  const matchDate = new Date(match.date || 0);
+
+  return (
+    <Card className="p-4 flex flex-col gap-3 rounded-2xl shadow-sm bg-secondary/40">
+      <div className="flex justify-between items-center text-center">
+        <div className="flex-1">
+          <p className="font-bold text-lg">{match.team1}</p>
+        </div>
+        <p className="text-sm text-muted-foreground bg-primary/20 px-2 py-1 rounded-full">VS</p>
+        <div className="flex-1">
+          <p className="font-bold text-lg">{match.team2}</p>
+        </div>
+      </div>
+      <div className="text-center text-muted-foreground space-y-1 mt-2">
+        <p className="font-semibold text-sm text-foreground">{tournamentName}</p>
+        <div className="flex items-center justify-center gap-4 text-xs">
+          <div className="flex items-center gap-1.5"><Calendar className="h-4 w-4"/> {matchDate.toLocaleDateString()}</div>
+          <div className="flex items-center gap-1.5"><Clock className="h-4 w-4"/> {matchDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+        </div>
       </div>
     </Card>
   );
@@ -155,6 +182,7 @@ function HomePage() {
     const { user, logout } = useAuth();
     const [activeMatches, setActiveMatches] = useState<MatchState[]>([]);
     const [completedMatches, setCompletedMatches] = useState<MatchState[]>([]);
+    const [upcomingMatches, setUpcomingMatches] = useState<{ match: TournamentMatch, tournamentName: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const { toast } = useToast();
@@ -162,7 +190,6 @@ function HomePage() {
     useEffect(() => {
         setLoading(true);
 
-        // Listener for all live matches
         const liveQuery = query(collection(db, "matches"), where("matchOver", "==", false));
         const liveUnsubscribe = onSnapshot(liveQuery, (querySnapshot) => {
             const liveMatchesData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
@@ -173,7 +200,6 @@ function HomePage() {
             setLoading(false);
         });
         
-        // Listener for current user's completed matches
         let completedUnsubscribe = () => {};
         if (user) {
             const completedQuery = query(collection(db, "matches"), where("userId", "==", user.uid), where("matchOver", "==", true));
@@ -184,6 +210,25 @@ function HomePage() {
                 console.error("Failed to fetch completed matches:", error);
             });
         }
+        
+        const fetchUpcomingMatches = async () => {
+            const tournamentsQuery = query(collection(db, "tournaments"));
+            const tournamentsSnapshot = await getDocs(tournamentsQuery);
+            const allUpcoming: { match: TournamentMatch, tournamentName: string }[] = [];
+            tournamentsSnapshot.forEach(doc => {
+                const tournament = doc.data() as Tournament;
+                if (tournament.matches) {
+                    const upcoming = tournament.matches
+                        .filter(m => m.status === 'Upcoming')
+                        .map(m => ({ match: m, tournamentName: tournament.name }));
+                    allUpcoming.push(...upcoming);
+                }
+            });
+            allUpcoming.sort((a, b) => new Date(a.match.date || 0).getTime() - new Date(b.match.date || 0).getTime());
+            setUpcomingMatches(allUpcoming);
+        };
+
+        fetchUpcomingMatches();
 
 
         return () => {
@@ -271,12 +316,16 @@ function HomePage() {
                                 <ActiveMatchCard key={match.id} match={match} onDelete={handleDeleteMatch} currentUserId={user?.uid} />
                             ))}
                         </TabsContent>
-                        <TabsContent value="upcoming" className="mt-4">
-                             <Card>
-                                <CardContent className="p-6 text-center text-muted-foreground">
-                                    <p>No upcoming matches found.</p>
-                                </CardContent>
-                            </Card>
+                        <TabsContent value="upcoming" className="mt-4 space-y-4">
+                             {loading && <p>Loading matches...</p>}
+                             {!loading && upcomingMatches.length === 0 && (
+                                <Card className="p-8 text-center text-muted-foreground rounded-2xl">
+                                    No upcoming matches found.
+                                </Card>
+                             )}
+                             {upcomingMatches.map(({match, tournamentName}) => (
+                                <UpcomingMatchCard key={match.id} match={match} tournamentName={tournamentName} />
+                             ))}
                         </TabsContent>
                          <TabsContent value="past" className="mt-4 space-y-4">
                              {loading && <p>Loading matches...</p>}
