@@ -336,9 +336,7 @@ function MatchDetailsContent() {
                         </div>
                         <div className="flex items-center justify-between p-3 border rounded-lg">
                             <Label className="font-semibold">PowerPlay</Label>
-                             <Button type="button" variant="ghost" className="p-0 h-auto">
-                                0 Selected <ChevronRight className="h-4 w-4 ml-1" />
-                            </Button>
+                             <span className="text-sm text-muted-foreground">Not available</span>
                         </div>
                     </div>
                     
@@ -361,25 +359,19 @@ function MatchDetailsContent() {
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                            <MapPin className="h-5 w-5 text-gray-500" />
-                            <div>
-                                <Label className="font-semibold">Location</Label>
-                                <p className="text-sm text-muted-foreground">{venue}</p>
-                            </div>
+                    <div className="flex items-center gap-3 p-3 border rounded-lg">
+                        <MapPin className="h-5 w-5 text-gray-500" />
+                        <div>
+                            <Label className="font-semibold">Location</Label>
+                            <p className="text-sm text-muted-foreground">{venue}</p>
                         </div>
-                        <ChevronRight className="h-5 w-5 text-gray-400" />
                     </div>
-                     <div className="flex items-center justify-between p-3 border rounded-lg">
-                         <div className="flex items-center gap-3">
-                            <Key className="h-5 w-5 text-gray-500" />
-                            <div>
-                                <Label className="font-semibold">Match Officials</Label>
-                                <p className="text-sm text-muted-foreground">Choose Officials</p>
-                            </div>
+                    <div className="flex items-center gap-3 p-3 border rounded-lg">
+                         <Key className="h-5 w-5 text-gray-500" />
+                        <div>
+                            <Label className="font-semibold">Match Officials</Label>
+                            <p className="text-sm text-muted-foreground">Not assigned</p>
                         </div>
-                        <ChevronRight className="h-5 w-5 text-gray-400" />
                     </div>
 
                      <div className="flex items-center justify-between p-3 border rounded-lg">
