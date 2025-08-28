@@ -9,7 +9,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
-import { Plus, User, LogOut, Home as HomeIcon, BarChart3, Trophy, Users as UsersIcon, Trash2, Gamepad2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, User, LogOut, Home as HomeIcon, BarChart3, Trophy, Users as UsersIcon, Trash2, Gamepad2, Radio } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -118,7 +119,7 @@ function BottomNav() {
     { name: 'Home', icon: HomeIcon, href: '/matches', active: true },
     { name: 'Scorecard', icon: BarChart3, href: '#', active: false },
     { name: 'My Game', icon: Gamepad2, href: '/my-game', active: false },
-    { name: 'Matches', icon: Trophy, href: '#', active: false },
+    { name: 'Matches', icon: Trophy, href: '/tournaments', active: false },
   ];
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg md:hidden">
@@ -235,30 +236,41 @@ function HomePage() {
                         </Link>
                     </div>
 
-                    <div className="space-y-2 pt-4">
-                        <h2 className="text-lg font-semibold text-muted-foreground">Active Matches</h2>
-                        {loading && <p>Loading matches...</p>}
-                        {!loading && activeMatches.length === 0 && (
-                            <Card className="p-8 text-center text-muted-foreground rounded-2xl">
-                            No active matches. Start a new one!
+                    <Tabs defaultValue="live" className="w-full pt-4">
+                        <TabsList className="grid w-full grid-cols-3">
+                            <TabsTrigger value="live">Live</TabsTrigger>
+                            <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+                            <TabsTrigger value="past">Past</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="live" className="mt-4 space-y-4">
+                            {loading && <p>Loading matches...</p>}
+                            {!loading && activeMatches.length === 0 && (
+                                <Card className="p-8 text-center text-muted-foreground rounded-2xl">
+                                    No live matches. Start a new one!
+                                </Card>
+                            )}
+                            {activeMatches.map(match => (
+                                <ActiveMatchCard key={match.id} match={match} onDelete={handleDeleteMatch} />
+                            ))}
+                        </TabsContent>
+                        <TabsContent value="upcoming" className="mt-4">
+                             <Card>
+                                <CardContent className="p-6 text-center text-muted-foreground">
+                                    <p>No upcoming matches found.</p>
+                                </CardContent>
                             </Card>
-                        )}
-                        {activeMatches.map(match => (
-                            <ActiveMatchCard key={match.id} match={match} onDelete={handleDeleteMatch} />
-                        ))}
-                    </div>
-
-                    <div className="space-y-2">
-                        <h2 className="text-lg font-semibold text-muted-foreground">Recent Results</h2>
-                        {!loading && completedMatches.length === 0 && (
-                            <Card className="p-8 text-center text-muted-foreground rounded-2xl">
-                            No completed matches yet.
-                            </Card>
-                        )}
-                        {completedMatches.map(match => (
-                            <RecentResultCard key={match.id} match={match} onDelete={handleDeleteMatch} />
-                        ))}
-                    </div>
+                        </TabsContent>
+                         <TabsContent value="past" className="mt-4 space-y-4">
+                             {!loading && completedMatches.length === 0 && (
+                                <Card className="p-8 text-center text-muted-foreground rounded-2xl">
+                                    No completed matches yet.
+                                </Card>
+                             )}
+                             {completedMatches.map(match => (
+                                <RecentResultCard key={match.id} match={match} onDelete={handleDeleteMatch} />
+                             ))}
+                        </TabsContent>
+                    </Tabs>
                 </main>
             </div>
             <BottomNav />
@@ -267,3 +279,5 @@ function HomePage() {
 }
 
 export default withAuth(HomePage);
+
+    

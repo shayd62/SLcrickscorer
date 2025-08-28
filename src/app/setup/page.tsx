@@ -12,9 +12,9 @@ import { cn } from '@/lib/utils';
 function BottomNav() {
   const navItems = [
     { name: 'Home', icon: HomeIcon, href: '/matches', active: false },
-    { name: 'Scorecard', icon: BarChart3, href: '/matches', active: false },
+    { name: 'Scorecard', icon: BarChart3, href: '#', active: false },
     { name: 'My Game', icon: Gamepad2, href: '/my-game', active: false },
-    { name: 'Matches', icon: Trophy, href: '/matches', active: false },
+    { name: 'Matches', icon: Trophy, href: '/tournaments', active: false },
   ];
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg md:hidden z-20">
@@ -71,3 +71,5 @@ function SetupPage() {
 }
 
 export default SetupPage;
+
+    
