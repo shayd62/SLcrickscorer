@@ -156,28 +156,54 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
 }
 
 function BottomNav() {
-  const navItems = [
+  const navItemsLeft = [
     { name: 'Home', icon: HomeIcon, href: '/matches', active: false },
     { name: 'Scorecard', icon: BarChart3, href: '#', active: false },
+  ];
+  const navItemsRight = [
     { name: 'My Game', icon: Gamepad2, href: '/my-game', active: true },
     { name: 'Tournament', icon: Trophy, href: '/tournaments', active: false },
   ];
   return (
-    <footer className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg md:hidden">
-      <div className="flex justify-around items-center h-16">
-        {navItems.map((item) => (
-          <Link href={item.href} key={item.name}>
-            <div
-              className={cn(
-                'flex flex-col items-center gap-1 text-muted-foreground',
-                item.active && 'text-primary'
-              )}
-            >
-              <item.icon className="h-6 w-6" />
-              <span className="text-xs font-medium">{item.name}</span>
-            </div>
-          </Link>
-        ))}
+    <footer className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg md:hidden h-16">
+      <div className="flex justify-between items-center h-full">
+        <div className="flex justify-around w-2/5">
+          {navItemsLeft.map((item) => (
+            <Link href={item.href} key={item.name}>
+              <div
+                className={cn(
+                  'flex flex-col items-center gap-1 text-muted-foreground',
+                  item.active && 'text-primary'
+                )}
+              >
+                <item.icon className="h-6 w-6" />
+                <span className="text-xs font-medium">{item.name}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+        <div className="w-1/5 flex justify-center">
+            <Link href="/setup">
+                <Button size="icon" className="rounded-full w-14 h-14 -translate-y-4 shadow-lg bg-primary hover:bg-primary/90">
+                    <Plus className="h-8 w-8" />
+                </Button>
+            </Link>
+        </div>
+        <div className="flex justify-around w-2/5">
+          {navItemsRight.map((item) => (
+            <Link href={item.href} key={item.name}>
+              <div
+                className={cn(
+                  'flex flex-col items-center gap-1 text-muted-foreground',
+                  item.active && 'text-primary'
+                )}
+              >
+                <item.icon className="h-6 w-6" />
+                <span className="text-xs font-medium">{item.name}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
       </div>
     </footer>
   );
