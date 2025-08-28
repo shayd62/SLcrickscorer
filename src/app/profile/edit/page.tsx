@@ -39,7 +39,7 @@ function EditProfilePage() {
   const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -88,30 +88,25 @@ function EditProfilePage() {
       reader.readAsDataURL(file);
     }
   };
-
-  const handlePictureUpload = async () => {
-    if (!selectedFile || !user) return;
-    setIsUploading(true);
-    try {
-      const photoURL = await uploadProfilePicture(user.uid, selectedFile);
-      await updateUserProfile(user.uid, { photoURL });
-      form.setValue('photoURL', photoURL);
-      toast({ title: "Profile Picture Updated!", description: "Your new picture has been saved." });
-    } catch (error: any) {
-      toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
-    } finally {
-      setIsUploading(false);
-    }
-  };
   
   const onSubmit = async (data: ProfileFormValues) => {
     if (!user) return;
+    setIsSaving(true);
     try {
-      await updateUserProfile(user.uid, data);
+      let finalData = { ...data };
+
+      if (selectedFile) {
+        const photoURL = await uploadProfilePicture(user.uid, selectedFile);
+        finalData.photoURL = photoURL;
+      }
+
+      await updateUserProfile(user.uid, finalData);
       toast({ title: "Profile Updated!", description: "Your profile has been successfully updated." });
       router.push('/profile');
     } catch (error: any) {
       toast({ title: "Update Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -153,9 +148,6 @@ function EditProfilePage() {
                       <Label htmlFor="photo">Profile Picture</Label>
                       <Input id="photo" type="file" onChange={handleFileChange} accept="image/*" />
                     </div>
-                    <Button type="button" onClick={handlePictureUpload} disabled={!selectedFile || isUploading} className="w-full">
-                        {isUploading ? 'Uploading...' : 'Upload Picture'}
-                    </Button>
                 </div>
 
 
@@ -238,7 +230,9 @@ function EditProfilePage() {
                 </Card>
 
 
-                <Button type="submit" className="w-full">Save Changes</Button>
+                <Button type="submit" className="w-full" disabled={isSaving}>
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </Button>
             </form>
             </CardContent>
         </Card>
