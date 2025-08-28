@@ -325,20 +325,13 @@ function HomePage() {
     return (
         <div className="min-h-screen bg-secondary/30 text-foreground flex flex-col items-center font-sans">
             <div className="w-full max-w-md mx-auto p-4 pb-24">
-                <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm">
-                    <div className="flex items-center gap-2">
-                        <User className="h-6 w-6" />
-                        <span className="font-semibold">{user?.displayName || user?.email || 'User'}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                         <Link href="/tournaments">
-                            <Button variant="ghost" size="icon">
-                                <Trophy className="h-6 w-6" />
-                            </Button>
-                        </Link>
-                        <Button variant="ghost" size="icon" onClick={logout}>
-                            <LogOut className="h-6 w-6" />
-                        </Button>
+                <header className="py-4 px-4 md:px-6 flex items-center justify-center text-center bg-[#2C3E50] text-white rounded-b-2xl">
+                    <div className='flex flex-col items-center'>
+                        <h1 className="text-2xl font-bold">
+                        <span className="text-red-500">SL</span>
+                        <span className="text-green-500">cricscorer</span>
+                        </h1>
+                        <p className="text-sm text-gray-300">Professional Match Scoring</p>
                     </div>
                 </header>
                 
@@ -410,3 +403,4 @@ export default withAuth(HomePage);
     
 
     
+
