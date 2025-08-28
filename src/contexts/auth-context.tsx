@@ -37,12 +37,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (user) {
         setUser(user);
         // Fetch user profile from Firestore
-        const userDocRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(userDocRef);
-        if (docSnap.exists()) {
-          setUserProfile(docSnap.data() as UserProfile);
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where("uid", "==", user.uid));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const userDoc = querySnapshot.docs[0];
+          setUserProfile(userDoc.data() as UserProfile);
         } else {
-          // Profile not created yet
+          // Profile not created yet or data inconsistency
           setUserProfile(null);
         }
       } else {
@@ -82,21 +85,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const userData = userDoc.data() as UserProfile;
 
     if (!userData.email) {
-        throw new Error("This account is not associated with an email address. Please contact support.");
+        // This case handles users who registered with phone only (and have a dummy email)
+        const dummyEmail = `${phoneNumber}@cricmate.com`;
+        return signInWithEmailAndPassword(auth, dummyEmail, password);
     }
     
     return signInWithEmailAndPassword(auth, userData.email, password);
   };
 
   const createUserProfile = async (uid: string, data: Omit<UserProfile, 'uid'>) => {
-    await setDoc(doc(db, 'users', uid), { uid, ...data });
+    // Use phone number as the document ID
+    await setDoc(doc(db, 'users', data.phoneNumber), { uid, ...data });
     setUserProfile({ uid, ...data });
   };
   
   const updateUserProfile = async (uid: string, data: Partial<Omit<UserProfile, 'uid'>>) => {
-    const userDocRef = doc(db, 'users', uid);
-    await updateDoc(userDocRef, data);
-    setUserProfile(prev => prev ? { ...prev, ...data } : null);
+    // Find user doc by UID to update it, as phone number (doc ID) might change.
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where("uid", "==", uid));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+        const userDocRef = querySnapshot.docs[0].ref;
+        await updateDoc(userDocRef, data);
+        setUserProfile(prev => prev ? { ...prev, ...data } : null);
+    } else {
+        throw new Error("User profile not found for update.");
+    }
   };
 
   const uploadProfilePicture = async (uid: string, file: File) => {
