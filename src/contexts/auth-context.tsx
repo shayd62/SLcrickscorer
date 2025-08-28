@@ -21,6 +21,7 @@ interface AuthContextType {
   updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid'>>) => Promise<void>;
   uploadProfilePicture: (uid: string, file: File) => Promise<string>;
   uploadTournamentImage: (tournamentId: string, file: File, type: 'logo' | 'cover') => Promise<string>;
+  searchUsers: (searchTerm: string) => Promise<UserProfile[]>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -128,6 +129,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return downloadURL;
   }
 
+  const searchUsers = async (searchTerm: string): Promise<UserProfile[]> => {
+      const usersRef = collection(db, 'users');
+      const nameQuery = query(usersRef, where('name', '>=', searchTerm), where('name', '<=', searchTerm + '\uf8ff'));
+      const phoneQuery = query(usersRef, where('phoneNumber', '>=', searchTerm), where('phoneNumber', '<=', searchTerm + '\uf8ff'));
+
+      const [nameSnapshot, phoneSnapshot] = await Promise.all([
+          getDocs(nameQuery),
+          getDocs(phoneQuery),
+      ]);
+      
+      const usersMap = new Map<string, UserProfile>();
+      
+      nameSnapshot.forEach(doc => {
+          const userData = doc.data() as UserProfile;
+          usersMap.set(userData.uid, userData);
+      });
+      
+      phoneSnapshot.forEach(doc => {
+          const userData = doc.data() as UserProfile;
+          usersMap.set(userData.uid, userData);
+      });
+
+      return Array.from(usersMap.values());
+  };
+
   const value = {
     user,
     userProfile,
@@ -139,7 +165,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     createUserProfile,
     updateUserProfile,
     uploadProfilePicture,
-    uploadTournamentImage
+    uploadTournamentImage,
+    searchUsers,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

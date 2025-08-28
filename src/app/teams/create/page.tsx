@@ -1,7 +1,7 @@
 
-
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -9,16 +9,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Plus, Trash2, Users, ArrowLeft, Trophy } from 'lucide-react';
+import { Plus, Trash2, Users, ArrowLeft, Trophy, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from "firebase/firestore";
 import { useAuth } from '@/contexts/auth-context';
+import type { UserProfile } from '@/lib/types';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 const playerSchema = z.object({
-  id: z.string(),
+  id: z.string(), // This will be the user's uid
   name: z.string().min(1, "Player name can't be empty"),
 });
 
@@ -29,18 +40,73 @@ const teamSchema = z.object({
 
 type TeamFormValues = z.infer<typeof teamSchema>;
 
+function PlayerSearchDialog({ onPlayerSelect, onOpenChange, open }: { open: boolean, onOpenChange: (open: boolean) => void, onPlayerSelect: (player: UserProfile) => void }) {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+    const [loading, setLoading] = useState(false);
+    const { searchUsers } = useAuth();
+
+    const handleSearch = async () => {
+        if (searchTerm.trim().length < 3) {
+            setSearchResults([]);
+            return;
+        }
+        setLoading(true);
+        const results = await searchUsers(searchTerm);
+        setSearchResults(results);
+        setLoading(false);
+    };
+
+    const handlePlayerSelect = (player: UserProfile) => {
+        onPlayerSelect(player);
+        onOpenChange(false);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Search for a Player</DialogTitle>
+                    <DialogDescription>Search by name or phone number.</DialogDescription>
+                </DialogHeader>
+                <div className="flex gap-2">
+                    <Input 
+                        placeholder="Enter name or phone..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <Button onClick={handleSearch} disabled={loading}>
+                        <Search className="h-4 w-4" />
+                    </Button>
+                </div>
+                <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
+                    {loading && <p>Searching...</p>}
+                    {!loading && searchResults.length === 0 && searchTerm.length > 2 && <p>No players found.</p>}
+                    {searchResults.map(player => (
+                        <div key={player.uid} className="flex items-center justify-between p-2 border rounded-md">
+                            <div>
+                                <p className="font-semibold">{player.name}</p>
+                                <p className="text-sm text-muted-foreground">{player.phoneNumber}</p>
+                            </div>
+                            <Button size="sm" onClick={() => handlePlayerSelect(player)}>Add</Button>
+                        </div>
+                    ))}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function CreateTeamPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [isPlayerSearchOpen, setPlayerSearchOpen] = useState(false);
   const form = useForm<TeamFormValues>({
     resolver: zodResolver(teamSchema),
     defaultValues: {
       name: '',
-      players: [
-        { id: `player-${Date.now()}-0`, name: '' },
-        { id: `player-${Date.now()}-1`, name: '' },
-      ],
+      players: [],
     },
     mode: 'onChange',
   });
@@ -74,8 +140,13 @@ function CreateTeamPage() {
     }
   };
   
-  const addPlayer = () => {
-    append({ id: `player-${Date.now()}-${fields.length}`, name: '' });
+  const handlePlayerSelect = (player: UserProfile) => {
+    const isAlreadyAdded = fields.some(p => p.id === player.uid);
+    if (isAlreadyAdded) {
+        toast({ title: "Player already in team", variant: 'destructive' });
+        return;
+    }
+    append({ id: player.uid, name: player.name });
   };
 
   return (
@@ -115,25 +186,26 @@ function CreateTeamPage() {
                     <Label>Players</Label>
                     {fields.map((field, index) => (
                         <div key={field.id} className="flex items-center gap-2">
-                        <Input
-                            {...form.register(`players.${index}.name`)}
-                            placeholder={`Player ${index + 1}`}
-                        />
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => remove(index)}
-                            disabled={fields.length <= 2}
-                        >
-                            <Trash2 className="h-5 w-5 text-gray-500" />
-                        </Button>
+                            <Input
+                                value={field.name}
+                                readOnly
+                                placeholder={`Player ${index + 1}`}
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => remove(index)}
+                            >
+                                <Trash2 className="h-5 w-5 text-gray-500" />
+                            </Button>
                         </div>
                     ))}
-                     {form.formState.errors.players && <p className="text-destructive text-sm">{form.formState.errors.players.message || form.formState.errors.players.root?.message}</p>}
+                    {form.formState.errors.players && <p className="text-destructive text-sm">{form.formState.errors.players.message || form.formState.errors.players.root?.message}</p>}
                 </div>
 
-                <Button type="button" variant="outline" onClick={addPlayer} className='w-full'>
+                <PlayerSearchDialog open={isPlayerSearchOpen} onOpenChange={setPlayerSearchOpen} onPlayerSelect={handlePlayerSelect} />
+                <Button type="button" variant="outline" onClick={() => setPlayerSearchOpen(true)} className='w-full'>
                     <Plus className="mr-2 h-4 w-4" /> Add Player
                 </Button>
 

@@ -1,7 +1,7 @@
 
 
 export interface Player {
-  id: string;
+  id: string; // This should be the user's UID
   name: string;
   isOut?: boolean;
 }
