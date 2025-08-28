@@ -6,7 +6,7 @@ import ScoringScreen from '@/components/scoring-screen';
 import type { MatchState } from '@/lib/types';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Home as HomeIcon, Settings, Trophy, Link as LinkIcon, RefreshCw, ClipboardList, Gamepad2, Plus } from 'lucide-react';
+import { ArrowLeft, Home as HomeIcon, Settings, Trophy, Link as LinkIcon, RefreshCw, ClipboardList, Gamepad2, Plus, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -15,17 +15,51 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose 
 import ScorecardDisplay from '@/components/scorecard-display';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { useAuth } from '@/contexts/auth-context';
 
+
+function SettingsSheet() {
+    const { logout } = useAuth();
+    const router = useRouter();
+
+    const handleLogout = async () => {
+        await logout();
+        router.push('/login');
+    };
+    
+    return (
+        <Sheet>
+            <SheetTrigger asChild>
+                <div className={'flex flex-col items-center gap-1 text-muted-foreground'}>
+                    <Settings className="h-6 w-6" />
+                    <span className="text-xs font-medium">Settings</span>
+                </div>
+            </SheetTrigger>
+            <SheetContent side="bottom">
+                <SheetHeader>
+                    <SheetTitle>Settings</SheetTitle>
+                </SheetHeader>
+                <div className="grid gap-4 py-4">
+                    <Link href="/profile">
+                        <Button variant="outline" className="w-full justify-start">
+                            <User className="mr-2 h-4 w-4" /> Profile
+                        </Button>
+                    </Link>
+                    <Button variant="destructive" className="w-full justify-start" onClick={handleLogout}>
+                        <LogOut className="mr-2 h-4 w-4" /> Log Out
+                    </Button>
+                </div>
+            </SheetContent>
+        </Sheet>
+    )
+}
 
 function BottomNav() {
   const navItemsLeft = [
     { name: 'Home', icon: HomeIcon, href: '/matches', active: false },
     { name: 'Tournament', icon: Trophy, href: '/tournaments', active: false },
   ];
-  const navItemsRight = [
-    { name: 'My Game', icon: Gamepad2, href: '/my-game', active: false },
-    { name: 'Settings', icon: Settings, href: '/profile', active: true },
-  ];
+
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg md:hidden z-20 h-16">
       <div className="flex justify-between items-center h-full">
@@ -52,19 +86,15 @@ function BottomNav() {
             </Link>
         </div>
         <div className="flex justify-around w-2/5">
-          {navItemsRight.map((item) => (
-            <Link href={item.href} key={item.name}>
+            <Link href={'/my-game'}>
               <div
-                className={cn(
-                  'flex flex-col items-center gap-1 text-muted-foreground',
-                  item.active && 'text-primary'
-                )}
+                className={cn('flex flex-col items-center gap-1 text-muted-foreground')}
               >
-                <item.icon className="h-6 w-6" />
-                <span className="text-xs font-medium">{item.name}</span>
+                <Gamepad2 className="h-6 w-6" />
+                <span className="text-xs font-medium">My Game</span>
               </div>
             </Link>
-          ))}
+            <SettingsSheet />
         </div>
       </div>
     </footer>
