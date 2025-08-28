@@ -10,7 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, Calendar, MapPin, Plus, ChevronRight, Key, Shield } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Plus, ChevronRight, Key, Shield, Search } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -68,6 +68,7 @@ function MatchDetailsContent() {
     const [editingTeam, setEditingTeam] = useState<'team1' | 'team2' | null>(null);
     const [newPlayerName, setNewPlayerName] = useState('');
     const [addingPlayer, setAddingPlayer] = useState(false);
+    const [squadSearchTerm, setSquadSearchTerm] = useState('');
     
     const team1Name = searchParams.get('team1Name') || 'Team A';
     const team2Name = searchParams.get('team2Name') || 'Team B';
@@ -151,6 +152,7 @@ function MatchDetailsContent() {
 
     const handleSquadSelect = (teamKey: 'team1' | 'team2') => {
         setEditingTeam(teamKey);
+        setSquadSearchTerm(''); // Reset search on open
         setDialogOpen(true);
     };
 
@@ -251,6 +253,10 @@ function MatchDetailsContent() {
 
     const editingTeamData = editingTeam === 'team1' ? team1 : team2;
     const editingSquadData = editingTeam === 'team1' ? squad1 : squad2;
+    
+    const filteredPlayers = (editingTeamData?.players || []).filter(player =>
+        player.name.toLowerCase().includes(squadSearchTerm.toLowerCase())
+    );
 
     return (
         <div className="min-h-screen bg-background text-foreground font-body">
@@ -403,8 +409,17 @@ function MatchDetailsContent() {
                         <DialogTitle>Select Squad for {editingTeamData?.name}</DialogTitle>
                         <DialogDescription>Select the players who will be playing in this match.</DialogDescription>
                     </DialogHeader>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search players..."
+                            value={squadSearchTerm}
+                            onChange={(e) => setSquadSearchTerm(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
                     <div className="max-h-80 overflow-y-auto space-y-2 p-1">
-                        {editingTeamData?.players.map(player => (
+                        {filteredPlayers.map(player => (
                             <div key={player.id} className="flex items-center space-x-2">
                                 <Checkbox
                                     id={player.id}
