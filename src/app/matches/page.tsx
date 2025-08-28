@@ -30,11 +30,15 @@ function ActiveMatchCard({ match, onDelete, currentUserId }: { match: MatchState
   const router = useRouter();
   const { config } = match;
 
-  const handleResume = () => {
-    router.push(`/scoring/${match.id}`);
-  };
+  const isCreator = match.userId === currentUserId;
   
-  const canDelete = match.userId === currentUserId;
+  const handleNavigation = () => {
+    if (isCreator) {
+      router.push(`/scoring/${match.id}`);
+    } else {
+      router.push(`/scorecard/${match.id}`);
+    }
+  };
 
   return (
     <Card className="p-4 flex flex-col gap-3 rounded-2xl shadow-sm">
@@ -52,10 +56,10 @@ function ActiveMatchCard({ match, onDelete, currentUserId }: { match: MatchState
          <p className="flex-1">{config.playersPerSide} Players per Side</p>
       </div>
       <div className="flex items-center gap-2 mt-2">
-        <Button onClick={handleResume} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg">
-          Resume
+        <Button onClick={handleNavigation} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg">
+          {isCreator ? 'Resume' : 'View Scorecard'}
         </Button>
-        {canDelete && (
+        {isCreator && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="icon" className="rounded-lg">
