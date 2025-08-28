@@ -73,11 +73,11 @@ function TournamentsPage() {
   };
   
   const handleShareTournament = (tournamentId: string) => {
-    const url = `${window.location.origin}/tournaments/${tournamentId}`;
+    const url = `${window.location.origin}/tournaments/invite/${tournamentId}`;
     navigator.clipboard.writeText(url);
     toast({
       title: "Link Copied!",
-      description: "Tournament link has been copied to your clipboard.",
+      description: "Tournament invite link has been copied to your clipboard.",
     })
   }
 
