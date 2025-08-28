@@ -105,18 +105,14 @@ function SetupPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-500 text-foreground font-body flex flex-col">
-       <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
-         <Button variant="ghost" size="icon" onClick={() => router.push('/matches')}>
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
+       <header className="py-4 px-4 md:px-6 flex items-center justify-center text-center bg-[#2C3E50] text-white">
           <div className='flex flex-col items-center'>
             <h1 className="text-2xl font-bold">
               <span className="text-red-500">SL</span>
-              <span className="text-green-600">cricscorer</span>
+              <span className="text-green-500">cricscorer</span>
             </h1>
-            <p className="text-sm text-muted-foreground">Professional Match Scoring</p>
+            <p className="text-sm text-gray-300">Professional Match Scoring</p>
           </div>
-          <div className="w-10"></div>
       </header>
       <main className="flex-grow p-4 md:p-8 flex justify-center items-start overflow-y-auto pb-24">
         <div className="w-full max-w-md">
