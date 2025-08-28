@@ -13,7 +13,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { ConfirmationResult } from 'firebase/auth';
 
 const emailSchema = z.object({
   email: z.string().email('Invalid email address.'),
@@ -22,6 +21,7 @@ const emailSchema = z.object({
 
 const phoneSchema = z.object({
   phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits.'),
+  password: z.string().min(1, 'Password is required.'),
 });
 
 type EmailFormValues = z.infer<typeof emailSchema>;
@@ -29,11 +29,9 @@ type PhoneFormValues = z.infer<typeof phoneSchema>;
 
 function LoginPage() {
   const router = useRouter();
-  const { signInWithEmail, setupRecaptcha, signInWithPhone, confirmPhoneSignIn } = useAuth();
+  const { signInWithEmail, signInWithPhoneAndPassword } = useAuth();
   const { toast } = useToast();
   const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email');
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const [otp, setOtp] = useState('');
 
   const emailForm = useForm<EmailFormValues>({ resolver: zodResolver(emailSchema) });
   const phoneForm = useForm<PhoneFormValues>({ resolver: zodResolver(phoneSchema) });
@@ -50,26 +48,11 @@ function LoginPage() {
 
   const onPhoneSubmit = async (data: PhoneFormValues) => {
     try {
-      const appVerifier = setupRecaptcha('recaptcha-container');
-      const result = await signInWithPhone(data.phoneNumber, appVerifier);
-      setConfirmationResult(result);
-      toast({ title: "OTP Sent", description: "Please check your phone for the OTP." });
-    } catch (error: any) {
-      toast({ title: "Failed to send OTP", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const onOtpSubmit = async () => {
-    if (!confirmationResult || !otp) {
-      toast({ title: "Error", description: "Something went wrong. Please try again.", variant: "destructive" });
-      return;
-    }
-    try {
-      await confirmPhoneSignIn(confirmationResult, otp);
+      await signInWithPhoneAndPassword(data.phoneNumber, data.password);
       toast({ title: "Login Successful!" });
       router.push('/');
     } catch (error: any) {
-      toast({ title: "Invalid OTP", description: error.message, variant: "destructive" });
+      toast({ title: "Login Failed", description: error.message, variant: "destructive" });
     }
   };
 
@@ -100,14 +83,6 @@ function LoginPage() {
               </div>
               <Button type="submit" className="w-full">Log In</Button>
             </form>
-          ) : confirmationResult ? (
-             <div className="space-y-4">
-                <div className="space-y-2">
-                    <Label htmlFor="otp">Enter OTP</Label>
-                    <Input id="otp" type="text" value={otp} onChange={(e) => setOtp(e.target.value)} />
-                </div>
-                <Button onClick={onOtpSubmit} className="w-full">Confirm OTP</Button>
-            </div>
           ) : (
             <form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-4">
               <div className="space-y-2">
@@ -115,8 +90,12 @@ function LoginPage() {
                 <Input id="phoneNumber" type="tel" {...phoneForm.register('phoneNumber')} placeholder="+1 123 456 7890" />
                 {phoneForm.formState.errors.phoneNumber && <p className="text-destructive text-sm">{phoneForm.formState.errors.phoneNumber.message}</p>}
               </div>
-              <div id="recaptcha-container"></div>
-              <Button type="submit" className="w-full">Send OTP</Button>
+               <div className="space-y-2">
+                <Label htmlFor="phone-password">Password</Label>
+                <Input id="phone-password" type="password" {...phoneForm.register('password')} />
+                {phoneForm.formState.errors.password && <p className="text-destructive text-sm">{phoneForm.formState.errors.password.message}</p>}
+              </div>
+              <Button type="submit" className="w-full">Log In</Button>
             </form>
           )}
 

@@ -2,9 +2,9 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
+import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential } from 'firebase/auth';
 import { auth, db, storage } from '@/lib/firebase';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useRouter } from 'next/navigation';
 import type { UserProfile } from '@/lib/types';
@@ -16,12 +16,11 @@ interface AuthContextType {
   logout: () => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<any>;
   signInWithEmail: (email: string, password: string) => Promise<any>;
-  setupRecaptcha: (elementId: string) => RecaptchaVerifier;
-  signInWithPhone: (phoneNumber: string, appVerifier: RecaptchaVerifier) => Promise<ConfirmationResult>;
-  confirmPhoneSignIn: (confirmationResult: ConfirmationResult, code: string) => Promise<any>;
+  signInWithPhoneAndPassword: (phoneNumber: string, password: string) => Promise<any>;
   createUserProfile: (uid: string, data: Omit<UserProfile, 'uid'>) => Promise<void>;
   updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid'>>) => Promise<void>;
   uploadProfilePicture: (uid: string, file: File) => Promise<string>;
+  uploadTournamentImage: (tournamentId: string, file: File, type: 'logo' | 'cover') => Promise<string>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -69,18 +68,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return signInWithEmailAndPassword(auth, email, password);
   };
 
-  const setupRecaptcha = (elementId: string) => {
-    return new RecaptchaVerifier(auth, elementId, {
-      'size': 'invisible',
-    });
-  };
+  const signInWithPhoneAndPassword = async (phoneNumber: string, password: string) => {
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("phoneNumber", "==", phoneNumber));
+    
+    const querySnapshot = await getDocs(q);
 
-  const signInWithPhone = (phoneNumber: string, appVerifier: RecaptchaVerifier) => {
-      return signInWithPhoneNumber(auth, phoneNumber, appVerifier);
-  };
-  
-  const confirmPhoneSignIn = (confirmationResult: ConfirmationResult, code: string) => {
-    return confirmationResult.confirm(code);
+    if (querySnapshot.empty) {
+        throw new Error("No user found with this phone number.");
+    }
+
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data() as UserProfile;
+
+    if (!userData.email) {
+        throw new Error("This account is not associated with an email address. Please contact support.");
+    }
+    
+    return signInWithEmailAndPassword(auth, userData.email, password);
   };
 
   const createUserProfile = async (uid: string, data: Omit<UserProfile, 'uid'>) => {
@@ -100,6 +105,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const downloadURL = await getDownloadURL(storageRef);
     return downloadURL;
   };
+  
+  const uploadTournamentImage = async (tournamentId: string, file: File, type: 'logo' | 'cover') => {
+    const storageRef = ref(storage, `tournaments/${tournamentId}/${type}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    return downloadURL;
+  }
 
   const value = {
     user,
@@ -108,12 +120,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     signUpWithEmail,
     signInWithEmail,
-    setupRecaptcha,
-    signInWithPhone,
-    confirmPhoneSignIn,
+    signInWithPhoneAndPassword,
     createUserProfile,
     updateUserProfile,
     uploadProfilePicture,
+    uploadTournamentImage
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
