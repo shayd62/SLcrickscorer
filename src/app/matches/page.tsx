@@ -26,13 +26,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-function ActiveMatchCard({ match, onDelete }: { match: MatchState, onDelete: (matchId: string) => void }) {
+function ActiveMatchCard({ match, onDelete, currentUserId }: { match: MatchState, onDelete: (matchId: string) => void, currentUserId?: string }) {
   const router = useRouter();
   const { config } = match;
 
   const handleResume = () => {
     router.push(`/scoring/${match.id}`);
   };
+  
+  const canDelete = match.userId === currentUserId;
 
   return (
     <Card className="p-4 flex flex-col gap-3 rounded-2xl shadow-sm">
@@ -53,25 +55,27 @@ function ActiveMatchCard({ match, onDelete }: { match: MatchState, onDelete: (ma
         <Button onClick={handleResume} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg">
           Resume
         </Button>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" size="icon" className="rounded-lg">
-              <Trash2 className="h-5 w-5" />
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the match.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => onDelete(match.id!)}>Delete</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {canDelete && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="icon" className="rounded-lg">
+                <Trash2 className="h-5 w-5" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the match.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => onDelete(match.id!)}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
     </Card>
   );
@@ -260,7 +264,7 @@ function HomePage() {
                                 </Card>
                             )}
                             {activeMatches.map(match => (
-                                <ActiveMatchCard key={match.id} match={match} onDelete={handleDeleteMatch} />
+                                <ActiveMatchCard key={match.id} match={match} onDelete={handleDeleteMatch} currentUserId={user?.uid} />
                             ))}
                         </TabsContent>
                         <TabsContent value="upcoming" className="mt-4">
