@@ -20,11 +20,11 @@ import { doc, getDoc, onSnapshot } from "firebase/firestore";
 function BottomNav() {
   const navItemsLeft = [
     { name: 'Home', icon: HomeIcon, href: '/matches', active: false },
-    { name: 'Scorecard', icon: BarChart3, href: '#', active: true },
+    { name: 'Tournament', icon: Trophy, href: '/tournaments', active: false },
   ];
   const navItemsRight = [
     { name: 'My Game', icon: Gamepad2, href: '/my-game', active: false },
-    { name: 'Tournament', icon: Trophy, href: '/tournaments', active: false },
+    { name: 'Scorecard', icon: BarChart3, href: '#', active: true },
   ];
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg md:hidden z-20 h-16">
