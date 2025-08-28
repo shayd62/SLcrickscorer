@@ -37,18 +37,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       if (user) {
         setUser(user);
-        // Fetch user profile from Firestore
+        // Find user profile by UID to get their phone number, then get the profile
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where("uid", "==", user.uid));
         const querySnapshot = await getDocs(q);
-        
+
         if (!querySnapshot.empty) {
-          const userDoc = querySnapshot.docs[0];
-          setUserProfile(userDoc.data() as UserProfile);
+            const userDocWithUid = querySnapshot.docs[0];
+            const phoneNumber = userDocWithUid.id; // The document ID is the phone number
+            const userDocRef = doc(db, 'users', phoneNumber);
+            const userDocSnap = await getDoc(userDocRef);
+
+            if (userDocSnap.exists()) {
+                 setUserProfile(userDocSnap.data() as UserProfile);
+            } else {
+                 setUserProfile(null);
+            }
         } else {
-          // Profile not created yet or data inconsistency
           setUserProfile(null);
         }
+
       } else {
         setUser(null);
         setUserProfile(null);
