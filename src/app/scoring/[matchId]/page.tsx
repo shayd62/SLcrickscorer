@@ -6,7 +6,7 @@ import ScoringScreen from '@/components/scoring-screen';
 import type { MatchState } from '@/lib/types';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Home as HomeIcon, BarChart3, Trophy, Link as LinkIcon, RefreshCw, ClipboardList, Gamepad2, Plus } from 'lucide-react';
+import { ArrowLeft, Home as HomeIcon, Settings, Trophy, Link as LinkIcon, RefreshCw, ClipboardList, Gamepad2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,7 @@ function BottomNav() {
   ];
   const navItemsRight = [
     { name: 'My Game', icon: Gamepad2, href: '/my-game', active: false },
-    { name: 'Scorecard', icon: BarChart3, href: '#', active: true },
+    { name: 'Settings', icon: Settings, href: '#', active: true },
   ];
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg md:hidden z-20 h-16">
@@ -177,5 +177,7 @@ function ScoringPage() {
 
 
 export default ScoringPage;
+
+    
 
     

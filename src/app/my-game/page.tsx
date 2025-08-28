@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Radio, BarChart3, Gamepad2, Trophy, Home as HomeIcon } from 'lucide-react';
+import { ArrowLeft, Radio, Settings, Gamepad2, Trophy, Home as HomeIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import withAuth from '@/components/with-auth';
 import Link from 'next/link';
@@ -162,7 +162,7 @@ function BottomNav() {
   ];
   const navItemsRight = [
     { name: 'My Game', icon: Gamepad2, href: '/my-game', active: true },
-    { name: 'Scorecard', icon: BarChart3, href: '#', active: false },
+    { name: 'Settings', icon: Settings, href: '#', active: false },
   ];
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg md:hidden h-16">
@@ -356,3 +356,5 @@ function MyGamePage() {
 }
 
 export default withAuth(MyGamePage);
+
+    

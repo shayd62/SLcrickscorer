@@ -4,7 +4,7 @@
 import MatchSetup from '@/components/match-setup';
 import type { MatchConfig } from '@/lib/types';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, BarChart3, Home as HomeIcon, Trophy, Gamepad2, Plus } from 'lucide-react';
+import { ArrowLeft, Settings, Home as HomeIcon, Trophy, Gamepad2, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,7 @@ function BottomNav() {
   ];
   const navItemsRight = [
     { name: 'My Game', icon: Gamepad2, href: '/my-game', active: false },
-    { name: 'Scorecard', icon: BarChart3, href: '#', active: false },
+    { name: 'Settings', icon: Settings, href: '#', active: false },
   ];
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg md:hidden z-20 h-16">
@@ -97,3 +97,5 @@ function SetupPage() {
 }
 
 export default SetupPage;
+
+    
