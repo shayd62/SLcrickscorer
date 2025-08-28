@@ -152,26 +152,36 @@ function HomePage() {
     const { toast } = useToast();
 
     useEffect(() => {
-        if (!user) return;
-
         setLoading(true);
-        const q = query(collection(db, "matches"), where("userId", "==", user.uid));
-        
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const matches = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
-            
-            const active = matches.filter(m => !m.matchOver);
-            const completed = matches.filter(m => m.matchOver);
-            
-            setActiveMatches(active);
-            setCompletedMatches(completed);
+
+        // Listener for all live matches
+        const liveQuery = query(collection(db, "matches"), where("matchOver", "==", false));
+        const liveUnsubscribe = onSnapshot(liveQuery, (querySnapshot) => {
+            const liveMatchesData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
+            setActiveMatches(liveMatchesData);
             setLoading(false);
         }, (error) => {
-            console.error("Failed to fetch matches:", error);
+            console.error("Failed to fetch live matches:", error);
             setLoading(false);
         });
+        
+        // Listener for current user's completed matches
+        let completedUnsubscribe = () => {};
+        if (user) {
+            const completedQuery = query(collection(db, "matches"), where("userId", "==", user.uid), where("matchOver", "==", true));
+            completedUnsubscribe = onSnapshot(completedQuery, (querySnapshot) => {
+                const completedMatchesData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
+                setCompletedMatches(completedMatchesData);
+            }, (error) => {
+                console.error("Failed to fetch completed matches:", error);
+            });
+        }
 
-        return () => unsubscribe();
+
+        return () => {
+            liveUnsubscribe();
+            completedUnsubscribe();
+        };
 
     }, [user]);
 
@@ -192,10 +202,10 @@ function HomePage() {
       }
     };
 
-    if (!user) {
+    if (!user && loading) {
         return (
           <div className="flex items-center justify-center min-h-screen">
-            <p>Loading user...</p>
+            <p>Loading...</p>
           </div>
         );
     }
@@ -206,7 +216,7 @@ function HomePage() {
                 <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm">
                     <div className="flex items-center gap-2">
                         <User className="h-6 w-6" />
-                        <span className="font-semibold">{user.displayName || user.email || 'User'}</span>
+                        <span className="font-semibold">{user?.displayName || user?.email || 'User'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                          <Link href="/tournaments">
@@ -261,6 +271,7 @@ function HomePage() {
                             </Card>
                         </TabsContent>
                          <TabsContent value="past" className="mt-4 space-y-4">
+                             {loading && <p>Loading matches...</p>}
                              {!loading && completedMatches.length === 0 && (
                                 <Card className="p-8 text-center text-muted-foreground rounded-2xl">
                                     No completed matches yet.
@@ -279,5 +290,3 @@ function HomePage() {
 }
 
 export default withAuth(HomePage);
-
-    
