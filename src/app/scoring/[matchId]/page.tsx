@@ -24,7 +24,7 @@ function BottomNav() {
   ];
   const navItemsRight = [
     { name: 'My Game', icon: Gamepad2, href: '/my-game', active: false },
-    { name: 'Settings', icon: Settings, href: '#', active: true },
+    { name: 'Settings', icon: Settings, href: '/profile', active: true },
   ];
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg md:hidden z-20 h-16">
