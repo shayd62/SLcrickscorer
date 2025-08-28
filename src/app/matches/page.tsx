@@ -117,7 +117,7 @@ function BottomNav() {
   const navItems = [
     { name: 'Home', icon: HomeIcon, href: '/matches', active: true },
     { name: 'Scorecard', icon: BarChart3, href: '#', active: false },
-    { name: 'My Game', icon: Gamepad2, href: '#', active: false },
+    { name: 'My Game', icon: Gamepad2, href: '/my-game', active: false },
     { name: 'Matches', icon: Trophy, href: '#', active: false },
   ];
   return (
@@ -267,5 +267,3 @@ function HomePage() {
 }
 
 export default withAuth(HomePage);
-
-    
