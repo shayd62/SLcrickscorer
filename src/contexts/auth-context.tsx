@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import type { UserProfile } from '@/lib/types';
 
@@ -19,6 +19,7 @@ interface AuthContextType {
   signInWithPhone: (phoneNumber: string, appVerifier: RecaptchaVerifier) => Promise<ConfirmationResult>;
   confirmPhoneSignIn: (confirmationResult: ConfirmationResult, code: string) => Promise<any>;
   createUserProfile: (uid: string, data: Omit<UserProfile, 'uid'>) => Promise<void>;
+  updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid'>>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -84,6 +85,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await setDoc(doc(db, 'users', uid), { uid, ...data });
     setUserProfile({ uid, ...data });
   };
+  
+  const updateUserProfile = async (uid: string, data: Partial<Omit<UserProfile, 'uid'>>) => {
+    const userDocRef = doc(db, 'users', uid);
+    await updateDoc(userDocRef, data);
+    setUserProfile(prev => prev ? { ...prev, ...data } : null);
+  };
 
   const value = {
     user,
@@ -96,6 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithPhone,
     confirmPhoneSignIn,
     createUserProfile,
+    updateUserProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

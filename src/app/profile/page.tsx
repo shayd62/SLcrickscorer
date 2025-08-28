@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/auth-context';
 import withAuth from '@/components/with-auth';
 import Image from 'next/image';
 import { CricketBatIcon, CricketBallIcon } from '@/components/icons';
+import Link from 'next/link';
 
 function ProfilePage() {
     const router = useRouter();
@@ -33,9 +34,11 @@ function ProfilePage() {
                     <h1 className="text-2xl font-bold">My Profile</h1>
                     <p className="text-sm text-muted-foreground">View and manage your details</p>
                 </div>
-                <Button variant="ghost" size="icon">
-                    <Edit className="h-5 w-5" />
-                </Button>
+                <Link href="/profile/edit">
+                    <Button variant="ghost" size="icon">
+                        <Edit className="h-5 w-5" />
+                    </Button>
+                </Link>
             </header>
             <main className="p-4 md:p-8 flex justify-center">
                 <Card className="w-full max-w-md shadow-lg">
