@@ -238,8 +238,12 @@ export interface MatchState {
 export interface UserProfile {
   uid: string;
   name: string;
+  shortName?: string;
   email?: string;
   phoneNumber?: string;
   address?: string | null;
   gender: 'Male' | 'Female' | 'Other';
+  battingStyle?: 'Right-handed' | 'Left-handed';
+  bowlingStyle?: 'Right-arm' | 'Left-arm';
+  isWicketKeeper?: boolean;
 }

@@ -14,14 +14,19 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { Switch } from '@/components/ui/switch';
 
 const registerSchema = z.object({
   name: z.string().min(1, 'Name is required.'),
+  shortName: z.string().optional(),
   email: z.string().optional(),
   phoneNumber: z.string().optional(),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
   address: z.string().optional(),
   gender: z.enum(['Male', 'Female', 'Other'], { required_error: 'Gender is required.' }),
+  battingStyle: z.enum(['Right-handed', 'Left-handed']).optional(),
+  bowlingStyle: z.enum(['Right-arm', 'Left-arm']).optional(),
+  isWicketKeeper: z.boolean().optional(),
 }).refine(data => data.email || data.phoneNumber, {
   message: 'Either Email or Phone Number is required.',
   path: ['email'],
@@ -34,12 +39,15 @@ function RegisterPage() {
   const { signUpWithEmail, createUserProfile } = useAuth();
   const { toast } = useToast();
 
-  const form = useForm<RegisterFormValues>({ resolver: zodResolver(registerSchema) });
+  const form = useForm<RegisterFormValues>({ 
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+        isWicketKeeper: false,
+    }
+  });
 
   const onSubmit = async (data: RegisterFormValues) => {
     if (!data.email) {
-      // For now, we only support email sign up through this form.
-      // Phone sign up requires a different flow (OTP verification).
       toast({ title: "Phone sign-up not implemented", description: "Please register with an email for now.", variant: "destructive" });
       return;
     }
@@ -53,10 +61,14 @@ function RegisterPage() {
 
       const profileData = {
         name: data.name,
+        shortName: data.shortName,
         email: data.email,
         phoneNumber: data.phoneNumber,
         address: data.address,
         gender: data.gender,
+        battingStyle: data.battingStyle,
+        bowlingStyle: data.bowlingStyle,
+        isWicketKeeper: data.isWicketKeeper,
       };
       
       await createUserProfile(user.uid, profileData);
@@ -77,10 +89,16 @@ function RegisterPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" {...form.register('name')} />
-              {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input id="name" {...form.register('name')} />
+                  {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
+                </div>
+                 <div className="space-y-2">
+                  <Label htmlFor="shortName">Short Name</Label>
+                  <Input id="shortName" {...form.register('shortName')} />
+                </div>
             </div>
             
             <div className="space-y-2">
@@ -119,6 +137,41 @@ function RegisterPage() {
                 </Select>
                  {form.formState.errors.gender && <p className="text-destructive text-sm">{form.formState.errors.gender.message}</p>}
             </div>
+            
+            <Card className='p-4 bg-secondary/30'>
+                 <CardHeader className="p-2">
+                    <CardTitle className="text-lg">Playing Style</CardTitle>
+                </CardHeader>
+                <CardContent className="p-2 space-y-4">
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Batting Style</Label>
+                            <Select onValueChange={(value) => form.setValue('battingStyle', value as 'Right-handed' | 'Left-handed')}>
+                                <SelectTrigger><SelectValue placeholder="Select hand" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Right-handed">Right-handed</SelectItem>
+                                    <SelectItem value="Left-handed">Left-handed</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Bowling Style</Label>
+                            <Select onValueChange={(value) => form.setValue('bowlingStyle', value as 'Right-arm' | 'Left-arm')}>
+                                <SelectTrigger><SelectValue placeholder="Select arm" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Right-arm">Right-arm</SelectItem>
+                                    <SelectItem value="Left-arm">Left-arm</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                     <div className="flex items-center justify-between">
+                        <Label>Are you a wicket-keeper?</Label>
+                        <Switch onCheckedChange={(checked) => form.setValue('isWicketKeeper', checked)} />
+                    </div>
+                </CardContent>
+            </Card>
+
 
             <Button type="submit" className="w-full">Register</Button>
           </form>

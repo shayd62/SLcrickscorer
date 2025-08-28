@@ -82,6 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createUserProfile = async (uid: string, data: Omit<UserProfile, 'uid'>) => {
     await setDoc(doc(db, 'users', uid), { uid, ...data });
+    setUserProfile({ uid, ...data });
   };
 
   const value = {

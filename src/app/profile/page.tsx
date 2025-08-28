@@ -4,10 +4,11 @@
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, User, Mail, Phone, MapPin, Edit } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, MapPin, Edit, Shield, GanttChartSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import withAuth from '@/components/with-auth';
 import Image from 'next/image';
+import { CricketBatIcon, CricketBallIcon } from '@/components/icons';
 
 function ProfilePage() {
     const router = useRouter();
@@ -46,7 +47,7 @@ function ProfilePage() {
                             height={100}
                             className="rounded-full border-4 border-primary"
                         />
-                        <CardTitle className="mt-4">{userProfile.name}</CardTitle>
+                        <CardTitle className="mt-4">{userProfile.name} ({userProfile.shortName})</CardTitle>
                         <CardDescription>{userProfile.gender}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -62,6 +63,27 @@ function ProfilePage() {
                             <MapPin className="h-5 w-5 text-muted-foreground" />
                             <span className="text-sm">{userProfile.address || 'Not provided'}</span>
                         </div>
+                         <Card>
+                            <CardHeader className='p-3'>
+                                <CardTitle className='text-base'>Playing Style</CardTitle>
+                            </CardHeader>
+                            <CardContent className='p-3 pt-0 space-y-3'>
+                                <div className="flex items-center gap-4">
+                                    <CricketBatIcon className="h-5 w-5 text-muted-foreground" />
+                                    <span className="text-sm">{userProfile.battingStyle || 'Not specified'}</span>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <CricketBallIcon className="h-5 w-5 text-muted-foreground" />
+                                    <span className="text-sm">{userProfile.bowlingStyle || 'Not specified'}</span>
+                                </div>
+                                {userProfile.isWicketKeeper && (
+                                    <div className="flex items-center gap-4">
+                                        <GanttChartSquare className="h-5 w-5 text-muted-foreground" />
+                                        <span className="text-sm">Wicket Keeper</span>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     </CardContent>
                 </Card>
             </main>
