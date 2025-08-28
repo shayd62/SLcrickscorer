@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -258,19 +259,54 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
         }
 
         try {
+            // Player uniqueness check
+            const teamsRef = collection(db, "teams");
+            const newTeamQuery = query(teamsRef, where("name", "==", selectedTeam), where("userId", "==", user?.uid));
+            const newTeamSnapshot = await getDocs(newTeamQuery);
+
+            if (newTeamSnapshot.empty) {
+                toast({ title: "Error", description: "Selected team not found.", variant: 'destructive' });
+                return;
+            }
+            const newTeamData = newTeamSnapshot.docs[0].data() as Team;
+            const newPlayerIds = newTeamData.players.map(p => p.id);
+
+            const participatingTeamNames = tournament.participatingTeams || [];
+            if (participatingTeamNames.length > 0) {
+                const participatingTeamsQuery = query(teamsRef, where("name", "in", participatingTeamNames));
+                const participatingTeamsSnapshot = await getDocs(participatingTeamsQuery);
+                const existingPlayerIds = new Set<string>();
+                
+                participatingTeamsSnapshot.forEach(doc => {
+                    const teamData = doc.data() as Team;
+                    teamData.players.forEach(p => existingPlayerIds.add(p.id));
+                });
+
+                const duplicatePlayer = newPlayerIds.find(id => existingPlayerIds.has(id));
+
+                if (duplicatePlayer) {
+                    toast({
+                        title: "Duplicate Player Found",
+                        description: `A player from "${selectedTeam}" is already in another team in this tournament. Each player can only be on one team.`,
+                        variant: "destructive"
+                    });
+                    return;
+                }
+            }
+
             await onUpdate({ participatingTeams: arrayUnion(selectedTeam) });
             toast({ title: "Team Added!", description: `"${selectedTeam}" has joined the tournament.` });
             setSelectedTeam('');
-            // The onSnapshot listener will handle the UI update.
+            fetchTeams(); // Re-fetch to update the available teams list
         } catch (e) {
             console.error("Error joining tournament: ", e);
             toast({ title: "Error", description: "Could not add team to the tournament.", variant: 'destructive' });
         }
     };
 
+
     const handleRemoveTeam = async (teamName: string) => {
         await onUpdate({ participatingTeams: arrayRemove(teamName) });
-        // Also remove from any groups
         const updatedGroups = (tournament.groups || []).map(g => ({
             ...g,
             teams: g.teams.filter(t => t !== teamName)
