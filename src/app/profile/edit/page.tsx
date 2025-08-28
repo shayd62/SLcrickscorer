@@ -95,6 +95,7 @@ function EditProfilePage() {
     try {
       const photoURL = await uploadProfilePicture(user.uid, selectedFile);
       await updateUserProfile(user.uid, { photoURL });
+      form.setValue('photoURL', photoURL);
       toast({ title: "Profile Picture Updated!", description: "Your new picture has been saved." });
     } catch (error: any) {
       toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
