@@ -112,9 +112,10 @@ function UpcomingMatchCard({ match, tournamentName }: { match: TournamentMatch, 
   );
 }
 
-function RecentResultCard({ match, onDelete }: { match: MatchState, onDelete: (matchId: string) => void }) {
+function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchState, onDelete: (matchId: string) => void, currentUserId?: string }) {
     const { config, resultText } = match;
     const router = useRouter();
+    const isCreator = match.userId === currentUserId;
     
     return (
         <Card className="p-4 bg-secondary/50 rounded-2xl transition-all hover:bg-secondary/70">
@@ -125,25 +126,27 @@ function RecentResultCard({ match, onDelete }: { match: MatchState, onDelete: (m
                         <p><span className='font-medium text-foreground'>{resultText}</span></p>
                     </div>
                 </div>
-                 <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                          <Trash2 className="h-5 w-5 text-destructive" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete this match record.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => onDelete(match.id!)}>Delete</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                 {isCreator && (
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                            <Trash2 className="h-5 w-5 text-destructive" />
+                        </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete this match record.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => onDelete(match.id!)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                 )}
             </div>
         </Card>
     );
@@ -200,16 +203,13 @@ function HomePage() {
             setLoading(false);
         });
         
-        let completedUnsubscribe = () => {};
-        if (user) {
-            const completedQuery = query(collection(db, "matches"), where("userId", "==", user.uid), where("matchOver", "==", true));
-            completedUnsubscribe = onSnapshot(completedQuery, (querySnapshot) => {
-                const completedMatchesData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
-                setCompletedMatches(completedMatchesData);
-            }, (error) => {
-                console.error("Failed to fetch completed matches:", error);
-            });
-        }
+        const completedQuery = query(collection(db, "matches"), where("matchOver", "==", true));
+        const completedUnsubscribe = onSnapshot(completedQuery, (querySnapshot) => {
+            const completedMatchesData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
+            setCompletedMatches(completedMatchesData);
+        }, (error) => {
+            console.error("Failed to fetch completed matches:", error);
+        });
         
         const fetchUpcomingMatches = async () => {
             const tournamentsQuery = query(collection(db, "tournaments"));
@@ -335,7 +335,7 @@ function HomePage() {
                                 </Card>
                              )}
                              {completedMatches.map(match => (
-                                <RecentResultCard key={match.id} match={match} onDelete={handleDeleteMatch} />
+                                <RecentResultCard key={match.id} match={match} onDelete={handleDeleteMatch} currentUserId={user?.uid} />
                              ))}
                         </TabsContent>
                     </Tabs>
@@ -347,3 +347,5 @@ function HomePage() {
 }
 
 export default withAuth(HomePage);
+
+    
