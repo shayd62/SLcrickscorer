@@ -44,7 +44,7 @@ function ProfilePage() {
                 <Card className="w-full max-w-md shadow-lg">
                     <CardHeader className="items-center text-center">
                         <Image 
-                            src={`https://picsum.photos/seed/${user.uid}/100/100`} 
+                            src={userProfile.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} 
                             alt="Profile Picture" 
                             width={100}
                             height={100}

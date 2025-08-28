@@ -26,6 +26,7 @@ const profileSchema = z.object({
   battingStyle: z.enum(['Right-handed', 'Left-handed']).optional(),
   bowlingStyle: z.enum(['Right-arm', 'Left-arm']).optional(),
   isWicketKeeper: z.boolean().optional(),
+  photoURL: z.string().url().optional().or(z.literal('')),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -46,6 +47,7 @@ function EditProfilePage() {
       battingStyle: 'Right-handed',
       bowlingStyle: 'Right-arm',
       isWicketKeeper: false,
+      photoURL: '',
     }
   });
 
@@ -60,6 +62,7 @@ function EditProfilePage() {
         battingStyle: userProfile.battingStyle,
         bowlingStyle: userProfile.bowlingStyle,
         isWicketKeeper: userProfile.isWicketKeeper,
+        photoURL: userProfile.photoURL || '',
       });
     }
   }, [userProfile, form]);
@@ -109,6 +112,12 @@ function EditProfilePage() {
                     <Label htmlFor="shortName">Short Name</Label>
                     <Input id="shortName" {...form.register('shortName')} />
                     </div>
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="photoURL">Profile Picture URL</Label>
+                    <Input id="photoURL" {...form.register('photoURL')} />
+                    {form.formState.errors.photoURL && <p className="text-destructive text-sm">{form.formState.errors.photoURL.message}</p>}
                 </div>
                 
                 <div className="space-y-2">

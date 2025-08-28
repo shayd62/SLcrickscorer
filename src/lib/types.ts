@@ -246,4 +246,5 @@ export interface UserProfile {
   battingStyle?: 'Right-handed' | 'Left-handed';
   bowlingStyle?: 'Right-arm' | 'Left-arm';
   isWicketKeeper?: boolean;
+  photoURL?: string;
 }

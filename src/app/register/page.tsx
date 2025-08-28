@@ -27,6 +27,7 @@ const registerSchema = z.object({
   battingStyle: z.enum(['Right-handed', 'Left-handed']).optional(),
   bowlingStyle: z.enum(['Right-arm', 'Left-arm']).optional(),
   isWicketKeeper: z.boolean().optional(),
+  photoURL: z.string().url().optional().or(z.literal('')),
 }).refine(data => data.email || data.phoneNumber, {
   message: 'Either Email or Phone Number is required.',
   path: ['email'],
@@ -69,6 +70,7 @@ function RegisterPage() {
         battingStyle: data.battingStyle,
         bowlingStyle: data.bowlingStyle,
         isWicketKeeper: data.isWicketKeeper,
+        photoURL: data.photoURL,
       };
       
       await createUserProfile(user.uid, profileData);
@@ -105,6 +107,12 @@ function RegisterPage() {
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" {...form.register('email')} />
               {form.formState.errors.email && <p className="text-destructive text-sm">{form.formState.errors.email.message}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="photoURL">Profile Picture URL (Optional)</Label>
+              <Input id="photoURL" {...form.register('photoURL')} />
+              {form.formState.errors.photoURL && <p className="text-destructive text-sm">{form.formState.errors.photoURL.message}</p>}
             </div>
 
             <div className="space-y-2">
