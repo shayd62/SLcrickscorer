@@ -61,6 +61,7 @@ export interface Tournament {
   description?: string;
   numberOfTeams?: string;
   logoUrl?: string;
+  coverPhotoUrl?: string;
   startDate: string;
   endDate: string;
   oversPerInnings: number;
@@ -240,7 +241,7 @@ export interface UserProfile {
   name: string;
   shortName?: string;
   email?: string;
-  phoneNumber?: string;
+  phoneNumber: string;
   address?: string | null;
   gender: 'Male' | 'Female' | 'Other';
   battingStyle?: 'Right-handed' | 'Left-handed';

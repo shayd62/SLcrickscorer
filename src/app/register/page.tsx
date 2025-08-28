@@ -19,8 +19,8 @@ import { Switch } from '@/components/ui/switch';
 const registerSchema = z.object({
   name: z.string().min(1, 'Name is required.'),
   shortName: z.string().optional(),
-  email: z.string().optional(),
-  phoneNumber: z.string().optional(),
+  email: z.string().email('Invalid email address.').optional().or(z.literal('')),
+  phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits.'),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
   address: z.string().optional(),
   gender: z.enum(['Male', 'Female', 'Other'], { required_error: 'Gender is required.' }),
@@ -48,22 +48,24 @@ function RegisterPage() {
   });
 
   const onSubmit = async (data: RegisterFormValues) => {
-    if (!data.email) {
-      toast({ title: "Phone sign-up not implemented", description: "Please register with an email for now.", variant: "destructive" });
-      return;
+    let emailToRegister = data.email;
+
+    if (!emailToRegister) {
+      // If no email is provided, create a dummy one from the phone number
+      emailToRegister = `${data.phoneNumber}@cricmate.com`;
     }
 
     try {
       if (!signUpWithEmail) {
         throw new Error('SignUp function is not available.');
       }
-      const userCredential = await signUpWithEmail(data.email, data.password);
+      const userCredential = await signUpWithEmail(emailToRegister, data.password);
       const user = userCredential.user;
 
       const profileData = {
         name: data.name,
         shortName: data.shortName,
-        email: data.email,
+        email: data.email, // Store the real email if provided, otherwise it's undefined
         phoneNumber: data.phoneNumber,
         address: data.address,
         gender: data.gender,
@@ -102,9 +104,15 @@ function RegisterPage() {
                   <Input id="shortName" {...form.register('shortName')} />
                 </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Phone Number</Label>
+              <Input id="phoneNumber" type="tel" {...form.register('phoneNumber')} />
+              {form.formState.errors.phoneNumber && <p className="text-destructive text-sm">{form.formState.errors.phoneNumber.message}</p>}
+            </div>
             
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Email (Optional)</Label>
               <Input id="email" type="email" {...form.register('email')} />
               {form.formState.errors.email && <p className="text-destructive text-sm">{form.formState.errors.email.message}</p>}
             </div>
@@ -113,11 +121,6 @@ function RegisterPage() {
               <Label htmlFor="photoURL">Profile Picture URL (Optional)</Label>
               <Input id="photoURL" {...form.register('photoURL')} />
               {form.formState.errors.photoURL && <p className="text-destructive text-sm">{form.formState.errors.photoURL.message}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phoneNumber">Phone Number</Label>
-              <Input id="phoneNumber" type="tel" {...form.register('phoneNumber')} />
             </div>
 
             <div className="space-y-2">

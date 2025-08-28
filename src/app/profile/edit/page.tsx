@@ -21,7 +21,8 @@ import Image from 'next/image';
 const profileSchema = z.object({
   name: z.string().min(1, 'Name is required.'),
   shortName: z.string().optional(),
-  phoneNumber: z.string().optional(),
+  email: z.string().email('Invalid email address.').optional().or(z.literal('')),
+  phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits.'),
   address: z.string().optional(),
   gender: z.enum(['Male', 'Female', 'Other'], { required_error: 'Gender is required.' }),
   battingStyle: z.enum(['Right-handed', 'Left-handed']).optional(),
@@ -45,6 +46,7 @@ function EditProfilePage() {
     defaultValues: {
       name: '',
       shortName: '',
+      email: '',
       phoneNumber: '',
       address: '',
       gender: 'Male',
@@ -60,6 +62,7 @@ function EditProfilePage() {
       form.reset({
         name: userProfile.name,
         shortName: userProfile.shortName || '',
+        email: userProfile.email || '',
         phoneNumber: userProfile.phoneNumber || '',
         address: userProfile.address || '',
         gender: userProfile.gender,
@@ -168,8 +171,15 @@ function EditProfilePage() {
                 </div>
                 
                 <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Phone Number</Label>
-                <Input id="phoneNumber" type="tel" {...form.register('phoneNumber')} />
+                  <Label htmlFor="phoneNumber">Phone Number</Label>
+                  <Input id="phoneNumber" type="tel" {...form.register('phoneNumber')} />
+                  {form.formState.errors.phoneNumber && <p className="text-destructive text-sm">{form.formState.errors.phoneNumber.message}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email (Optional)</Label>
+                  <Input id="email" type="email" {...form.register('email')} />
+                  {form.formState.errors.email && <p className="text-destructive text-sm">{form.formState.errors.email.message}</p>}
                 </div>
 
                 <div className="space-y-2">
