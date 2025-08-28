@@ -17,8 +17,8 @@ interface AuthContextType {
   signUpWithEmail: (email: string, password: string) => Promise<any>;
   signInWithEmail: (email: string, password: string) => Promise<any>;
   signInWithPhoneAndPassword: (phoneNumber: string, password: string) => Promise<any>;
-  createUserProfile: (uid: string, data: Omit<UserProfile, 'uid'>) => Promise<void>;
-  updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid'>>) => Promise<void>;
+  createUserProfile: (uid: string, data: Omit<UserProfile, 'uid' | 'id'>) => Promise<void>;
+  updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => Promise<void>;
   uploadProfilePicture: (uid: string, file: File) => Promise<string>;
   uploadTournamentImage: (tournamentId: string, file: File, type: 'logo' | 'cover') => Promise<string>;
   searchUsers: (searchTerm: string) => Promise<UserProfile[]>;
@@ -37,22 +37,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       if (user) {
         setUser(user);
-        // Find user profile by UID to get their phone number, then get the profile
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where("uid", "==", user.uid));
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
-            const userDocWithUid = querySnapshot.docs[0];
-            const phoneNumber = userDocWithUid.id; // The document ID is the phone number
-            const userDocRef = doc(db, 'users', phoneNumber);
-            const userDocSnap = await getDoc(userDocRef);
-
-            if (userDocSnap.exists()) {
-                 setUserProfile(userDocSnap.data() as UserProfile);
-            } else {
-                 setUserProfile(null);
-            }
+            const userDoc = querySnapshot.docs[0];
+            setUserProfile({ id: userDoc.id, ...userDoc.data() } as UserProfile);
         } else {
           setUserProfile(null);
         }
@@ -102,25 +93,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return signInWithEmailAndPassword(auth, userData.email, password);
   };
 
-  const createUserProfile = async (uid: string, data: Omit<UserProfile, 'uid'>) => {
+  const createUserProfile = async (uid: string, data: Omit<UserProfile, 'uid' | 'id'>) => {
     // Use phone number as the document ID
-    await setDoc(doc(db, 'users', data.phoneNumber), { uid, ...data });
-    setUserProfile({ uid, ...data });
+    const docId = data.phoneNumber;
+    const profileData = { uid, ...data };
+    await setDoc(doc(db, 'users', docId), profileData);
+    setUserProfile({ id: docId, ...profileData });
   };
   
-  const updateUserProfile = async (uid: string, data: Partial<Omit<UserProfile, 'uid'>>) => {
-    // Find user doc by UID to update it, as phone number (doc ID) might change.
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where("uid", "==", uid));
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-        const userDocRef = querySnapshot.docs[0].ref;
-        await updateDoc(userDocRef, data);
-        setUserProfile(prev => prev ? { ...prev, ...data } : null);
-    } else {
-        throw new Error("User profile not found for update.");
+  const updateUserProfile = async (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => {
+    if (!userProfile?.id) {
+        throw new Error("No user profile found to update.");
     }
+    const userDocRef = doc(db, 'users', userProfile.id);
+    await updateDoc(userDocRef, data);
+    setUserProfile(prev => prev ? { ...prev, ...data } : null);
   };
 
   const uploadProfilePicture = async (uid: string, file: File) => {
@@ -150,12 +137,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const usersMap = new Map<string, UserProfile>();
       
       nameSnapshot.forEach(doc => {
-          const userData = doc.data() as UserProfile;
+          const userData = { id: doc.id, ...doc.data()} as UserProfile;
           usersMap.set(userData.uid, userData);
       });
       
       phoneSnapshot.forEach(doc => {
-          const userData = doc.data() as UserProfile;
+          const userData = { id: doc.id, ...doc.data() } as UserProfile;
           usersMap.set(userData.uid, userData);
       });
 

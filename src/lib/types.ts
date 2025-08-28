@@ -237,6 +237,7 @@ export interface MatchState {
 }
 
 export interface UserProfile {
+  id: string; // The document ID, which is the phone number
   uid: string;
   name: string;
   shortName?: string;
