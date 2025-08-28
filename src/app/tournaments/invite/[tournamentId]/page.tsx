@@ -14,6 +14,7 @@ import { doc, getDoc, updateDoc, arrayUnion, onSnapshot, collection, query, wher
 import { useAuth } from '@/contexts/auth-context';
 import withAuth from '@/components/with-auth';
 import Link from 'next/link';
+import { Label } from '@/components/ui/label';
 
 function TournamentInvitePage() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
