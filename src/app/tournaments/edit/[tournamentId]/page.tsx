@@ -1,7 +1,8 @@
 
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Shield, ArrowLeft, CalendarIcon, Plus } from 'lucide-react';
+import { Shield, ArrowLeft, CalendarIcon, Plus, Upload } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -23,6 +24,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, getDoc, query, where } from 'firebase/firestore';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
+import Image from 'next/image';
 
 const tournamentSchema = z.object({
   name: z.string().min(1, 'Tournament name is required.'),
@@ -41,6 +43,8 @@ const tournamentSchema = z.object({
   ballType: z.string().optional(),
   pitchType: z.string().optional(),
   tournamentFormat: z.enum(['Round Robin', 'Knockout', 'League']).optional(),
+  logoUrl: z.string().url().optional().or(z.literal('')),
+  coverPhotoUrl: z.string().url().optional().or(z.literal('')),
 });
 
 type TournamentFormValues = z.infer<typeof tournamentSchema>;
@@ -51,7 +55,12 @@ function EditTournamentPage() {
   const { toast } = useToast();
   const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
   const tournamentId = params.tournamentId as string;
-  const { user } = useAuth();
+  const { user, uploadTournamentImage } = useAuth();
+  
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
   const form = useForm<TournamentFormValues>({
     resolver: zodResolver(tournamentSchema),
@@ -70,6 +79,8 @@ function EditTournamentPage() {
       ballType: '',
       pitchType: '',
       tournamentFormat: undefined,
+      logoUrl: '',
+      coverPhotoUrl: '',
     },
     mode: 'onChange',
   });
@@ -106,6 +117,8 @@ function EditTournamentPage() {
                     startDate: new Date(tournamentData.startDate),
                     endDate: new Date(tournamentData.endDate),
                 });
+                if(tournamentData.logoUrl) setLogoPreview(tournamentData.logoUrl);
+                if(tournamentData.coverPhotoUrl) setCoverPreview(tournamentData.coverPhotoUrl);
             } else {
                 toast({ title: "Error", description: "Tournament not found.", variant: "destructive" });
                 router.push('/tournaments');
@@ -115,23 +128,53 @@ function EditTournamentPage() {
     }
   }, [tournamentId, form, router, toast, user]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'cover') => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              if (type === 'logo') {
+                  setLogoFile(file);
+                  setLogoPreview(reader.result as string);
+              } else {
+                  setCoverFile(file);
+                  setCoverPreview(reader.result as string);
+              }
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
   const onSubmit = async (data: TournamentFormValues) => {
     if (!user) return;
-    const tournamentData = {
-      ...data,
-      id: tournamentId,
-      startDate: data.startDate.toISOString(),
-      endDate: data.endDate.toISOString(),
-      userId: user.uid,
-    };
+
+    let { logoUrl, coverPhotoUrl } = data;
 
     try {
-      await setDoc(doc(db, "tournaments", tournamentId), tournamentData, { merge: true });
-      toast({
-        title: "Tournament Updated!",
-        description: `The tournament "${data.name}" has been updated successfully.`,
-      });
-      router.push(`/tournaments/${tournamentId}`);
+        if(logoFile) {
+            logoUrl = await uploadTournamentImage(tournamentId, logoFile, 'logo');
+        }
+        if(coverFile) {
+            coverPhotoUrl = await uploadTournamentImage(tournamentId, coverFile, 'cover');
+        }
+
+        const tournamentData = {
+          ...data,
+          id: tournamentId,
+          startDate: data.startDate.toISOString(),
+          endDate: data.endDate.toISOString(),
+          userId: user.uid,
+          logoUrl,
+          coverPhotoUrl,
+        };
+
+        await setDoc(doc(db, "tournaments", tournamentId), tournamentData, { merge: true });
+        toast({
+            title: "Tournament Updated!",
+            description: `The tournament "${data.name}" has been updated successfully.`,
+        });
+        router.push(`/tournaments/${tournamentId}`);
+
     } catch (e) {
       console.error("Error updating document: ", e);
       toast({ title: "Error", description: "Could not update the tournament.", variant: "destructive" });
@@ -173,6 +216,20 @@ function EditTournamentPage() {
                 <Input id="tournament-name" {...form.register('name')} placeholder="e.g., Premier League 2024" />
                 {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
               </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <Label>Logo</Label>
+                        {logoPreview && <Image src={logoPreview} alt="Logo preview" width={80} height={80} className="rounded-full mx-auto" />}
+                        <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'logo')} />
+                    </div>
+                     <div className="space-y-2">
+                        <Label>Cover Photo</Label>
+                        {coverPreview && <Image src={coverPreview} alt="Cover preview" width={300} height={100} className="rounded-md mx-auto w-full aspect-[3/1] object-cover" />}
+                        <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'cover')} />
+                    </div>
+                </div>
+
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <Controller

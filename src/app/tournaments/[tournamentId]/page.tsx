@@ -754,7 +754,7 @@ function TournamentDetailsPage() {
             </header>
 
             <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 relative">
-                 <div className="relative w-full h-64 rounded-xl overflow-hidden bg-secondary shadow-lg">
+                 <div className="relative w-full h-48 md:h-64 rounded-xl overflow-hidden bg-secondary shadow-lg group">
                     <Image
                         src={tournament.coverPhotoUrl || 'https://picsum.photos/1200/400'}
                         alt="Tournament Cover Photo"
@@ -762,7 +762,19 @@ function TournamentDetailsPage() {
                         objectFit="cover"
                         data-ai-hint="cricket stadium"
                     />
-                    <div className="absolute inset-0 bg-black/40" />
+                    <div className="absolute inset-0 bg-black/50" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-24 h-24 md:w-32 md:h-32 bg-background/70 rounded-full flex items-center justify-center border-4 border-white backdrop-blur-sm">
+                             <Image
+                                src={tournament.logoUrl || 'https://picsum.photos/200/200'}
+                                alt="Tournament Logo"
+                                width={128}
+                                height={128}
+                                className="rounded-full object-cover"
+                                data-ai-hint="cricket logo"
+                            />
+                        </div>
+                    </div>
                 </div>
                 <Tabs defaultValue="teams" className="w-full">
                     <TabsList className="grid w-full grid-cols-4">
