@@ -100,13 +100,11 @@ export function PlayerSearchDialog({
                     ))}
                 </div>
                  <DialogFooter>
-                    <Link href="/register" legacyBehavior>
-                        <a target="_blank" rel="noopener noreferrer">
-                             <Button variant="outline">
-                                <UserPlus className="mr-2 h-4 w-4"/>
-                                Register New Player
-                            </Button>
-                        </a>
+                    <Link href="/register" target="_blank" rel="noopener noreferrer">
+                         <Button variant="outline">
+                            <UserPlus className="mr-2 h-4 w-4"/>
+                            Register New Player
+                        </Button>
                     </Link>
                 </DialogFooter>
             </DialogContent>
