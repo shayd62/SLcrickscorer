@@ -33,7 +33,7 @@ const powerPlaySchema = z.object({
 });
 
 const matchDetailsSchema = z.object({
-  matchType: z.enum(['Limited Overs', 'Test Match', 'The Hundred']),
+  matchType: z.enum(['Limited Overs', 'Test Match', 'The Hundred', 'T20', 'ODI']),
   matchRound: z.enum(['League', 'Quarter Final', 'Pre Quarter Final', 'Final']),
   matchNumber: z.number().min(1),
   group: z.string().min(1, 'Group is required'),
@@ -368,8 +368,10 @@ function MatchDetailsContent() {
                 <main className="p-4 space-y-6">
                     <div className="space-y-2">
                         <Label className="font-semibold">Match Type</Label>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                             <ChipButton label="Limited Overs" isSelected={form.watch('matchType') === 'Limited Overs'} onClick={() => form.setValue('matchType', 'Limited Overs')} />
+                            <ChipButton label="T20" isSelected={form.watch('matchType') === 'T20'} onClick={() => form.setValue('matchType', 'T20')} />
+                            <ChipButton label="ODI" isSelected={form.watch('matchType') === 'ODI'} onClick={() => form.setValue('matchType', 'ODI')} />
                             <ChipButton label="Test Match" isSelected={form.watch('matchType') === 'Test Match'} onClick={() => form.setValue('matchType', 'Test Match')} />
                             <ChipButton label="The Hundred" isSelected={form.watch('matchType') === 'The Hundred'} onClick={() => form.setValue('matchType', 'The Hundred')} />
                         </div>
