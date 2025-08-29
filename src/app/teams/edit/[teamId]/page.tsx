@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Plus, Trash2, Users, ArrowLeft, Trophy, MapPin, ChevronRight, UserPlus } from 'lucide-react';
+import { Plus, Trash2, Users, ArrowLeft, Trophy, MapPin, ChevronRight, UserPlus, Settings } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -187,7 +187,9 @@ function EditTeamPage() {
           <div className='flex flex-col items-center'>
             <h1 className="text-xl font-bold">{team.name}</h1>
           </div>
-          <div className="w-10"></div>
+          <Button variant="ghost" size="icon" onClick={() => { /* Navigate to team settings */ }}>
+            <Settings className="h-6 w-6" />
+          </Button>
       </header>
       <main className="p-4 md:p-8 flex flex-col items-center">
         <div className="flex flex-col items-center gap-2">
