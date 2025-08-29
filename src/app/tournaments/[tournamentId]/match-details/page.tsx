@@ -324,6 +324,7 @@ function MatchDetailsContent() {
 
     const editingTeamData = editingTeam === 'team1' ? team1 : team2;
     const editingSquadData = editingTeam === 'team1' ? squad1 : squad2;
+    const opponentSquadData = editingTeam === 'team1' ? squad2 : squad1;
     
     const filteredPlayers = (editingTeamData?.players || []).filter(player =>
         player.name.toLowerCase().includes(squadSearchTerm.toLowerCase())
@@ -494,16 +495,23 @@ function MatchDetailsContent() {
                         />
                     </div>
                     <div className="max-h-80 overflow-y-auto space-y-2 p-1">
-                        {filteredPlayers.map(player => (
-                            <div key={player.id} className="flex items-center space-x-2">
-                                <Checkbox
-                                    id={player.id}
-                                    checked={editingSquadData.some(p => p.id === player.id)}
-                                    onCheckedChange={(checked) => handlePlayerSelection(player.id, !!checked)}
-                                />
-                                <Label htmlFor={player.id}>{player.name}</Label>
-                            </div>
-                        ))}
+                        {filteredPlayers.map(player => {
+                            const isSelectedInOpponentSquad = opponentSquadData.some(p => p.id === player.id);
+                            return (
+                                <div key={player.id} className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id={player.id}
+                                        checked={editingSquadData.some(p => p.id === player.id)}
+                                        onCheckedChange={(checked) => handlePlayerSelection(player.id, !!checked)}
+                                        disabled={isSelectedInOpponentSquad}
+                                    />
+                                    <Label htmlFor={player.id} className={cn(isSelectedInOpponentSquad && "text-muted-foreground line-through")}>
+                                        {player.name}
+                                        {isSelectedInOpponentSquad && " (in other team)"}
+                                    </Label>
+                                </div>
+                            )
+                        })}
                     </div>
                     <DialogFooter className="sm:justify-between items-center mt-4">
                          <Button type="button" variant="outline" onClick={() => setPlayerSearchOpen(true)}>
