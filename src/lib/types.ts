@@ -128,6 +128,11 @@ export interface AllRounderLeaderboardStat {
     points: number;
 }
 
+export interface PowerPlay {
+  type: string; // e.g., 'P1', 'P2'
+  startOver: number;
+  endOver: number;
+}
 
 export interface MatchConfig {
   team1: Team;
@@ -150,6 +155,7 @@ export interface MatchConfig {
   venue?: string;
   matchDate?: string;
   ballsPerOver: number;
+  powerPlay?: PowerPlay[];
   noBall: {
     enabled: boolean;
     reball: boolean;

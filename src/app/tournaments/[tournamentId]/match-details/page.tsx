@@ -5,12 +5,12 @@
 import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, Calendar, MapPin, Plus, ChevronRight, Key, Shield, Search } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Plus, ChevronRight, Key, Shield, Search, Settings, Trash2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,12 +19,18 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { db } from '@/lib/firebase';
 import { doc, collection, query, where, addDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
-import type { Team, MatchConfig, MatchState, Innings, Player, Tournament, UserProfile } from '@/lib/types';
+import type { Team, MatchConfig, MatchState, Innings, Player, Tournament, UserProfile, PowerPlay } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { PlayerSearchDialog } from '@/components/player-search-dialog';
+
+const powerPlaySchema = z.object({
+  type: z.string().min(1),
+  startOver: z.number().min(1),
+  endOver: z.number().min(1),
+});
 
 const matchDetailsSchema = z.object({
   matchType: z.enum(['Limited Overs', 'Test Match', 'The Hundred']),
@@ -35,6 +41,7 @@ const matchDetailsSchema = z.object({
   pitchType: z.enum(['Turf', 'Mat', 'Cement', 'Astroturf']),
   ballType: z.enum(['Leather', 'Soft Tennis', 'Tape', 'Rubber']),
   pointsTable: z.boolean(),
+  powerPlay: z.array(powerPlaySchema).optional(),
 });
 
 type MatchDetailsFormValues = z.infer<typeof matchDetailsSchema>;
@@ -52,6 +59,55 @@ function ChipButton({ label, isSelected, onClick }: { label: string, isSelected:
     )
 }
 
+function PowerPlayDialog({ open, onOpenChange, control, overs }: { open: boolean; onOpenChange: (open: boolean) => void; control: any; overs: number }) {
+    const { fields, append, remove } = useFieldArray({ control, name: 'powerPlay' });
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Power Play Settings</DialogTitle>
+                    <DialogDescription>Define the Power Play overs for the match. Max overs: {overs}</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 max-h-80 overflow-y-auto">
+                    {fields.map((field, index) => (
+                        <div key={field.id} className="flex items-center gap-2 border p-2 rounded-lg">
+                            <Input
+                                {...control.register(`powerPlay.${index}.type`)}
+                                placeholder={`P${index + 1}`}
+                                className="w-16"
+                            />
+                            <Input
+                                type="number"
+                                {...control.register(`powerPlay.${index}.startOver`, { valueAsNumber: true, max: overs })}
+                                placeholder="Start"
+                                className="w-20"
+                            />
+                            <Input
+                                type="number"
+                                {...control.register(`powerPlay.${index}.endOver`, { valueAsNumber: true, max: overs })}
+                                placeholder="End"
+                                className="w-20"
+                            />
+                            <Button variant="ghost" size="icon" onClick={() => remove(index)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+                <Button variant="outline" onClick={() => append({ type: `P${fields.length + 1}`, startOver: 1, endOver: overs })}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Power Play Phase
+                </Button>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button onClick={() => onOpenChange(false)}>Done</Button>
+                    </DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 function MatchDetailsContent() {
     const router = useRouter();
     const params = useParams();
@@ -66,6 +122,7 @@ function MatchDetailsContent() {
     const [squad2, setSquad2] = useState<Player[]>([]);
     
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [powerPlayDialogOpen, setPowerPlayDialogOpen] = useState(false);
     const [editingTeam, setEditingTeam] = useState<'team1' | 'team2' | null>(null);
     const [squadSearchTerm, setSquadSearchTerm] = useState('');
     const [isPlayerSearchOpen, setPlayerSearchOpen] = useState(false);
@@ -87,7 +144,8 @@ function MatchDetailsContent() {
             overs: 20,
             pitchType: 'Turf',
             ballType: 'Leather',
-            pointsTable: true
+            pointsTable: true,
+            powerPlay: [{ type: 'P1', startOver: 1, endOver: 6 }]
         }
     });
 
@@ -251,6 +309,7 @@ function MatchDetailsContent() {
             venue: venue,
             matchDate: matchDateStr ? decodeURIComponent(matchDateStr) : undefined,
             ballsPerOver: 6,
+            powerPlay: data.powerPlay,
             noBall: { enabled: true, reball: true, run: 1 },
             wideBall: { enabled: true, reball: true, run: 1 },
             ...data
@@ -273,6 +332,7 @@ function MatchDetailsContent() {
     return (
         <div className="min-h-screen bg-background text-foreground font-body">
             <PlayerSearchDialog open={isPlayerSearchOpen} onOpenChange={setPlayerSearchOpen} onPlayerSelect={handleAddNewPlayerToTeam} />
+            <PowerPlayDialog open={powerPlayDialogOpen} onOpenChange={setPowerPlayDialogOpen} control={form.control} overs={form.watch('overs')} />
             <form onSubmit={form.handleSubmit(handleProceedToToss)}>
                 <header className="p-4 bg-gray-800 text-white">
                     <div className="flex items-center justify-between">
@@ -354,8 +414,8 @@ function MatchDetailsContent() {
                             <Input id="overs" type="number" {...form.register('overs', { valueAsNumber: true })} className="w-20" />
                         </div>
                         <div className="flex items-center justify-between p-3 border rounded-lg">
-                            <Label className="font-semibold">PowerPlay</Label>
-                             <span className="text-sm text-muted-foreground">Not available</span>
+                           <Label className="font-semibold">PowerPlay</Label>
+                           <Button type="button" variant="ghost" onClick={() => setPowerPlayDialogOpen(true)}><Settings className="h-5 w-5" /></Button>
                         </div>
                     </div>
                     
