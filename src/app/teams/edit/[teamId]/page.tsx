@@ -4,13 +4,13 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Plus, Trash2, Users, ArrowLeft, Trophy, MapPin } from 'lucide-react';
+import { Plus, Trash2, Users, ArrowLeft, Trophy, MapPin, ChevronRight } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import type { Team, UserProfile } from '@/lib/types';
+import type { Team, UserProfile, MatchState } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayRemove, collection, query, where, getDocs } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,7 +25,35 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { cn } from '@/lib/utils';
 
+
+function MatchResultCard({ match, currentTeamName }: { match: MatchState, currentTeamName: string }) {
+    const router = useRouter();
+    const { config, resultText } = match;
+
+    const opponent = config.team1.name === currentTeamName ? config.team2 : config.team1;
+    const isWinner = match.winner === (config.team1.name === currentTeamName ? 'team1' : 'team2');
+
+    return (
+        <Card className="cursor-pointer hover:bg-secondary/50" onClick={() => router.push(`/scorecard/${match.id}`)}>
+            <CardContent className="p-4">
+                <div className="flex justify-between items-center">
+                    <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">vs {opponent.name}</p>
+                        <p className={cn(
+                            "font-semibold",
+                            isWinner ? 'text-green-500' : 'text-destructive'
+                        )}>
+                            {resultText}
+                        </p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
 
 function EditTeamPage() {
   const router = useRouter();
@@ -33,12 +61,14 @@ function EditTeamPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [team, setTeam] = useState<Team | null>(null);
+  const [matches, setMatches] = useState<MatchState[]>([]);
   
   const teamId = params.teamId as string;
   
   useEffect(() => {
     if (teamId && user) {
-        const fetchTeam = async () => {
+        const fetchTeamAndMatches = async () => {
+            // Fetch team details
             const teamDocRef = doc(db, "teams", teamId);
             const docSnap = await getDoc(teamDocRef);
             if (docSnap.exists()) {
@@ -49,12 +79,38 @@ function EditTeamPage() {
                     return;
                 }
                 setTeam(teamData);
+
+                // Fetch matches for this team
+                const matchesRef = collection(db, "matches");
+                const q1 = query(matchesRef, where("config.team1.name", "==", teamData.name), where("matchOver", "==", true));
+                const q2 = query(matchesRef, where("config.team2.name", "==", teamData.name), where("matchOver", "==", true));
+
+                const [query1Snapshot, query2Snapshot] = await Promise.all([getDocs(q1), getDocs(q2)]);
+                
+                const teamMatches: MatchState[] = [];
+                const matchIds = new Set<string>();
+
+                query1Snapshot.forEach((doc) => {
+                    if (!matchIds.has(doc.id)) {
+                        teamMatches.push({ ...doc.data(), id: doc.id } as MatchState);
+                        matchIds.add(doc.id);
+                    }
+                });
+                query2Snapshot.forEach((doc) => {
+                    if (!matchIds.has(doc.id)) {
+                        teamMatches.push({ ...doc.data(), id: doc.id } as MatchState);
+                        matchIds.add(doc.id);
+                    }
+                });
+                
+                setMatches(teamMatches);
+
             } else {
                 toast({ title: "Error", description: "Team not found.", variant: "destructive" });
                 router.push('/teams');
             }
         };
-        fetchTeam();
+        fetchTeamAndMatches();
     }
   }, [teamId, router, toast, user]);
 
@@ -124,12 +180,18 @@ function EditTeamPage() {
                 <TabsTrigger value="matches">Matches</TabsTrigger>
                 <TabsTrigger value="players">Players</TabsTrigger>
             </TabsList>
-            <TabsContent value="matches" className="mt-4">
-                <Card>
-                    <CardContent className="p-6 text-center text-muted-foreground">
-                        No matches played yet.
-                    </CardContent>
-                </Card>
+            <TabsContent value="matches" className="mt-4 space-y-2">
+                {matches.length > 0 ? (
+                    matches.map(match => (
+                        <MatchResultCard key={match.id} match={match} currentTeamName={team.name} />
+                    ))
+                ) : (
+                    <Card>
+                        <CardContent className="p-6 text-center text-muted-foreground">
+                            No matches played yet.
+                        </CardContent>
+                    </Card>
+                )}
             </TabsContent>
             <TabsContent value="players" className="mt-4 space-y-2">
                 {team.players.map(player => (
