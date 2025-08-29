@@ -1,16 +1,16 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Plus, Trash2, Users, ArrowLeft, Trophy, MapPin, ChevronRight, UserPlus, Settings } from 'lucide-react';
+import { Plus, Trash2, Users, ArrowLeft, Trophy, MapPin, ChevronRight, UserPlus, Settings, Pencil, Share2, Pin } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import type { Team, UserProfile, MatchState } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayRemove, arrayUnion, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayRemove, arrayUnion, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,6 +25,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 import { PlayerSearchDialog } from '@/components/player-search-dialog';
 
@@ -173,6 +180,36 @@ function EditTeamPage() {
     }
   };
 
+  const handleTeamDelete = async () => {
+    if (!team) return;
+    try {
+      await deleteDoc(doc(db, "teams", team.id));
+      toast({
+        title: "Team Deleted",
+        description: `Team "${team.name}" has been deleted successfully.`,
+        variant: "destructive",
+      });
+      router.push('/teams');
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete the team. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Error deleting team: ", error);
+    }
+  };
+
+  const handleShare = () => {
+    // This could be a link to a public team page in the future
+    const teamLink = `${window.location.origin}/teams/view/${teamId}`;
+    navigator.clipboard.writeText(teamLink);
+    toast({
+      title: "Link Copied!",
+      description: "A shareable link for your team has been copied to your clipboard.",
+    });
+  };
+
   if (!team) {
     return <div className="flex justify-center items-center h-screen">Loading team...</div>
   }
@@ -187,9 +224,56 @@ function EditTeamPage() {
           <div className='flex flex-col items-center'>
             <h1 className="text-xl font-bold">{team.name}</h1>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => { /* Navigate to team settings */ }}>
-            <Settings className="h-6 w-6" />
-          </Button>
+           <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Settings className="h-6 w-6" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => router.push(`/teams/edit-form/${team.id}`)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  <span>Edit</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleShare}>
+                    <Share2 className="mr-2 h-4 w-4" />
+                    <span>Share</span>
+                </DropdownMenuItem>
+                 <DropdownMenuItem>
+                    <Pin className="mr-2 h-4 w-4" />
+                    <span>Pin</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      <span>Delete</span>
+                    </DropdownMenuItem>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete the team "{team.name}" and all its data. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleTeamDelete}
+                        className="bg-destructive hover:bg-destructive/90"
+                      >
+                        Delete Team
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </DropdownMenuContent>
+            </DropdownMenu>
       </header>
       <main className="p-4 md:p-8 flex flex-col items-center">
         <div className="flex flex-col items-center gap-2">
