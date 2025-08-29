@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import type { Team } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trash2, Users, ArrowLeft, Plus, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -130,11 +130,6 @@ function TeamsPage() {
                     </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex-grow">
-                  <ul className="space-y-1 text-sm text-muted-foreground h-48 overflow-y-auto">
-                    {team.players.map((p, i) => <li key={p.id || `${team.name}-player-${i}`}>{p.name}</li>)}
-                  </ul>
-                </CardContent>
               </Card>
             ))}
           </div>
