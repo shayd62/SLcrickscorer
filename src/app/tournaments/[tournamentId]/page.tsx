@@ -261,29 +261,26 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
         }
 
         try {
-            const teamsRef = collection(db, "teams");
-            const teamKey = `team-${selectedTeam.replace(/\s/g, '-')}`;
-            const newTeamDoc = await getDoc(doc(teamsRef, teamKey));
-            
-            if (!newTeamDoc.exists()) {
+            const teamToAdd = availableTeams.find(t => t.name === selectedTeam);
+            if (!teamToAdd) {
                 toast({ title: "Error", description: "Selected team not found.", variant: 'destructive' });
                 return;
             }
 
-            const newTeamData = newTeamDoc.data() as Team;
-            const newPlayerIds = newTeamData.players.map(p => p.id);
-
+            const teamsRef = collection(db, "teams");
             const participatingTeamNames = tournament.participatingTeams || [];
+
             if (participatingTeamNames.length > 0) {
-                const participatingTeamsQuery = query(teamsRef, where("name", "in", participatingTeamNames));
+                const participatingTeamsQuery = query(teamsRef, where("name", "in", participatingTeamNames), where("userId", "==", user?.uid));
                 const participatingTeamsSnapshot = await getDocs(participatingTeamsQuery);
+
                 const existingPlayerIds = new Set<string>();
-                
                 participatingTeamsSnapshot.forEach(doc => {
                     const teamData = doc.data() as Team;
                     teamData.players.forEach(p => existingPlayerIds.add(p.id));
                 });
 
+                const newPlayerIds = teamToAdd.players.map(p => p.id);
                 const duplicatePlayer = newPlayerIds.find(id => existingPlayerIds.has(id));
 
                 if (duplicatePlayer) {
@@ -291,16 +288,16 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
                         title: "Duplicate Player Found",
                         description: `A player from "${selectedTeam}" is already in another team in this tournament. Each player can only be on one team.`,
                         variant: "destructive",
-                        duration: 5000,
+                        duration: 7000,
                     });
                     return;
                 }
             }
-
+            
             await onUpdate({ participatingTeams: arrayUnion(selectedTeam) });
             toast({ title: "Team Added!", description: `"${selectedTeam}" has joined the tournament.` });
             setSelectedTeam('');
-            fetchTeams(); // Re-fetch to update the available teams list
+            fetchTeams();
         } catch (e) {
             console.error("Error joining tournament: ", e);
             toast({ title: "Error", description: "Could not add team to the tournament.", variant: 'destructive' });
