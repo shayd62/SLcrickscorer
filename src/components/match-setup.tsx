@@ -12,18 +12,24 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CricketBallIcon, CricketBatIcon } from '@/components/icons';
 import { User, Users, Swords, Trophy, Plus, Trash2, Shield, UserCheck, UserPlus, Settings } from 'lucide-react';
-import type { MatchConfig, MatchState, Innings, Player as PlayerType, Team, Tournament } from '@/lib/types';
+import type { MatchConfig, MatchState, Innings, Player as PlayerType, Team, Tournament, UserProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
+import { PlayerSearchDialog } from './player-search-dialog';
+import { useToast } from '@/hooks/use-toast';
 
+const playerSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1, "Player name can't be empty"),
+});
 
 const teamSchema = z.object({
   name: z.string().min(1, 'Team name is required.'),
-  players: z.array(z.object({ name: z.string().min(1, "Player name can't be empty") })).min(2, 'At least 2 players are required.'),
+  players: z.array(playerSchema).min(2, 'At least 2 players are required.'),
   captainId: z.string().optional(),
   wicketKeeperId: z.string().optional(),
   twelfthManId: z.string().optional(),
@@ -61,8 +67,8 @@ type SetupFormValues = z.infer<typeof setupSchema>;
 const ADVANCED_SETTINGS_KEY = 'cricketAdvancedSettings';
 
 const defaultValues: Partial<SetupFormValues> = {
-  team1: { name: '', players: Array(11).fill(0).map((_, i) => ({ name: '' })) },
-  team2: { name: '', players: Array(11).fill(0).map((_, i) => ({ name: '' })) },
+  team1: { name: '', players: Array(11).fill(0).map((_, i) => ({ name: '', id: `t1p${i}` })) },
+  team2: { name: '', players: Array(11).fill(0).map((_, i) => ({ name: '', id: `t2p${i}` })) },
   oversPerInnings: 20,
   playersPerSide: 11,
   toss: { winner: 'team1', decision: 'bat' },
@@ -118,6 +124,10 @@ const createInitialState = (config: MatchConfig, userId?: string | null, matchId
 export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matchId: string) => void; }) {
   const [step, setStep] = useState(1);
   const [savedTeams, setSavedTeams] = useState<Team[]>([]);
+  const [playerSearchOpen, setPlayerSearchOpen] = useState(false);
+  const [editingTeamKey, setEditingTeamKey] = useState<'team1' | 'team2' | null>(null);
+  const { toast } = useToast();
+
   const router = useRouter();
   const { user } = useAuth();
   const form = useForm<SetupFormValues>({
@@ -147,8 +157,8 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
     }
   }, [form]);
 
-  const { fields: team1Players, append: appendT1, remove: removeT1, replace: replaceT1 } = useFieldArray({ control: form.control, name: "team1.players" });
-  const { fields: team2Players, append: appendT2, remove: removeT2, replace: replaceT2 } = useFieldArray({ control: form.control, name: "team2.players" });
+  const { fields: team1Players, append: appendT1, remove: removeT1 } = useFieldArray({ control: form.control, name: "team1.players" });
+  const { fields: team2Players, append: appendT2, remove: removeT2 } = useFieldArray({ control: form.control, name: "team2.players" });
   
   const playersPerSide = form.watch('playersPerSide');
   const matchType = form.watch('matchType');
@@ -156,28 +166,27 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
 
   useEffect(() => {
     const adjustPlayers = (
-      currentPlayers: {name: string, id?: string}[],
-      appendFn: (items: { name: string }[]) => void,
-      removeFn: (indices: number | number[]) => void
+      currentPlayers: {name: string, id: string}[],
+      appendFn: (items: { name: string, id: string }[]) => void,
+      removeFn: (indices: number | number[]) => void,
+      teamPrefix: string
     ) => {
         const currentLength = currentPlayers.length;
         if (playersPerSide < 2 || playersPerSide > 11) return;
         const difference = playersPerSide - currentLength;
         if (difference > 0) {
-            appendFn(Array(difference).fill({ name: '' }));
+            appendFn(Array.from({length: difference}, (_, i) => ({ name: '', id: `${teamPrefix}p${currentLength + i}` })));
         } else if (difference < 0) {
             const indicesToRemove = Array.from({ length: Math.abs(difference) }, (_, i) => currentLength - 1 - i);
             removeFn(indicesToRemove);
         }
     };
     
-    if (form.formState.isDirty && team1Players.length !== playersPerSide) {
-      adjustPlayers(form.getValues('team1.players'), appendT1, removeT1);
+    if (form.formState.isDirty) {
+      adjustPlayers(form.getValues('team1.players'), appendT1, removeT1, 't1');
+      adjustPlayers(form.getValues('team2.players'), appendT2, removeT2, 't2');
     }
-    if (form.formState.isDirty && team2Players.length !== playersPerSide) {
-      adjustPlayers(form.getValues('team2.players'), appendT2, removeT2);
-    }
-  }, [playersPerSide, form]);
+  }, [playersPerSide, form, appendT1, removeT1, appendT2, removeT2]);
   
   useEffect(() => {
     switch (matchFormat) {
@@ -187,7 +196,6 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
       case 'ODI':
         form.setValue('oversPerInnings', 50);
         break;
-      // For other cases, let the user decide
       default:
         break;
     }
@@ -201,41 +209,41 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
     const selectedTeam = savedTeams.find(t => t.name === teamName);
     if (selectedTeam) {
       form.setValue(`${teamKey}.name`, selectedTeam.name);
-      const players = selectedTeam.players.map(p => ({name: p.name}));
-      form.setValue(`${teamKey}.players`, players as any);
+      form.setValue(`${teamKey}.players`, selectedTeam.players.slice(0, playersPerSide));
       form.setValue('playersPerSide', selectedTeam.players.length);
     }
   };
   
-  const onSubmit = async (data: SetupFormValues) => {
-    const { team1, team2, oversPerInnings, toss, opening, playersPerSide, matchType, matchFormat, tournamentId, tournamentStage, venue } = data;
+  const handleOpenPlayerSearch = (teamKey: 'team1' | 'team2') => {
+    setEditingTeamKey(teamKey);
+    setPlayerSearchOpen(true);
+  };
+  
+  const handlePlayerSelect = (player: UserProfile) => {
+    if (!editingTeamKey) return;
     
-    const processTeam = (teamData: typeof team1, teamPrefix: string): Team => ({
-        ...teamData,
-        players: teamData.players.map((p, i) => ({ ...p, id: `${teamPrefix}p${i+1}` })),
-        captainId: teamData.captainId || '',
-        wicketKeeperId: teamData.wicketKeeperId || '',
-        twelfthManId: teamData.twelfthManId || '',
-    });
+    const teamPlayers = form.getValues(`${editingTeamKey}.players`);
+    const isAlreadyAdded = teamPlayers.some(p => p.id === player.uid);
+    if(isAlreadyAdded) {
+        toast({ title: "Player already in team", variant: "destructive" });
+        return;
+    }
+    
+    const emptyPlayerIndex = teamPlayers.findIndex(p => !p.name);
 
-    const team1WithIds = processTeam(team1, 't1');
-    const team2WithIds = processTeam(team2, 't2');
-    
+    if (emptyPlayerIndex !== -1) {
+        form.setValue(`${editingTeamKey}.players.${emptyPlayerIndex}.name`, player.name);
+        form.setValue(`${editingTeamKey}.players.${emptyPlayerIndex}.id`, player.uid);
+    } else {
+        toast({ title: "Team is full", description: "Remove a player to add a new one.", variant: "destructive" });
+    }
+  };
+
+  const onSubmit = async (data: SetupFormValues) => {
     const finalConfig: MatchConfig = {
-      team1: team1WithIds,
-      team2: team2WithIds,
-      oversPerInnings,
-      playersPerSide,
-      toss,
-      opening,
-      matchType: matchType || '',
-      matchFormat: matchFormat || '',
-      tournamentId: tournamentId || '',
-      tournamentStage: tournamentStage || '',
-      venue: venue || '',
-      ballsPerOver: data.ballsPerOver || 6,
-      noBall: data.noBall || { enabled: true, reball: true, run: 1 },
-      wideBall: data.wideBall || { enabled: true, reball: true, run: 1 },
+      ...data,
+      team1: { ...data.team1 },
+      team2: { ...data.team2 },
     };
     
     const matchId = `${finalConfig.team1.name.replace(/\s+/g, '-')}-vs-${finalConfig.team2.name.replace(/\s+/g, '-')}-${Date.now()}`;
@@ -248,24 +256,14 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
         console.error("Error adding document: ", e);
     }
   };
-  
-  const handleFinalStep = async () => {
-    const result = await form.trigger();
-    if (result) {
-      form.handleSubmit(onSubmit)();
-    }
-  };
 
   const getTeamWithIds = (teamKey: 'team1' | 'team2') => {
-    const teamData = form.watch(teamKey);
-    return {
-      ...teamData,
-      players: teamData.players.map((p, i) => ({...p, id: `${teamKey === 'team1' ? 't1' : 't2'}p${i + 1}`}))
-    }
+    return form.watch(teamKey);
   }
 
   return (
     <div className="w-full mx-auto">
+      <PlayerSearchDialog open={playerSearchOpen} onOpenChange={setPlayerSearchOpen} onPlayerSelect={handlePlayerSelect} />
       <CardHeader className="px-0">
         <CardTitle className="text-center text-xl font-semibold flex items-center justify-center gap-2 text-black">
           <Users className="h-6 w-6 text-primary" />
@@ -389,7 +387,6 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
                 const teamIndex = teamKey === 'team1' ? 0 : 1;
                 const players = teamKey === 'team1' ? team1Players : team2Players;
                 const removeFn = teamKey === 'team1' ? removeT1 : removeT2;
-                const appendFn = teamKey === 'team1' ? appendT1 : appendT2;
 
                 return (
                   <div key={teamKey} className="space-y-3 pt-4">
@@ -419,8 +416,8 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
                         </div>
                       ))}
                     </div>
-                     <Button type="button" onClick={() => appendFn({name: ''})} className="w-full justify-between bg-white text-gray-600 hover:bg-gray-100 rounded-lg shadow-sm border">
-                      Add Player
+                     <Button type="button" onClick={() => handleOpenPlayerSearch(teamKey as 'team1' | 'team2')} className="w-full justify-between bg-white text-gray-600 hover:bg-gray-100 rounded-lg shadow-sm border">
+                      Add Player from Search
                       <div className="bg-green-500 text-white rounded-md p-1">
                         <Plus className="h-5 w-5" />
                       </div>

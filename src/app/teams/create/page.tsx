@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Plus, Trash2, Users, ArrowLeft, Trophy, Search } from 'lucide-react';
+import { Plus, Trash2, Users, ArrowLeft, Trophy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -17,16 +17,8 @@ import { db } from '@/lib/firebase';
 import { doc, setDoc } from "firebase/firestore";
 import { useAuth } from '@/contexts/auth-context';
 import type { UserProfile } from '@/lib/types';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog";
+import { PlayerSearchDialog } from '@/components/player-search-dialog';
+
 
 const playerSchema = z.object({
   id: z.string(), // This will be the user's uid
@@ -39,63 +31,6 @@ const teamSchema = z.object({
 });
 
 type TeamFormValues = z.infer<typeof teamSchema>;
-
-function PlayerSearchDialog({ onPlayerSelect, onOpenChange, open }: { open: boolean, onOpenChange: (open: boolean) => void, onPlayerSelect: (player: UserProfile) => void }) {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
-    const [loading, setLoading] = useState(false);
-    const { searchUsers } = useAuth();
-
-    const handleSearch = async () => {
-        if (searchTerm.trim().length < 3) {
-            setSearchResults([]);
-            return;
-        }
-        setLoading(true);
-        const results = await searchUsers(searchTerm);
-        setSearchResults(results);
-        setLoading(false);
-    };
-
-    const handlePlayerSelect = (player: UserProfile) => {
-        onPlayerSelect(player);
-        onOpenChange(false);
-    };
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Search for a Player</DialogTitle>
-                    <DialogDescription>Search by name or phone number.</DialogDescription>
-                </DialogHeader>
-                <div className="flex gap-2">
-                    <Input 
-                        placeholder="Enter name or phone..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <Button onClick={handleSearch} disabled={loading}>
-                        <Search className="h-4 w-4" />
-                    </Button>
-                </div>
-                <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
-                    {loading && <p>Searching...</p>}
-                    {!loading && searchResults.length === 0 && searchTerm.length > 2 && <p>No players found.</p>}
-                    {searchResults.map(player => (
-                        <div key={player.uid} className="flex items-center justify-between p-2 border rounded-md">
-                            <div>
-                                <p className="font-semibold">{player.name}</p>
-                                <p className="text-sm text-muted-foreground">{player.phoneNumber}</p>
-                            </div>
-                            <Button size="sm" onClick={() => handlePlayerSelect(player)}>Add</Button>
-                        </div>
-                    ))}
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 function CreateTeamPage() {
   const router = useRouter();
@@ -151,6 +86,7 @@ function CreateTeamPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-foreground font-body">
+       <PlayerSearchDialog open={isPlayerSearchOpen} onOpenChange={setPlayerSearchOpen} onPlayerSelect={handlePlayerSelect} />
        <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm">
          <Button variant="ghost" size="icon" onClick={() => router.push('/matches')}>
             <ArrowLeft className="h-6 w-6" />
@@ -204,7 +140,6 @@ function CreateTeamPage() {
                     {form.formState.errors.players && <p className="text-destructive text-sm">{form.formState.errors.players.message || form.formState.errors.players.root?.message}</p>}
                 </div>
 
-                <PlayerSearchDialog open={isPlayerSearchOpen} onOpenChange={setPlayerSearchOpen} onPlayerSelect={handlePlayerSelect} />
                 <Button type="button" variant="outline" onClick={() => setPlayerSearchOpen(true)} className='w-full'>
                     <Plus className="mr-2 h-4 w-4" /> Add Player
                 </Button>
