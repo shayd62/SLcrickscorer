@@ -8,12 +8,13 @@ import { db } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, User, LogOut, Home as HomeIcon, Settings, Trophy, Users as UsersIcon, Trash2, Gamepad2, Radio, Calendar, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import Image from 'next/image';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +27,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+
+const formatOvers = (balls: number, ballsPerOver: number = 6) => {
+    if (balls === 0) return "0.0";
+    const overs = Math.floor(balls / ballsPerOver);
+    const ballsInOver = balls % ballsPerOver;
+    return `${overs}.${ballsInOver}`;
+};
 
 function SettingsSheet() {
     const { logout } = useAuth();
@@ -65,7 +74,7 @@ function SettingsSheet() {
 
 function ActiveMatchCard({ match, onDelete, currentUserId }: { match: MatchState, onDelete: (matchId: string) => void, currentUserId?: string }) {
   const router = useRouter();
-  const { config } = match;
+  const { config, innings1, innings2, target } = match;
 
   const isCreator = match.userId === currentUserId;
   
@@ -77,47 +86,81 @@ function ActiveMatchCard({ match, onDelete, currentUserId }: { match: MatchState
     }
   };
 
+  const getTeamScore = (teamKey: 'team1' | 'team2') => {
+      if (innings1.battingTeam === teamKey) {
+          return { score: innings1.score, wickets: innings1.wickets, overs: formatOvers(innings1.balls, config.ballsPerOver) };
+      }
+      if (innings2 && innings2.battingTeam === teamKey) {
+          return { score: innings2.score, wickets: innings2.wickets, overs: formatOvers(innings2.balls, config.ballsPerOver) };
+      }
+       if (innings1.bowlingTeam === teamKey) {
+          return { score: innings1.score, wickets: innings1.wickets, overs: formatOvers(innings1.balls, config.ballsPerOver), isOpponent: true };
+      }
+      return { score: 0, wickets: 0, overs: '0.0'};
+  }
+  
+  const team1Score = getTeamScore('team1');
+  const team2Score = getTeamScore('team2');
+
+  const team1Data = team1Score.isOpponent ? team2Score : team1Score;
+  const team2Data = team2Score.isOpponent ? team1Score : team2Score;
+
+  const runsNeeded = target && innings2 ? target - innings2.score : 0;
+  const battingTeamInInnings2 = innings2?.battingTeam;
+  const chasingTeam = battingTeamInInnings2 === 'team1' ? config.team1 : config.team2;
+
   return (
-    <Card className="p-4 flex flex-col gap-3 rounded-2xl shadow-sm">
-      <div className="flex justify-between items-center text-center">
-        <div className="flex-1">
-          <p className="font-bold text-lg">{config.team1.name}</p>
+    <Card className="rounded-lg shadow-sm cursor-pointer" onClick={handleNavigation}>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex justify-between items-center">
+            <p className="text-xs text-muted-foreground">{config.tournamentId ? `${config.matchNumber || '1st'} ${config.matchFormat || 'ODI'} • ${config.tournamentId}` : `Friendly Match • ${config.oversPerInnings} Overs`}</p>
+            <Badge variant="outline" className="text-primary border-primary">{config.matchFormat || 'ODI'}</Badge>
         </div>
-        <p className="text-sm text-muted-foreground bg-secondary px-2 py-1 rounded-full">VS</p>
-        <div className="flex-1">
-          <p className="font-bold text-lg">{config.team2.name}</p>
+        
+        <div className="space-y-2">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                     <Image src="https://picsum.photos/seed/sl-flag/24/16" width={24} height={16} alt={`${config.team1.shortName} flag`} className="rounded-sm" data-ai-hint="sri lanka flag" />
+                    <span className="font-semibold text-lg">{config.team1.shortName || config.team1.name}</span>
+                </div>
+                <div className="font-bold text-lg">{team1Data.score}-{team1Data.wickets} <span className="font-normal text-muted-foreground">({team1Data.overs})</span></div>
+            </div>
+            <div className="flex items-center justify-between">
+                 <div className="flex items-center gap-2">
+                     <Image src="https://picsum.photos/seed/zim-flag/24/16" width={24} height={16} alt={`${config.team2.shortName} flag`} className="rounded-sm" data-ai-hint="zimbabwe flag" />
+                    <span className="font-semibold text-lg">{config.team2.shortName || config.team2.name}</span>
+                </div>
+                <div className="font-bold text-lg">{team2Data.score}-{team2Data.wickets} <span className="font-normal text-muted-foreground">({team2Data.overs})</span></div>
+            </div>
         </div>
-      </div>
-       <div className="flex justify-between text-sm text-muted-foreground text-center">
-         <p className="flex-1">{config.oversPerInnings} Overs Match</p>
-         <p className="flex-1">{config.playersPerSide} Players per Side</p>
-      </div>
-      <div className="flex items-center gap-2 mt-2">
-        <Button onClick={handleNavigation} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg">
-          {isCreator ? 'Resume' : 'View Scorecard'}
-        </Button>
-        {isCreator && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="icon" className="rounded-lg">
-                <Trash2 className="h-5 w-5" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the match.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onDelete(match.id!)}>Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+
+        {innings2 && runsNeeded > 0 && (
+             <p className="text-sm text-destructive font-medium">{chasingTeam.name} need {runsNeeded} runs to win</p>
         )}
-      </div>
+      </CardContent>
+       {isCreator && (
+            <div className="p-2 border-t flex justify-end">
+                 <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                        This will permanently delete this match.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onDelete(match.id!)}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </div>
+        )}
     </Card>
   );
 }
@@ -401,6 +444,3 @@ function HomePage() {
 export default withAuth(HomePage);
 
     
-
-    
-
