@@ -1,4 +1,5 @@
 
+
 'use client';
 import withAuth from "@/components/with-auth";
 import { useAuth } from "@/contexts/auth-context";
@@ -10,7 +11,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, User, LogOut, Home as HomeIcon, Settings, Trophy, Users as UsersIcon, Trash2, Gamepad2, Radio, Calendar, Clock } from "lucide-react";
+import { Plus, User, LogOut, Home as HomeIcon, Settings, Trophy, Users as UsersIcon, Trash2, Gamepad2, Radio, Calendar, Clock, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -172,17 +173,20 @@ function UpcomingMatchCard({ match, tournamentName }: { match: TournamentMatch, 
 
   return (
     <Card className="p-4 flex flex-col gap-3 rounded-2xl shadow-sm bg-secondary/40">
-      <div className="flex justify-between items-center text-center">
-        <div className="flex-1">
-          <p className="font-bold text-lg">{match.team1}</p>
-        </div>
-        <p className="text-sm text-muted-foreground bg-primary/20 px-2 py-1 rounded-full">VS</p>
-        <div className="flex-1">
-          <p className="font-bold text-lg">{match.team2}</p>
-        </div>
+      <div className="text-center text-xs text-muted-foreground">
+         {tournamentName} - Match {match.id.slice(-4)}
+      </div>
+      <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3">
+              <Image src="https://picsum.photos/seed/teamA/32/32" width={32} height={32} alt={`${match.team1} flag`} className="rounded-full" data-ai-hint="cricket logo" />
+              <span className="font-semibold text-base">{match.team1}</span>
+          </div>
+          <div className="flex items-center gap-3">
+               <Image src="https://picsum.photos/seed/teamB/32/32" width={32} height={32} alt={`${match.team2} flag`} className="rounded-full" data-ai-hint="cricket logo" />
+              <span className="font-semibold text-base">{match.team2}</span>
+          </div>
       </div>
       <div className="text-center text-muted-foreground space-y-1 mt-2">
-        <p className="font-semibold text-sm text-foreground">{tournamentName}</p>
         <div className="flex items-center justify-center gap-4 text-xs">
           <div className="flex items-center gap-1.5"><Calendar className="h-4 w-4"/> {matchDate.toLocaleDateString()}</div>
           <div className="flex items-center gap-1.5"><Clock className="h-4 w-4"/> {matchDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
@@ -193,41 +197,108 @@ function UpcomingMatchCard({ match, tournamentName }: { match: TournamentMatch, 
 }
 
 function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchState, onDelete: (matchId: string) => void, currentUserId?: string }) {
-    const { config, resultText } = match;
+    const { config, innings1, innings2, target, resultText } = match;
     const router = useRouter();
     const isCreator = match.userId === currentUserId;
+
+    const winnerKey = match.winner;
+    const team1Won = winnerKey === 'team1';
+    const team2Won = winnerKey === 'team2';
     
+    const getScore = (innings: typeof innings1, teamKey: 'team1' | 'team2') => {
+        if (innings.battingTeam === teamKey) {
+            return { score: innings.score, wickets: innings.wickets, overs: formatOvers(innings.balls, config.ballsPerOver) };
+        }
+        if (innings2 && innings2.battingTeam === teamKey) {
+             return { score: innings2.score, wickets: innings2.wickets, overs: formatOvers(innings2.balls, config.ballsPerOver) };
+        }
+        // Find the batting innings of the other team to display opponent score
+        if (innings1.bowlingTeam === teamKey) {
+            return { score: innings1.score, wickets: innings1.wickets, overs: formatOvers(innings1.balls, config.ballsPerOver) };
+        }
+        if (innings2 && innings2.bowlingTeam === teamKey) {
+            return { score: innings2.score, wickets: innings2.wickets, overs: formatOvers(innings2.balls, config.ballsPerOver) };
+        }
+        return { score: 0, wickets: 0, overs: '0.0'};
+    }
+    
+    // This logic is tricky. Let's trace it.
+    // Innings 1: team A bats. innings1.battingTeam is team A.
+    // Innings 2: team B bats. innings2.battingTeam is team B.
+    // We want to show Team A's score, which is in innings1.
+    // We want to show Team B's score, which is in innings2.
+    const team1Score = innings1.battingTeam === 'team1' ? innings1 : innings2;
+    const team2Score = innings1.battingTeam === 'team2' ? innings1 : innings2;
+    
+    const getTeamScore = (teamKey: 'team1' | 'team2') => {
+        const i1 = innings1.battingTeam === teamKey ? innings1 : (innings2 && innings2.battingTeam === teamKey ? innings2 : null);
+        const i2 = innings1.battingTeam !== teamKey ? innings1 : (innings2 && innings2.battingTeam !== teamKey ? innings2 : null);
+
+        if (i1) {
+            return { score: i1.score, wickets: i1.wickets, overs: formatOvers(i1.balls, config.ballsPerOver) };
+        }
+        return { score: i2?.score || 0, wickets: i2?.wickets || 0, overs: formatOvers(i2?.balls || 0, config.ballsPerOver) };
+    }
+    
+    const finalTeam1Score = getTeamScore('team1');
+    const finalTeam2Score = getTeamScore('team2');
+
     return (
-        <Card className="p-4 bg-secondary/50 rounded-2xl transition-all hover:bg-secondary/70">
-            <div className="flex justify-between items-start">
-                <div className="flex-grow space-y-2 cursor-pointer" onClick={() => router.push(`/scorecard/${match.id}`)}>
-                    <h3 className="font-semibold text-foreground">{config.team1.name} vs {config.team2.name}</h3>
-                    <div className="text-sm text-muted-foreground">
-                        <p><span className='font-medium text-foreground'>{resultText}</span></p>
+        <Card className="rounded-lg shadow-sm cursor-pointer" onClick={() => router.push(`/scorecard/${match.id}`)}>
+            <CardContent className="p-4 space-y-3">
+                <div className="flex justify-between items-center text-primary font-semibold">
+                    <p>{config.tournamentId || 'Friendly Match'}</p>
+                    <ChevronRight className="h-5 w-5"/>
+                </div>
+                 <div className="text-xs text-muted-foreground">
+                    <span className="font-semibold text-foreground">RESULT</span> • {config.matchNumber ? `${config.matchNumber}th Match,` : ''} {config.venue ? `${config.venue},` : ''} {config.matchDate ? new Date(config.matchDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''}
+                </div>
+                
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Image src="https://picsum.photos/seed/t1-flag/24/16" width={24} height={16} alt={`${config.team1.name} flag`} className="rounded-sm" data-ai-hint="cricket team" />
+                            <span className={cn("text-lg", team1Won && "font-bold")}>{config.team1.name}</span>
+                        </div>
+                        <div className="font-bold text-lg">{finalTeam1Score.score}/{finalTeam1Score.wickets}</div>
+                    </div>
+                     <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                             <Image src="https://picsum.photos/seed/t2-flag/24/16" width={24} height={16} alt={`${config.team2.name} flag`} className="rounded-sm" data-ai-hint="cricket team" />
+                            <span className={cn("text-lg", team2Won && "font-bold")}>{config.team2.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                             {innings2 && <span className="font-normal text-muted-foreground text-sm">({finalTeam2Score.overs}/{config.oversPerInnings} ov, T:{target})</span>}
+                             <span className="font-bold text-lg">{finalTeam2Score.score}/{finalTeam2Score.wickets}</span>
+                        </div>
                     </div>
                 </div>
+
+                <p className="text-sm font-medium pt-2">{resultText}</p>
                  {isCreator && (
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                            <Trash2 className="h-5 w-5 text-destructive" />
-                        </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete this match record.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => onDelete(match.id!)}>Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                 )}
-            </div>
+                    <div className="p-2 border-t flex justify-end -mb-4 -mx-4">
+                         <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                This will permanently delete this match.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => onDelete(match.id!)}>Delete</AlertDialogAction>
+                            </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
+                )}
+            </CardContent>
         </Card>
     );
 }
