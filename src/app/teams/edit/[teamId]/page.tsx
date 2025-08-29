@@ -4,13 +4,13 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Plus, Trash2, Users, ArrowLeft, Trophy, MapPin, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Users, ArrowLeft, Trophy, MapPin, ChevronRight, UserPlus } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import type { Team, UserProfile, MatchState } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayRemove, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayRemove, arrayUnion, collection, query, where, getDocs } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,6 +26,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
+import { PlayerSearchDialog } from '@/components/player-search-dialog';
 
 
 function MatchResultCard({ match, currentTeamName }: { match: MatchState, currentTeamName: string }) {
@@ -62,6 +63,7 @@ function EditTeamPage() {
   const { user } = useAuth();
   const [team, setTeam] = useState<Team | null>(null);
   const [matches, setMatches] = useState<MatchState[]>([]);
+  const [isPlayerSearchOpen, setPlayerSearchOpen] = useState(false);
   
   const teamId = params.teamId as string;
   
@@ -144,12 +146,40 @@ function EditTeamPage() {
     }
   };
 
+  const handleAddPlayerToTeam = async (player: UserProfile) => {
+    if (!team) return;
+
+    const isAlreadyAdded = team.players.some(p => p.id === player.uid);
+    if (isAlreadyAdded) {
+        toast({ title: "Player already in team", variant: "destructive" });
+        return;
+    }
+
+    const newPlayer = {
+        id: player.uid,
+        name: player.name,
+    };
+
+    try {
+        const teamRef = doc(db, 'teams', team.id);
+        await updateDoc(teamRef, { players: arrayUnion(newPlayer) });
+        
+        setTeam(prevTeam => prevTeam ? ({ ...prevTeam, players: [...prevTeam.players, newPlayer] }) : null);
+        
+        toast({ title: "Player Added!", description: `${newPlayer.name} has been added to ${team.name}.` });
+    } catch (error) {
+        console.error("Error adding new player: ", error);
+        toast({ title: "Error", description: "Could not add player.", variant: "destructive" });
+    }
+  };
+
   if (!team) {
     return <div className="flex justify-center items-center h-screen">Loading team...</div>
   }
 
   return (
     <div className="min-h-screen bg-gray-50 text-foreground font-body">
+       <PlayerSearchDialog open={isPlayerSearchOpen} onOpenChange={setPlayerSearchOpen} onPlayerSelect={handleAddPlayerToTeam} />
        <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm">
          <Button variant="ghost" size="icon" onClick={() => router.push('/teams')}>
             <ArrowLeft className="h-6 w-6" />
@@ -227,6 +257,10 @@ function EditTeamPage() {
                         </CardContent>
                     </Card>
                 )}
+                 <Button variant="outline" className="w-full mt-4" onClick={() => setPlayerSearchOpen(true)}>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Add Player
+                </Button>
             </TabsContent>
         </Tabs>
       </main>

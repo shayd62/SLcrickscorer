@@ -4,16 +4,18 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, UserPlus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/auth-context';
 import type { UserProfile } from '@/lib/types';
+import Link from 'next/link';
 
 export function PlayerSearchDialog({ 
     open, 
@@ -79,7 +81,14 @@ export function PlayerSearchDialog({
                 </div>
                 <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
                     {loading && <p>Searching...</p>}
-                    {!loading && searchResults.length === 0 && searchTerm.length > 2 && <p>No players found.</p>}
+                    {!loading && searchResults.length === 0 && searchTerm.length > 2 && (
+                         <div className="text-center text-muted-foreground p-4">
+                            <p>No players found.</p>
+                            <Link href="/register">
+                                <Button variant="link">Or register a new player</Button>
+                            </Link>
+                         </div>
+                    )}
                     {searchResults.map(player => (
                         <div key={player.uid} className="flex items-center justify-between p-2 border rounded-md">
                             <div>
@@ -90,6 +99,16 @@ export function PlayerSearchDialog({
                         </div>
                     ))}
                 </div>
+                 <DialogFooter>
+                    <Link href="/register" legacyBehavior>
+                        <a target="_blank" rel="noopener noreferrer">
+                             <Button variant="outline">
+                                <UserPlus className="mr-2 h-4 w-4"/>
+                                Register New Player
+                            </Button>
+                        </a>
+                    </Link>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );
