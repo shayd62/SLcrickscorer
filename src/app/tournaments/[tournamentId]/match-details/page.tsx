@@ -114,6 +114,13 @@ function MatchDetailsContent() {
         fetchTournament();
     }, [fetchTournament]);
 
+    useEffect(() => {
+        if (tournament) {
+            const nextMatchNumber = (tournament.matches?.length || 0) + 1;
+            form.setValue('matchNumber', nextMatchNumber);
+        }
+    }, [tournament, form]);
+
     const fetchTeams = useCallback(async () => {
         if (!user) return;
         try {
