@@ -103,7 +103,9 @@ function TeamsPage() {
               <Card key={team.id} className="flex flex-col">
                 <CardHeader>
                   <CardTitle className="flex justify-between items-center">
-                    <span>{team.name}</span>
+                    <Link href={`/teams/edit/${team.id}`}>
+                      <span className="hover:underline">{team.name}</span>
+                    </Link>
                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="icon" onClick={() => handleEditTeam(team.id)}>
                         <Pencil className="h-5 w-5 text-muted-foreground" />
