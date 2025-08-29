@@ -43,9 +43,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (!querySnapshot.empty) {
             const userDoc = querySnapshot.docs[0];
-            setUserProfile({ id: userDoc.id, ...userDoc.data() } as UserProfile);
+            setUserProfile({ id: userDoc.id, uid: user.uid, ...userDoc.data() } as UserProfile);
         } else {
-          setUserProfile(null);
+          // Fallback for older data structure, can be removed later
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists()) {
+            setUserProfile({ id: userDoc.id, uid: user.uid, ...userDoc.data() } as UserProfile);
+          } else {
+            setUserProfile(null);
+          }
         }
 
       } else {
@@ -98,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const docId = data.phoneNumber;
     const profileData = { uid, ...data };
     await setDoc(doc(db, 'users', docId), profileData);
-    setUserProfile({ id: docId, ...profileData });
+    setUserProfile({ id: docId, ...profileData, uid });
   };
   
   const updateUserProfile = async (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => {
@@ -114,6 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const storageRef = ref(storage, `profile-pictures/${uid}`);
     await uploadBytes(storageRef, file);
     const downloadURL = await getDownloadURL(storageRef);
+    await updateUserProfile(uid, { photoURL: downloadURL });
     return downloadURL;
   };
   

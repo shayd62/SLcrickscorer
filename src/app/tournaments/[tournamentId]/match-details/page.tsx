@@ -19,11 +19,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { db } from '@/lib/firebase';
 import { doc, collection, query, where, addDoc, getDocs, setDoc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
-import type { Team, MatchConfig, MatchState, Innings, Player, Tournament } from '@/lib/types';
+import type { Team, MatchConfig, MatchState, Innings, Player, Tournament, UserProfile } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { PlayerSearchDialog } from '@/components/player-search-dialog';
 
 const matchDetailsSchema = z.object({
   matchType: z.enum(['Limited Overs', 'Test Match', 'The Hundred']),
@@ -66,9 +67,9 @@ function MatchDetailsContent() {
     
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingTeam, setEditingTeam] = useState<'team1' | 'team2' | null>(null);
-    const [newPlayerName, setNewPlayerName] = useState('');
-    const [addingPlayer, setAddingPlayer] = useState(false);
     const [squadSearchTerm, setSquadSearchTerm] = useState('');
+    const [isPlayerSearchOpen, setPlayerSearchOpen] = useState(false);
+
     
     const team1Name = searchParams.get('team1Name') || 'Team A';
     const team2Name = searchParams.get('team2Name') || 'Team B';
@@ -175,22 +176,23 @@ function MatchDetailsContent() {
             return currentSquad;
         });
     };
-
-    const handleAddNewPlayer = async () => {
-        if (!newPlayerName.trim()) {
-            toast({ title: "Player name is empty", variant: "destructive" });
-            return;
-        }
-
+    
+    const handleAddNewPlayerToTeam = async (player: UserProfile) => {
         const teamToUpdate = editingTeam === 'team1' ? team1 : team2;
         const setTeamState = editingTeam === 'team1' ? setTeam1 : setTeam2;
         const setSquadState = editingTeam === 'team1' ? setSquad1 : setSquad2;
         
         if (!teamToUpdate) return;
         
+        const isAlreadyAdded = teamToUpdate.players.some(p => p.id === player.uid);
+        if (isAlreadyAdded) {
+            toast({ title: "Player already in team", variant: "destructive" });
+            return;
+        }
+
         const newPlayer: Player = {
-            id: `player-${Date.now()}`,
-            name: newPlayerName.trim(),
+            id: player.uid,
+            name: player.name,
         };
 
         const updatedPlayers = [...teamToUpdate.players, newPlayer];
@@ -204,14 +206,12 @@ function MatchDetailsContent() {
             setSquadState(squad => [...squad, newPlayer]);
             
             toast({ title: "Player Added!", description: `${newPlayer.name} has been added to ${teamToUpdate.name}.` });
-            setNewPlayerName('');
-            setAddingPlayer(false);
         } catch (error) {
             console.error("Error adding new player: ", error);
             toast({ title: "Error", description: "Could not add player.", variant: "destructive" });
         }
     };
-    
+
     const handleProceedToToss = (data: MatchDetailsFormValues) => {
         if (!team1 || !team2 || squad1.length < 2 || squad2.length < 2) {
             toast({ title: "Squad Error", description: "Both teams must have at least 2 players selected.", variant: 'destructive' });
@@ -260,6 +260,7 @@ function MatchDetailsContent() {
 
     return (
         <div className="min-h-screen bg-background text-foreground font-body">
+            <PlayerSearchDialog open={isPlayerSearchOpen} onOpenChange={setPlayerSearchOpen} onPlayerSelect={handleAddNewPlayerToTeam} />
             <form onSubmit={form.handleSubmit(handleProceedToToss)}>
                 <header className="p-4 bg-gray-800 text-white">
                     <div className="flex items-center justify-between">
@@ -430,19 +431,8 @@ function MatchDetailsContent() {
                             </div>
                         ))}
                     </div>
-                     {addingPlayer && (
-                        <div className="flex items-center gap-2 mt-4">
-                            <Input 
-                                placeholder="New player name" 
-                                value={newPlayerName}
-                                onChange={(e) => setNewPlayerName(e.target.value)}
-                            />
-                            <Button onClick={handleAddNewPlayer} size="sm">Save</Button>
-                            <Button onClick={() => setAddingPlayer(false)} size="sm" variant="ghost">Cancel</Button>
-                        </div>
-                    )}
                     <DialogFooter className="sm:justify-between items-center mt-4">
-                        <Button type="button" variant="outline" onClick={() => setAddingPlayer(true)} disabled={addingPlayer}>
+                         <Button type="button" variant="outline" onClick={() => setPlayerSearchOpen(true)}>
                             <Plus className="mr-2 h-4 w-4" /> Add Player
                         </Button>
                         <DialogClose asChild><Button type="button" onClick={() => setDialogOpen(false)}>Done</Button></DialogClose>
