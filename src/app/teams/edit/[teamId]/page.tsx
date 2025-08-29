@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import type { Team, UserProfile } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { PlayerSearchDialog } from '@/components/player-search-dialog';
 
@@ -58,8 +58,8 @@ function EditTeamPage() {
             const teamDocRef = doc(db, "teams", teamId);
             const docSnap = await getDoc(teamDocRef);
             if (docSnap.exists()) {
-                const teamData = docSnap.data() as Team;
-                if (teamData.userId && user && teamData.userId !== user.uid) {
+                const teamData = { id: docSnap.id, ...docSnap.data() } as Team;
+                 if (teamData.userId && user && teamData.userId !== user.uid) {
                     toast({ title: "Unauthorized", description: "You do not have permission to edit this team.", variant: "destructive" });
                     router.push('/teams');
                     return;
@@ -89,7 +89,7 @@ function EditTeamPage() {
     const teamDataWithUser = { ...data, userId: user.uid };
 
     try {
-        await setDoc(doc(db, "teams", teamId), teamDataWithUser, { merge: true });
+        await updateDoc(doc(db, "teams", teamId), teamDataWithUser);
         toast({
             title: "Team Updated!",
             description: `Team "${data.name}" has been updated successfully.`,
