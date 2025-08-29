@@ -2,32 +2,34 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Plus, Trash2, Users, ArrowLeft, Trophy } from 'lucide-react';
+import { Plus, Trash2, Users, ArrowLeft, Camera, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import Link from 'next/link';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, addDoc, collection } from "firebase/firestore";
+import { db, storage } from '@/lib/firebase';
+import { addDoc, collection } from "firebase/firestore";
 import { useAuth } from '@/contexts/auth-context';
 import type { UserProfile } from '@/lib/types';
 import { PlayerSearchDialog } from '@/components/player-search-dialog';
-
-
-const playerSchema = z.object({
-  id: z.string(), // This will be the user's uid
-  name: z.string().min(1, "Player name can't be empty"),
-});
+import Image from 'next/image';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 
 const teamSchema = z.object({
   name: z.string().min(1, 'Team name is required.'),
-  players: z.array(playerSchema).min(2, 'At least 2 players are required.'),
+  shortName: z.string().max(3, 'Short name must be 3 characters or less.').optional(),
+  email: z.string().email('Invalid email address.'),
+  city: z.string().min(1, 'City is required.'),
+  website: z.string().url('Invalid URL.').optional().or(z.literal('')),
+  about: z.string().max(250, 'About must be 250 characters or less.').optional(),
+  isPinProtected: z.boolean().default(false),
+  logoUrl: z.string().url().optional().or(z.literal('')),
 });
 
 type TeamFormValues = z.infer<typeof teamSchema>;
@@ -35,118 +37,171 @@ type TeamFormValues = z.infer<typeof teamSchema>;
 function CreateTeamPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { user } = useAuth();
-  const [isPlayerSearchOpen, setPlayerSearchOpen] = useState(false);
+  const { user, uploadTournamentImage } = useAuth();
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
   const form = useForm<TeamFormValues>({
     resolver: zodResolver(teamSchema),
     defaultValues: {
       name: '',
-      players: [],
+      shortName: '',
+      email: '',
+      city: '',
+      website: '',
+      about: '',
+      isPinProtected: false,
+      logoUrl: '',
     },
     mode: 'onChange',
   });
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "players",
-  });
 
   const onSubmit = async (data: TeamFormValues) => {
     if (!user) {
         toast({ title: "Not Authenticated", description: "You must be logged in to create a team.", variant: "destructive" });
         return;
     }
+    
+    let finalData: any = { ...data, userId: user.uid, players: [] };
 
     try {
-        const newTeamRef = await addDoc(collection(db, "teams"), { ...data, userId: user.uid });
+        if(logoFile) {
+            const teamIdForImage = `team-${Date.now()}`;
+            const logoUrl = await uploadTournamentImage(teamIdForImage, logoFile, 'logo');
+            finalData.logoUrl = logoUrl;
+        }
+
+        await addDoc(collection(db, "teams"), finalData);
         toast({
-            title: "Team Saved!",
-            description: `Team "${data.name}" has been saved successfully.`,
+            title: "Team Created!",
+            description: `Team "${data.name}" has been created successfully.`,
         });
         router.push('/teams');
     } catch (e) {
         console.error("Error adding document: ", e);
          toast({
-            title: "Error saving team",
+            title: "Error creating team",
             description: "Could not save team to Firestore.",
             variant: "destructive"
         });
     }
   };
   
-  const handlePlayerSelect = (player: UserProfile) => {
-    const isAlreadyAdded = fields.some(p => p.id === player.uid);
-    if (isAlreadyAdded) {
-        toast({ title: "Player already in team", variant: 'destructive' });
-        return;
-    }
-    append({ id: player.uid, name: player.name });
-  };
+  const nameValue = form.watch('name');
 
   return (
     <div className="min-h-screen bg-gray-50 text-foreground font-body">
-       <PlayerSearchDialog open={isPlayerSearchOpen} onOpenChange={setPlayerSearchOpen} onPlayerSelect={handlePlayerSelect} />
-       <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm">
-         <Button variant="ghost" size="icon" onClick={() => router.push('/matches')}>
+      <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-6 w-6" />
-          </Button>
-          <div className='flex flex-col items-center'>
-            <h1 className="text-2xl font-bold">Create a New Team</h1>
-            <p className="text-sm text-muted-foreground">Define your squad</p>
-          </div>
-           <Link href="/teams">
-            <Button variant="ghost" size="icon">
-                <Trophy className="h-6 w-6" />
-            </Button>
-           </Link>
+        </Button>
+        <h1 className="text-xl font-bold">Team</h1>
+        <div className="w-10"></div>
       </header>
       <main className="p-4 md:p-8 flex justify-center">
-        <Card className="w-full max-w-md">
-            <CardHeader>
-                <CardTitle className='flex items-center gap-2'>
-                    <Users className="h-6 w-6 text-primary" />
-                    Team Details
-                </CardTitle>
-                <CardDescription>Enter your team's name and add the players.</CardDescription>
-            </CardHeader>
-            <CardContent>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="space-y-2">
-                    <Label htmlFor="team-name">Team Name</Label>
-                    <Input id="team-name" {...form.register('name')} placeholder="e.g., Royal Challengers" />
-                    {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
+        <form onSubmit={form.handleSubmit(onSubmit)} className="w-full max-w-md space-y-4">
+            <div className="flex flex-col items-center gap-2">
+                <div className="relative">
+                    <Image 
+                        src={logoPreview || '/placeholder-team.png'}
+                        alt="Team Logo"
+                        width={96}
+                        height={96}
+                        className="rounded-full border-2 border-dashed"
+                    />
+                     <label htmlFor="logo-upload" className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full cursor-pointer hover:bg-primary/90">
+                        <Camera className="h-4 w-4" />
+                        <input id="logo-upload" type="file" className="sr-only" onChange={handleFileChange} accept="image/*" />
+                     </label>
                 </div>
+            </div>
 
-                <div className="space-y-2">
-                    <Label>Players</Label>
-                    {fields.map((field, index) => (
-                        <div key={field.id} className="flex items-center gap-2">
-                            <Input
-                                value={field.name}
-                                readOnly
-                                placeholder={`Player ${index + 1}`}
-                            />
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => remove(index)}
-                            >
-                                <Trash2 className="h-5 w-5 text-gray-500" />
-                            </Button>
-                        </div>
-                    ))}
-                    {form.formState.errors.players && <p className="text-destructive text-sm">{form.formState.errors.players.message || form.formState.errors.players.root?.message}</p>}
-                </div>
+            <Card>
+                <CardContent className="p-0">
+                    <div className="divide-y">
+                        {Object.entries({
+                            name: { label: 'Name*', placeholder: 'Required', type: 'text'},
+                            shortName: { label: 'Short Name', placeholder: 'Max 3. Chars', type: 'text'},
+                            email: { label: 'E-Mail*', placeholder: 'Required', type: 'email'},
+                            city: { label: 'City*', placeholder: 'e.g. Bogura, Bangladesh', type: 'text'},
+                        }).map(([key, { label, placeholder, type }]) => (
+                            <div key={key} className="flex items-center justify-between px-4 py-3">
+                                <Label htmlFor={key} className="font-medium text-base">{label}</Label>
+                                <Input
+                                    id={key}
+                                    type={type}
+                                    {...form.register(key as keyof TeamFormValues)}
+                                    className="border-0 text-right w-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+                                    placeholder={placeholder}
+                                />
+                            </div>
+                        ))}
+                         {Object.entries({
+                             admins: { label: 'Admins', value: '0 Selected' },
+                             scorers: { label: 'Scorers', value: '0 Selected' },
+                         }).map(([key, {label, value}]) => (
+                            <div key={key} className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-secondary/50">
+                                <span className="font-medium text-base">{label}</span>
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                    <span>{value}</span>
+                                    <ChevronRight className="h-5 w-5" />
+                                </div>
+                            </div>
+                         ))}
+                          <div className="flex items-center justify-between px-4 py-3">
+                                <Label htmlFor="website" className="font-medium text-base">Website</Label>
+                                <Input
+                                    id="website"
+                                    type="text"
+                                    {...form.register('website')}
+                                    className="border-0 text-right w-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+                                    placeholder="Optional"
+                                />
+                            </div>
+                            <div className="px-4 py-3">
+                                 <Label htmlFor="about" className="font-medium text-base">About</Label>
+                                 <Textarea 
+                                    id="about" 
+                                    {...form.register('about')} 
+                                    placeholder="Description your team. Max. 250 Characters"
+                                    className="mt-2"
+                                 />
+                            </div>
+                             <div className="flex items-center justify-between px-4 py-3">
+                                <div>
+                                    <Label htmlFor="pin-protected" className="font-medium text-base">Pin Protected</Label>
+                                    <p className="text-sm text-muted-foreground">Other teams need security pin to start a match with this team</p>
+                                </div>
+                                <Switch id="pin-protected" {...form.register('isPinProtected')} />
+                            </div>
+                    </div>
+                </CardContent>
+            </Card>
 
-                <Button type="button" variant="outline" onClick={() => setPlayerSearchOpen(true)} className='w-full'>
-                    <Plus className="mr-2 h-4 w-4" /> Add Player
+            <div className="space-y-2">
+                {!nameValue && (
+                     <div className="text-center bg-yellow-100 text-yellow-800 p-2 rounded-md">
+                        Please Enter Name
+                    </div>
+                )}
+                <Button type="submit" className="w-full text-lg py-6 bg-pink-500 hover:bg-pink-600" disabled={!form.formState.isValid}>
+                    Save Team
                 </Button>
-
-                <Button type="submit" className="w-full text-lg py-6">Save Team</Button>
-            </form>
-            </CardContent>
-        </Card>
+            </div>
+        </form>
       </main>
     </div>
   );

@@ -15,6 +15,12 @@ export interface Team {
   wicketKeeperId?: string;
   twelfthManId?: string;
   userId?: string;
+  logoUrl?: string;
+  email?: string;
+  city?: string;
+  website?: string;
+  about?: string;
+  isPinProtected?: boolean;
 }
 
 export interface Group {
