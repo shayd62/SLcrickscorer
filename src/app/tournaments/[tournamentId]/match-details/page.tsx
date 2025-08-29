@@ -118,8 +118,13 @@ function MatchDetailsContent() {
         if (tournament) {
             const nextMatchNumber = (tournament.matches?.length || 0) + 1;
             form.setValue('matchNumber', nextMatchNumber);
+
+            const group = tournament.groups?.find(g => g.teams.includes(team1Name) && g.teams.includes(team2Name));
+            if (group) {
+                form.setValue('group', group.name);
+            }
         }
-    }, [tournament, form]);
+    }, [tournament, team1Name, team2Name, form]);
 
     const fetchTeams = useCallback(async () => {
         if (!user) return;
@@ -330,7 +335,7 @@ function MatchDetailsContent() {
                                 control={form.control}
                                 name="group"
                                 render={({ field }) => (
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <SelectTrigger className="w-24 border-0 shadow-none">
                                             <SelectValue placeholder="Select"/>
                                         </SelectTrigger>
