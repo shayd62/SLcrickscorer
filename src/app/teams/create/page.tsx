@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, addDoc, collection } from "firebase/firestore";
 import { useAuth } from '@/contexts/auth-context';
 import type { UserProfile } from '@/lib/types';
 import { PlayerSearchDialog } from '@/components/player-search-dialog';
@@ -56,10 +56,9 @@ function CreateTeamPage() {
         toast({ title: "Not Authenticated", description: "You must be logged in to create a team.", variant: "destructive" });
         return;
     }
-    const teamKey = `team-${data.name.replace(/\s/g, '-')}`;
-    const teamDataWithUser = { ...data, userId: user.uid };
+
     try {
-        await setDoc(doc(db, "teams", teamKey), teamDataWithUser);
+        const newTeamRef = await addDoc(collection(db, "teams"), { ...data, userId: user.uid });
         toast({
             title: "Team Saved!",
             description: `Team "${data.name}" has been saved successfully.`,

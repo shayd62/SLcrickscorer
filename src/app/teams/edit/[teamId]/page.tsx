@@ -39,6 +39,7 @@ function EditTeamPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isPlayerSearchOpen, setPlayerSearchOpen] = useState(false);
+  const [originalTeamName, setOriginalTeamName] = useState('');
   
   const teamId = params.teamId as string;
   
@@ -53,9 +54,8 @@ function EditTeamPage() {
 
   useEffect(() => {
     if (teamId && user) {
-        const teamKey = `team-${teamId}`;
         const fetchTeam = async () => {
-            const teamDocRef = doc(db, "teams", teamKey);
+            const teamDocRef = doc(db, "teams", teamId);
             const docSnap = await getDoc(teamDocRef);
             if (docSnap.exists()) {
                 const teamData = docSnap.data() as Team;
@@ -65,6 +65,7 @@ function EditTeamPage() {
                     return;
                 }
                 form.reset(teamData);
+                setOriginalTeamName(teamData.name);
             } else {
                 toast({ title: "Error", description: "Team not found.", variant: "destructive" });
                 router.push('/teams');
@@ -84,11 +85,11 @@ function EditTeamPage() {
         toast({ title: "Not Authenticated", description: "You must be logged in to edit a team.", variant: "destructive" });
         return;
     }
-    const teamKey = `team-${data.name.replace(/\s/g, '-')}`;
+    
     const teamDataWithUser = { ...data, userId: user.uid };
 
     try {
-        await setDoc(doc(db, "teams", teamKey), teamDataWithUser, { merge: true });
+        await setDoc(doc(db, "teams", teamId), teamDataWithUser, { merge: true });
         toast({
             title: "Team Updated!",
             description: `Team "${data.name}" has been updated successfully.`,
@@ -109,8 +110,6 @@ function EditTeamPage() {
     append({ id: player.uid, name: player.name });
   };
   
-  const originalTeamName = form.getValues('name');
-
 
   return (
     <div className="min-h-screen bg-gray-50 text-foreground font-body">

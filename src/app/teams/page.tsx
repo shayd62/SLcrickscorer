@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -36,7 +35,7 @@ function TeamsPage() {
      try {
       const q = query(collection(db, "teams"), where("userId", "==", user.uid));
       const querySnapshot = await getDocs(q);
-      const savedTeams = querySnapshot.docs.map(doc => doc.data() as Team);
+      const savedTeams = querySnapshot.docs.map(doc => ({ ...doc.data() as Omit<Team, 'id'>, id: doc.id }));
       setTeams(savedTeams);
     } catch (e) {
       console.error("Failed to load teams from firestore", e);
@@ -50,10 +49,9 @@ function TeamsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const handleDeleteTeam = async (teamName: string) => {
-    const teamKey = `team-${teamName.replace(/\s/g, '-')}`;
+  const handleDeleteTeam = async (teamId: string, teamName: string) => {
     try {
-        await deleteDoc(doc(db, "teams", teamKey));
+        await deleteDoc(doc(db, "teams", teamId));
         toast({
             title: "Team Deleted!",
             description: `Team "${teamName}" has been deleted.`,
@@ -66,8 +64,7 @@ function TeamsPage() {
     }
   };
   
-  const handleEditTeam = (teamName: string) => {
-    const teamId = teamName.replace(/\s/g, '-');
+  const handleEditTeam = (teamId: string) => {
     router.push(`/teams/edit/${teamId}`);
   }
 
@@ -103,12 +100,12 @@ function TeamsPage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {teams.map((team) => (
-              <Card key={team.name} className="flex flex-col">
+              <Card key={team.id} className="flex flex-col">
                 <CardHeader>
                   <CardTitle className="flex justify-between items-center">
                     <span>{team.name}</span>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => handleEditTeam(team.name)}>
+                      <Button variant="ghost" size="icon" onClick={() => handleEditTeam(team.id)}>
                         <Pencil className="h-5 w-5 text-muted-foreground" />
                       </Button>
                       <AlertDialog>
@@ -126,7 +123,7 @@ function TeamsPage() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteTeam(team.name)}>Delete</AlertDialogAction>
+                            <AlertDialogAction onClick={() => handleDeleteTeam(team.id, team.name)}>Delete</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
