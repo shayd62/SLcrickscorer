@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -753,6 +754,16 @@ function TournamentDetailsPage() {
             </header>
 
             <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 relative">
+                 <div className="relative w-full h-64 rounded-xl overflow-hidden bg-secondary shadow-lg">
+                    <Image
+                        src={tournament.coverPhotoUrl || 'https://picsum.photos/1200/400'}
+                        alt="Tournament Cover Photo"
+                        layout="fill"
+                        objectFit="cover"
+                        data-ai-hint="cricket stadium"
+                    />
+                    <div className="absolute inset-0 bg-black/40" />
+                </div>
                 <Tabs defaultValue="teams" className="w-full">
                     <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="teams"><Users className="mr-2 h-4 w-4"/>Teams & Groups</TabsTrigger>
