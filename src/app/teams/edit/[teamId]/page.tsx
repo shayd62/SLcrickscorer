@@ -41,8 +41,7 @@ function EditTeamPage() {
   const [isPlayerSearchOpen, setPlayerSearchOpen] = useState(false);
   
   const teamId = params.teamId as string;
-  const originalTeamName = teamId.replace(/-/g, ' ');
-
+  
   const form = useForm<TeamFormValues>({
     resolver: zodResolver(teamSchema),
     defaultValues: {
@@ -85,15 +84,11 @@ function EditTeamPage() {
         toast({ title: "Not Authenticated", description: "You must be logged in to edit a team.", variant: "destructive" });
         return;
     }
-    const oldTeamKey = `team-${originalTeamName.replace(/\s/g, '-')}`;
-    const newTeamKey = `team-${data.name.replace(/\s/g, '-')}`;
+    const teamKey = `team-${data.name.replace(/\s/g, '-')}`;
     const teamDataWithUser = { ...data, userId: user.uid };
 
     try {
-        if (oldTeamKey !== newTeamKey) {
-            await deleteDoc(doc(db, "teams", oldTeamKey));
-        }
-        await setDoc(doc(db, "teams", newTeamKey), teamDataWithUser);
+        await setDoc(doc(db, "teams", teamKey), teamDataWithUser, { merge: true });
         toast({
             title: "Team Updated!",
             description: `Team "${data.name}" has been updated successfully.`,
@@ -113,6 +108,8 @@ function EditTeamPage() {
     }
     append({ id: player.uid, name: player.name });
   };
+  
+  const originalTeamName = form.getValues('name');
 
 
   return (

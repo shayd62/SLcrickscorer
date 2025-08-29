@@ -243,11 +243,12 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
         if (!user) return;
         const q = query(collection(db, "teams"), where("userId", "==", user.uid));
         const querySnapshot = await getDocs(q);
-        const allTeams = querySnapshot.docs.map(doc => doc.data() as Team);
+        const allTeams = querySnapshot.docs.map(doc => ({ ...doc.data() as Omit<Team, 'id'>, id: doc.id }));
         const participating = tournament.participatingTeams || [];
         const notYetJoined = allTeams.filter(team => !participating.includes(team.name));
         setAvailableTeams(notYetJoined);
-    }, [tournament, user]);
+    }, [tournament.participatingTeams, user]);
+
 
     useEffect(() => {
         fetchTeams();
@@ -260,16 +261,16 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
         }
 
         try {
-            // Player uniqueness check
             const teamsRef = collection(db, "teams");
-            const newTeamQuery = query(teamsRef, where("name", "==", selectedTeam), where("userId", "==", user?.uid));
-            const newTeamSnapshot = await getDocs(newTeamQuery);
-
-            if (newTeamSnapshot.empty) {
+            const teamKey = `team-${selectedTeam.replace(/\s/g, '-')}`;
+            const newTeamDoc = await getDoc(doc(teamsRef, teamKey));
+            
+            if (!newTeamDoc.exists()) {
                 toast({ title: "Error", description: "Selected team not found.", variant: 'destructive' });
                 return;
             }
-            const newTeamData = newTeamSnapshot.docs[0].data() as Team;
+
+            const newTeamData = newTeamDoc.data() as Team;
             const newPlayerIds = newTeamData.players.map(p => p.id);
 
             const participatingTeamNames = tournament.participatingTeams || [];
@@ -289,7 +290,8 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
                     toast({
                         title: "Duplicate Player Found",
                         description: `A player from "${selectedTeam}" is already in another team in this tournament. Each player can only be on one team.`,
-                        variant: "destructive"
+                        variant: "destructive",
+                        duration: 5000,
                     });
                     return;
                 }
@@ -354,7 +356,7 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
                             </SelectTrigger>
                             <SelectContent>
                                 {availableTeams.map(team => (
-                                    <SelectItem key={team.name} value={team.name}>{team.name}</SelectItem>
+                                    <SelectItem key={team.id} value={team.name}>{team.name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
