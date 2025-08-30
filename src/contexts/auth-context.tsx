@@ -18,6 +18,7 @@ interface AuthContextType {
   signInWithEmail: (email: string, password: string) => Promise<any>;
   signInWithPhoneAndPassword: (phoneNumber: string, password: string) => Promise<any>;
   createUserProfile: (uid: string, data: Omit<UserProfile, 'uid' | 'id'>) => Promise<void>;
+  registerNewPlayer: (name: string, phoneNumber: string) => Promise<UserProfile>;
   updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => Promise<void>;
   uploadProfilePicture: (uid: string, file: File) => Promise<string>;
   uploadTeamLogo: (teamId: string, file: File) => Promise<string>;
@@ -109,6 +110,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await setDoc(doc(db, 'users', docId), profileData);
     setUserProfile({ id: docId, ...profileData, uid });
   };
+
+  const registerNewPlayer = async (name: string, phoneNumber: string): Promise<UserProfile> => {
+    const dummyEmail = `${phoneNumber}@cricmate.com`;
+    const defaultPassword = 'password123'; // Or any default password logic
+
+    const userCredential = await createUserWithEmailAndPassword(auth, dummyEmail, defaultPassword);
+    const user = userCredential.user;
+
+    const profileData: Omit<UserProfile, 'id'> = {
+        uid: user.uid,
+        name: name,
+        phoneNumber: phoneNumber,
+        gender: 'Other', // Default value
+    };
+
+    const docId = phoneNumber;
+    await setDoc(doc(db, 'users', docId), profileData);
+
+    const newUserProfile: UserProfile = {
+        id: docId,
+        ...profileData
+    };
+
+    return newUserProfile;
+};
   
   const updateUserProfile = async (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => {
     if (!userProfile?.id) {
@@ -168,8 +194,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const searchTeams = async (searchTerm: string): Promise<Team[]> => {
     if (!user) return [];
-
-    const teamsRef = collection(db, 'teams');
+    
+    const teamsRef = collection(db, "teams");
     const q = query(teamsRef, where("userId", "==", user.uid));
     const allTeamsSnapshot = await getDocs(q);
     const allTeams = allTeamsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
@@ -208,6 +234,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithEmail,
     signInWithPhoneAndPassword,
     createUserProfile,
+    registerNewPlayer,
     updateUserProfile,
     uploadProfilePicture,
     uploadTeamLogo,

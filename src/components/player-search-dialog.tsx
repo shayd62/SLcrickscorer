@@ -16,6 +16,72 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import type { UserProfile } from '@/lib/types';
 import Link from 'next/link';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Label } from './ui/label';
+import { useToast } from '@/hooks/use-toast';
+
+const newPlayerSchema = z.object({
+    name: z.string().min(1, 'Name is required.'),
+    phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits.'),
+});
+type NewPlayerFormValues = z.infer<typeof newPlayerSchema>;
+
+function NewPlayerDialog({ onPlayerCreated }: { onPlayerCreated: (player: UserProfile) => void }) {
+    const [open, setOpen] = useState(false);
+    const { registerNewPlayer, loading: authLoading } = useAuth();
+    const { toast } = useToast();
+    const form = useForm<NewPlayerFormValues>({ resolver: zodResolver(newPlayerSchema) });
+
+    const handleCreatePlayer = async (data: NewPlayerFormValues) => {
+        try {
+            const newUserProfile = await registerNewPlayer(data.name, data.phoneNumber);
+            toast({ title: "Player Created!", description: `${data.name} has been registered.` });
+            onPlayerCreated(newUserProfile);
+            setOpen(false);
+            form.reset();
+        } catch (error: any) {
+            toast({ title: "Creation Failed", description: error.message, variant: "destructive" });
+        }
+    };
+    
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                 <Button variant="outline">
+                    <UserPlus className="mr-2 h-4 w-4"/>
+                    Register New Player
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Register New Player</DialogTitle>
+                    <DialogDescription>Quickly add a new player by providing their name and phone number.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={form.handleSubmit(handleCreatePlayer)} className="space-y-4">
+                     <div className="space-y-2">
+                        <Label htmlFor="new-player-name">Full Name</Label>
+                        <Input id="new-player-name" {...form.register('name')} />
+                        {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="new-player-phone">Phone Number</Label>
+                        <Input id="new-player-phone" {...form.register('phoneNumber')} />
+                        {form.formState.errors.phoneNumber && <p className="text-destructive text-sm">{form.formState.errors.phoneNumber.message}</p>}
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button type="submit" disabled={authLoading}>
+                            {authLoading ? 'Creating...' : 'Create Player'}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 export function PlayerSearchDialog({ 
     open, 
@@ -84,9 +150,6 @@ export function PlayerSearchDialog({
                     {!loading && searchResults.length === 0 && searchTerm.length > 2 && (
                          <div className="text-center text-muted-foreground p-4">
                             <p>No players found.</p>
-                            <Link href="/register">
-                                <Button variant="link">Or register a new player</Button>
-                            </Link>
                          </div>
                     )}
                     {searchResults.map(player => (
@@ -100,12 +163,7 @@ export function PlayerSearchDialog({
                     ))}
                 </div>
                  <DialogFooter>
-                    <Link href="/register" target="_blank" rel="noopener noreferrer">
-                         <Button variant="outline">
-                            <UserPlus className="mr-2 h-4 w-4"/>
-                            Register New Player
-                        </Button>
-                    </Link>
+                    <NewPlayerDialog onPlayerCreated={handlePlayerSelect} />
                 </DialogFooter>
             </DialogContent>
         </Dialog>
