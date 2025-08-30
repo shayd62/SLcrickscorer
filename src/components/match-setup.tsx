@@ -78,6 +78,23 @@ const defaultValues: Partial<SetupFormValues> = {
   wideBall: { enabled: true, reball: true, run: 1 },
 };
 
+// This function recursively removes properties with `undefined` values from an object.
+const removeUndefined = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefined);
+  }
+  if (obj !== null && typeof obj === 'object') {
+    return Object.keys(obj).reduce((acc, key) => {
+      const value = obj[key];
+      if (value !== undefined) {
+        acc[key] = removeUndefined(value);
+      }
+      return acc;
+    }, {} as {[key: string]: any});
+  }
+  return obj;
+};
+
 const createInitialState = (config: MatchConfig, userId?: string | null, matchId?: string): MatchState => {
   const { team1, team2, toss, opening, oversPerInnings } = config;
   
@@ -280,14 +297,17 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
       team2: { ...data.team2 },
     };
     
-    const matchId = `${finalConfig.team1.name.replace(/\s+/g, '-')}-vs-${finalConfig.team2.name.replace(/\s+/g, '-')}-${Date.now()}`;
-    const initialState = createInitialState(finalConfig, user?.uid, matchId);
+    const cleanedConfig = removeUndefined(finalConfig);
+
+    const matchId = `${cleanedConfig.team1.name.replace(/\s+/g, '-')}-vs-${cleanedConfig.team2.name.replace(/\s+/g, '-')}-${Date.now()}`;
+    const initialState = createInitialState(cleanedConfig, user?.uid, matchId);
     
     try {
         await setDoc(doc(db, "matches", matchId), initialState);
         onSetupComplete(matchId);
     } catch (e) {
         console.error("Error adding document: ", e);
+        toast({ title: "Error starting match", description: (e as Error).message, variant: "destructive"})
     }
   };
 
