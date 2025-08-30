@@ -4,11 +4,11 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Plus, Trash2, Users, ArrowLeft, Trophy, MapPin, ChevronRight, UserPlus, Settings, Pencil, Share2, Pin } from 'lucide-react';
+import { Plus, Trash2, Users, ArrowLeft, Trophy, MapPin, ChevronRight, UserPlus, Settings, Pencil, Share2, Pin, Star, ShieldAlert, Award, User as UserIcon } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import type { Team, UserProfile, MatchState, Innings, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, FielderLeaderboardStat } from '@/lib/types';
+import type { Team, UserProfile, MatchState, Innings, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, FielderLeaderboardStat, AllRounderLeaderboardStat } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, arrayRemove, arrayUnion, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
@@ -148,6 +148,34 @@ function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
     );
 }
 
+function AllRounderLeaderboard({ stats }: { stats: AllRounderLeaderboardStat[] }) {
+    if (stats.length === 0) {
+        return <p className="text-muted-foreground text-center py-8">No all-rounder data available yet.</p>;
+    }
+    
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Player</TableHead>
+                    <TableHead className="text-center">Runs</TableHead>
+                    <TableHead className="text-center">Wickets</TableHead>
+                    <TableHead className="text-right">Points</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {stats.map(player => (
+                    <TableRow key={player.playerId}>
+                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="text-center">{player.runs}</TableCell>
+                        <TableCell className="text-center">{player.wickets}</TableCell>
+                        <TableCell className="text-right font-bold">{player.points}</TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+}
 
 function EditTeamPage() {
   const router = useRouter();
@@ -160,6 +188,7 @@ function EditTeamPage() {
   const [batterStats, setBatterStats] = useState<BatterLeaderboardStat[]>([]);
   const [bowlerStats, setBowlerStats] = useState<BowlerLeaderboardStat[]>([]);
   const [fielderStats, setFielderStats] = useState<FielderLeaderboardStat[]>([]);
+  const [allRounderStats, setAllRounderStats] = useState<AllRounderLeaderboardStat[]>([]);
 
   
   const teamId = params.teamId as string;
@@ -260,6 +289,31 @@ function EditTeamPage() {
             stumpings: data.stumpings
         }))
         .sort((a, b) => (b.catches + b.runOuts + b.stumpings) - (a.catches + a.runOuts + a.stumpings)));
+    
+    const allPlayers: { [playerId: string]: { name: string; team: string; matches: Set<string> } } = {};
+    Object.values(batterPlayerStats).forEach(p => { if (!allPlayers[p.name]) allPlayers[p.name] = { name: p.name, team: currentTeam.name, matches: p.matches }});
+    Object.values(bowlerPlayerStats).forEach(p => { if (!allPlayers[p.name]) allPlayers[p.name] = { name: p.name, team: currentTeam.name, matches: p.matches }});
+    Object.values(fielderPlayerStats).forEach(p => { if (!allPlayers[p.name]) allPlayers[p.name] = { name: p.name, team: currentTeam.name, matches: p.matches }});
+    
+    setAllRounderStats(Object.values(allPlayers)
+        .map(player => {
+            const batting = batterPlayerStats[player.name] || { runs: 0 };
+            const bowling = bowlerPlayerStats[player.name] || { wickets: 0 };
+            const fielding = fielderPlayerStats[player.name] || { catches: 0, runOuts: 0, stumpings: 0 };
+            
+            const points = (batting.runs * 1) + (bowling.wickets * 20) + ((fielding.catches + fielding.runOuts + fielding.stumpings) * 10);
+
+            return {
+                playerId: player.name,
+                playerName: player.name,
+                teamName: player.team,
+                matches: player.matches.size,
+                runs: batting.runs,
+                wickets: bowling.wickets,
+                points: points,
+            };
+        })
+        .sort((a, b) => b.points - a.points));
 
   }, []);
   
@@ -556,18 +610,30 @@ function EditTeamPage() {
                     Add Player
                 </Button>
             </TabsContent>
-            <TabsContent value="leaderboard" className="mt-4 space-y-4">
-                 <Card>
-                    <CardHeader><CardTitle>Top Batters</CardTitle></CardHeader>
-                    <CardContent><BatterLeaderboard stats={batterStats} /></CardContent>
-                </Card>
+            <TabsContent value="leaderboard" className="mt-4">
                 <Card>
-                    <CardHeader><CardTitle>Top Bowlers</CardTitle></CardHeader>
-                    <CardContent><BowlerLeaderboard stats={bowlerStats} /></CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader><CardTitle>Top Fielders</CardTitle></CardHeader>
-                    <CardContent><FielderLeaderboard stats={fielderStats} /></CardContent>
+                    <CardContent className="p-2">
+                        <Tabs defaultValue="batter" className="w-full">
+                            <TabsList className="grid w-full grid-cols-4">
+                                <TabsTrigger value="batter"><Star className="mr-2 h-4 w-4" />Batter</TabsTrigger>
+                                <TabsTrigger value="bowler"><ShieldAlert className="mr-2 h-4 w-4" />Bowler</TabsTrigger>
+                                <TabsTrigger value="all-rounder"><Award className="mr-2 h-4 w-4" />All-rounder</TabsTrigger>
+                                <TabsTrigger value="fielder"><UserIcon className="mr-2 h-4 w-4" />Fielder</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="batter" className="mt-4">
+                                <BatterLeaderboard stats={batterStats} />
+                            </TabsContent>
+                            <TabsContent value="bowler" className="mt-4">
+                                <BowlerLeaderboard stats={bowlerStats} />
+                            </TabsContent>
+                            <TabsContent value="all-rounder" className="mt-4">
+                                <AllRounderLeaderboard stats={allRounderStats} />
+                            </TabsContent>
+                            <TabsContent value="fielder" className="mt-4">
+                                <FielderLeaderboard stats={fielderStats} />
+                            </TabsContent>
+                        </Tabs>
+                    </CardContent>
                 </Card>
             </TabsContent>
         </Tabs>
