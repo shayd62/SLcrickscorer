@@ -38,16 +38,16 @@ const removeUndefined = (obj: any): any => {
     return obj.map(removeUndefined);
   }
   if (obj !== null && typeof obj === 'object') {
-    return Object.keys(obj).reduce((acc, key) => {
-      const value = obj[key];
-      if (value !== undefined) {
-        const nested = removeUndefined(value);
-        if (nested !== undefined) {
-            acc[key] = nested;
+    const newObj: {[key: string]: any} = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key) && obj[key] !== undefined) {
+        const value = removeUndefined(obj[key]);
+        if (value !== undefined) {
+            newObj[key] = value;
         }
       }
-      return acc;
-    }, {} as {[key: string]: any});
+    }
+    return newObj;
   }
   return obj;
 };
@@ -68,10 +68,12 @@ export default function CreateTournamentPage() {
     }
     const tournamentId = `tourn-${data.name.replace(/\s+/g, '-')}-${Date.now()}`;
     const tournamentData = {
-        ...data,
-        id: tournamentId,
+        name: data.name,
+        location: data.location,
         startDate: data.startDate.toISOString(),
         endDate: data.endDate.toISOString(),
+        numberOfTeams: data.numberOfTeams,
+        id: tournamentId,
         userId: user.uid,
         participatingTeams: [],
         pointsPolicy: {
@@ -81,6 +83,7 @@ export default function CreateTournamentPage() {
             bonus: 0,
         },
         oversPerInnings: 20, // Default value
+        ...(data.description && { description: data.description }),
     };
 
     try {

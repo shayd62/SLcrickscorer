@@ -158,7 +158,7 @@ function EditTournamentPage() {
             coverPhotoUrl = await uploadTournamentImage(tournamentId, coverFile, 'cover');
         }
 
-        const tournamentData = {
+        const tournamentData: {[key: string]: any} = {
           ...data,
           id: tournamentId,
           startDate: data.startDate.toISOString(),
@@ -167,6 +167,13 @@ function EditTournamentPage() {
           logoUrl,
           coverPhotoUrl,
         };
+        
+        // Clean the object by removing keys with undefined values
+        Object.keys(tournamentData).forEach(key => {
+            if (tournamentData[key] === undefined || tournamentData[key] === '') {
+                delete tournamentData[key];
+            }
+        });
 
         await setDoc(doc(db, "tournaments", tournamentId), tournamentData, { merge: true });
         toast({
