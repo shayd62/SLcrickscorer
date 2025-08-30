@@ -531,7 +531,7 @@ export default function LiveViewPage() {
                   <div className="col-span-1 bg-blue-500/80 p-2 flex flex-col justify-center">
                     <div className="flex justify-between font-semibold">
                           <p className="truncate">{currentBowler?.name}</p>
-                          <p>{currentBowler?.wickets}/{currentBowler?.runsConceded}</p>
+                          <p>{currentBowler?.wickets}/{currentBowler?.runsConceded} ({formatOvers(currentBowler?.balls || 0)})</p>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                           <p className="text-xs">This Over:</p>
@@ -549,7 +549,6 @@ export default function LiveViewPage() {
                   {/* Bowling Team */}
                   <div className="col-span-1 bg-red-500/90 p-2 flex flex-col items-center justify-center text-center">
                       <p className="font-bold truncate">{bowlingTeam.name}</p>
-                       <p className="text-sm">{formatOvers(currentBowler?.balls || 0)} Overs</p>
                       {target && <p className="text-xs mt-1">Target {target}</p>}
                   </div>
               </div>
@@ -579,3 +578,4 @@ export default function LiveViewPage() {
     </div>
   );
 }
+
