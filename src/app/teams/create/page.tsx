@@ -13,7 +13,7 @@ import { Plus, Trash2, Users, ArrowLeft, Camera, ChevronRight } from 'lucide-rea
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
-import { addDoc, collection } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { useAuth } from '@/contexts/auth-context';
 import type { UserProfile } from '@/lib/types';
 import { PlayerSearchDialog } from '@/components/player-search-dialog';
@@ -37,7 +37,7 @@ type TeamFormValues = z.infer<typeof teamSchema>;
 function CreateTeamPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { user, uploadTournamentImage } = useAuth();
+  const { user, uploadTeamLogo } = useAuth();
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
@@ -75,12 +75,15 @@ function CreateTeamPage() {
         return;
     }
     
-    let finalData: any = { ...data, userId: user.uid, players: [] };
+    // Generate a unique ID for the new team first
+    const teamDocRef = doc(collection(db, "teams"));
+    const teamId = teamDocRef.id;
+
+    let finalData: any = { ...data, userId: user.uid, players: [], id: teamId };
 
     try {
         if(logoFile) {
-            const teamIdForImage = `team-${Date.now()}`;
-            const logoUrl = await uploadTournamentImage(teamIdForImage, logoFile, 'logo');
+            const logoUrl = await uploadTeamLogo(teamId, logoFile);
             finalData.logoUrl = logoUrl;
         }
 
@@ -91,7 +94,7 @@ function CreateTeamPage() {
             }
         });
 
-        await addDoc(collection(db, "teams"), finalData);
+        await setDoc(teamDocRef, finalData);
         toast({
             title: "Team Created!",
             description: `Team "${data.name}" has been created successfully.`,

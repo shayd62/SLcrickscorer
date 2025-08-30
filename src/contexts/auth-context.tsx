@@ -20,6 +20,7 @@ interface AuthContextType {
   createUserProfile: (uid: string, data: Omit<UserProfile, 'uid' | 'id'>) => Promise<void>;
   updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => Promise<void>;
   uploadProfilePicture: (uid: string, file: File) => Promise<string>;
+  uploadTeamLogo: (teamId: string, file: File) => Promise<string>;
   uploadTournamentImage: (tournamentId: string, file: File, type: 'logo' | 'cover') => Promise<string>;
   searchUsers: (searchTerm: string) => Promise<UserProfile[]>;
 }
@@ -124,6 +125,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await updateUserProfile(uid, { photoURL: downloadURL });
     return downloadURL;
   };
+
+  const uploadTeamLogo = async (teamId: string, file: File) => {
+    const storageRef = ref(storage, `team-logos/${teamId}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    return downloadURL;
+  };
   
   const uploadTournamentImage = async (tournamentId: string, file: File, type: 'logo' | 'cover') => {
     const storageRef = ref(storage, `tournaments/${tournamentId}/${type}`);
@@ -168,6 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     createUserProfile,
     updateUserProfile,
     uploadProfilePicture,
+    uploadTeamLogo,
     uploadTournamentImage,
     searchUsers,
   };

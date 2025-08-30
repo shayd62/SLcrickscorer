@@ -38,7 +38,7 @@ function EditTeamFormPage() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
-  const { user, uploadTournamentImage } = useAuth();
+  const { user, uploadTeamLogo } = useAuth();
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const teamId = params.teamId as string;
@@ -110,7 +110,7 @@ function EditTeamFormPage() {
 
     try {
         if(logoFile) {
-            const logoUrl = await uploadTournamentImage(teamId, logoFile, 'logo');
+            const logoUrl = await uploadTeamLogo(teamId, logoFile);
             finalData.logoUrl = logoUrl;
         }
 
