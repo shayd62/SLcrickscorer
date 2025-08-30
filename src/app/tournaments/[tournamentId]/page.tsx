@@ -238,6 +238,36 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
     const [searchResults, setSearchResults] = useState<Team[]>([]);
     const { toast } = useToast();
     const { user, searchTeams } = useAuth();
+    const [participatingTeams, setParticipatingTeams] = useState<Team[]>([]);
+    
+    useEffect(() => {
+        const fetchTeamData = async () => {
+            if (!tournament.participatingTeams || tournament.participatingTeams.length === 0) {
+                setParticipatingTeams([]);
+                return;
+            }
+            const teamsRef = collection(db, "teams");
+            // Firestore 'in' query is limited to 30 items. If more teams, need to chunk.
+            const chunks = [];
+            for (let i = 0; i < tournament.participatingTeams.length; i += 30) {
+                chunks.push(tournament.participatingTeams.slice(i, i + 30));
+            }
+            
+            const teamPromises = chunks.map(chunk => 
+                getDocs(query(teamsRef, where("name", "in", chunk)))
+            );
+
+            const teamSnapshots = await Promise.all(teamPromises);
+            const teams: Team[] = [];
+            teamSnapshots.forEach(snapshot => {
+                snapshot.forEach(doc => {
+                    teams.push({ id: doc.id, ...doc.data() } as Team);
+                });
+            });
+            setParticipatingTeams(teams);
+        };
+        fetchTeamData();
+    }, [tournament.participatingTeams]);
     
     const handleSearch = async () => {
         if (searchTerm.trim().length < 2) {
@@ -337,16 +367,18 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
                 </div>
 
                 <div className="mt-4 border-t pt-4">
-                    {tournament.participatingTeams?.length > 0 ? (
+                    {participatingTeams.length > 0 ? (
                         <ul className="space-y-2 max-h-48 overflow-y-auto">
-                            {tournament.participatingTeams.map(teamName => (
-                                <li key={teamName} className="flex items-center justify-between p-2 bg-secondary rounded-md">
-                                    <span>{teamName}</span>
+                            {participatingTeams.map(team => (
+                                <li key={team.id} className="flex items-center justify-between p-2 bg-secondary rounded-md">
+                                    <Link href={`/teams/edit/${team.id}`} className="hover:underline">
+                                        <span>{team.name}</span>
+                                    </Link>
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
                                         <AlertDialogContent>
-                                            <AlertDialogHeader><AlertDialogTitle>Remove Team?</AlertDialogTitle><AlertDialogDescription>This will remove "{teamName}" from the tournament and any groups it's in. Are you sure?</AlertDialogDescription></AlertDialogHeader>
-                                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveTeam(teamName)}>Remove</AlertDialogAction></AlertDialogFooter>
+                                            <AlertDialogHeader><AlertDialogTitle>Remove Team?</AlertDialogTitle><AlertDialogDescription>This will remove "{team.name}" from the tournament and any groups it's in. Are you sure?</AlertDialogDescription></AlertDialogHeader>
+                                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveTeam(team.name)}>Remove</AlertDialogAction></AlertDialogFooter>
                                         </AlertDialogContent>
                                     </AlertDialog>
                                 </li>
