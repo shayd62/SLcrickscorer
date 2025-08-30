@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CricketBallIcon, CricketBatIcon } from '@/components/icons';
-import { User, Users, Swords, Trophy, Plus, Trash2, Shield, UserCheck, UserPlus, Settings } from 'lucide-react';
+import { User, Users, Swords, Trophy, Plus, Trash2, Shield, UserCheck, UserPlus, Settings, Search } from 'lucide-react';
 import type { MatchConfig, MatchState, Innings, Player as PlayerType, Team, Tournament, UserProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -126,6 +126,8 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
   const [savedTeams, setSavedTeams] = useState<Team[]>([]);
   const [playerSearchOpen, setPlayerSearchOpen] = useState(false);
   const [editingTeamKey, setEditingTeamKey] = useState<'team1' | 'team2' | null>(null);
+  const [team1Pin, setTeam1Pin] = useState('');
+  const [team2Pin, setTeam2Pin] = useState('');
   const { toast } = useToast();
 
   const router = useRouter();
@@ -140,7 +142,7 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
     const fetchTeams = async () => {
         try {
             const querySnapshot = await getDocs(collection(db, "teams"));
-            const teams = querySnapshot.docs.map(doc => doc.data() as Team);
+            const teams = querySnapshot.docs.map(doc => ({...doc.data() as Omit<Team, 'id'>, id: doc.id}));
             setSavedTeams(teams);
         } catch (e) {
             console.error("Failed to parse teams from firestore", e);
@@ -238,6 +240,38 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
         toast({ title: "Team is full", description: "Remove a player to add a new one.", variant: "destructive" });
     }
   };
+
+  const handlePinSearch = (teamKey: 'team1' | 'team2', pin: string) => {
+      const targetPin = parseInt(pin, 10);
+      if (isNaN(targetPin)) {
+          toast({ title: 'Invalid PIN', description: 'Please enter a numeric PIN.', variant: 'destructive' });
+          return;
+      }
+
+      let foundTeam: Team | null = null;
+      for (const team of savedTeams) {
+          let hash = 0;
+          for (let i = 0; i < team.id.length; i++) {
+              const char = team.id.charCodeAt(i);
+              hash = ((hash << 5) - hash) + char;
+              hash |= 0;
+          }
+          const generatedPin = (Math.abs(hash) % 10000);
+          
+          if (generatedPin === targetPin) {
+              foundTeam = team;
+              break;
+          }
+      }
+
+      if (foundTeam) {
+          handleTeamSelect(foundTeam.name, teamKey);
+          toast({ title: 'Team Found!', description: `Loaded team: ${foundTeam.name}` });
+      } else {
+          toast({ title: 'Team Not Found', description: 'No team found with that PIN.', variant: 'destructive' });
+      }
+  };
+
 
   const onSubmit = async (data: SetupFormValues) => {
     const finalConfig: MatchConfig = {
@@ -387,15 +421,22 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
                 const teamIndex = teamKey === 'team1' ? 0 : 1;
                 const players = teamKey === 'team1' ? team1Players : team2Players;
                 const removeFn = teamKey === 'team1' ? removeT1 : removeT2;
+                const teamPin = teamKey === 'team1' ? team1Pin : team2Pin;
+                const setTeamPin = teamKey === 'team1' ? setTeam1Pin : setTeam2Pin;
 
                 return (
                   <div key={teamKey} className="space-y-3 pt-4">
                     <h3 className="font-bold text-lg">Team {form.watch(`${teamKey}.name`) || (teamIndex === 0 ? 'A' : 'B')}</h3>
                     
+                    <div className="flex gap-2">
+                      <Input value={teamPin} onChange={(e) => setTeamPin(e.target.value)} placeholder="Find by 4-digit PIN"/>
+                      <Button type="button" variant="secondary" onClick={() => handlePinSearch(teamKey as 'team1'|'team2', teamPin)}><Search className="h-4 w-4"/></Button>
+                    </div>
+
                     {savedTeams.length > 0 && (
                       <Select onValueChange={(val) => handleTeamSelect(val, teamKey as 'team1' | 'team2')}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Load a saved team" />
+                          <SelectValue placeholder="Or load a saved team" />
                         </SelectTrigger>
                         <SelectContent>
                           {savedTeams.map(team => <SelectItem key={team.name} value={team.name}>{team.name}</SelectItem>)}
