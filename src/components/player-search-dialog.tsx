@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/auth-context';
 import type { UserProfile } from '@/lib/types';
