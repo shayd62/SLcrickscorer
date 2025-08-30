@@ -9,7 +9,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil, Radio, Star, ShieldAlert, User, Award, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil, Radio, Star, ShieldAlert, User, Award, ChevronRight, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, Innings, FielderLeaderboardStat, Player, AllRounderLeaderboardStat } from '@/lib/types';
 import { db } from '@/lib/firebase';
@@ -234,44 +234,31 @@ function PointsTable({ teams, title = "Points Table" }: { teams: TournamentPoint
 }
 
 function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void> }) {
-    const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
-    const [selectedTeam, setSelectedTeam] = useState<string>('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchResults, setSearchResults] = useState<Team[]>([]);
     const { toast } = useToast();
-    const { user } = useAuth();
-
-    const fetchTeams = useCallback(async () => {
-        if (!user) return;
-        const q = query(collection(db, "teams"), where("userId", "==", user.uid));
-        const querySnapshot = await getDocs(q);
-        const allTeams = querySnapshot.docs.map(doc => ({ ...doc.data() as Omit<Team, 'id'>, id: doc.id }));
-        const participating = tournament.participatingTeams || [];
-        const notYetJoined = allTeams.filter(team => !participating.includes(team.name));
-        setAvailableTeams(notYetJoined);
-    }, [tournament.participatingTeams, user]);
-
-
-    useEffect(() => {
-        fetchTeams();
-    }, [fetchTeams]);
-
-    const handleJoin = async () => {
-        if (!selectedTeam) {
-            toast({ title: "No team selected", description: "Please select a team to add.", variant: 'destructive' });
+    const { user, searchTeams } = useAuth();
+    
+    const handleSearch = async () => {
+        if (searchTerm.trim().length < 2) {
+            setSearchResults([]);
             return;
         }
+        const results = await searchTeams(searchTerm);
+        const participatingNames = tournament.participatingTeams || [];
+        const availableResults = results.filter(team => !participatingNames.includes(team.name));
+        setSearchResults(availableResults);
+    };
 
+    const handleAddTeam = async (team: Team) => {
         try {
-            const teamToAdd = availableTeams.find(t => t.name === selectedTeam);
-            if (!teamToAdd) {
-                toast({ title: "Error", description: "Selected team not found.", variant: 'destructive' });
-                return;
-            }
-
+            const teamToAdd = team;
+            
             const teamsRef = collection(db, "teams");
             const participatingTeamNames = tournament.participatingTeams || [];
 
             if (participatingTeamNames.length > 0) {
-                const participatingTeamsQuery = query(teamsRef, where("name", "in", participatingTeamNames), where("userId", "==", user?.uid));
+                const participatingTeamsQuery = query(teamsRef, where("name", "in", participatingTeamNames));
                 const participatingTeamsSnapshot = await getDocs(participatingTeamsQuery);
 
                 const existingPlayerIds = new Set<string>();
@@ -286,7 +273,7 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
                 if (duplicatePlayer) {
                     toast({
                         title: "Duplicate Player Found",
-                        description: `A player from "${selectedTeam}" is already in another team in this tournament. Each player can only be on one team.`,
+                        description: `A player from "${team.name}" is already in another team in this tournament. Each player can only be on one team.`,
                         variant: "destructive",
                         duration: 7000,
                     });
@@ -294,10 +281,10 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
                 }
             }
             
-            await onUpdate({ participatingTeams: arrayUnion(selectedTeam) });
-            toast({ title: "Team Added!", description: `"${selectedTeam}" has joined the tournament.` });
-            setSelectedTeam('');
-            fetchTeams();
+            await onUpdate({ participatingTeams: arrayUnion(team.name) });
+            toast({ title: "Team Added!", description: `"${team.name}" has joined the tournament.` });
+            setSearchTerm('');
+            setSearchResults([]);
         } catch (e) {
             console.error("Error joining tournament: ", e);
             toast({ title: "Error", description: "Could not add team to the tournament.", variant: 'destructive' });
@@ -327,43 +314,45 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                {tournament.participatingTeams?.length > 0 ? (
-                    <ul className="space-y-2 max-h-48 overflow-y-auto">
-                        {tournament.participatingTeams.map(teamName => (
-                            <li key={teamName} className="flex items-center justify-between p-2 bg-secondary rounded-md">
-                                <span>{teamName}</span>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader><AlertDialogTitle>Remove Team?</AlertDialogTitle><AlertDialogDescription>This will remove "{teamName}" from the tournament and any groups it's in. Are you sure?</AlertDialogDescription></AlertDialogHeader>
-                                        <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveTeam(teamName)}>Remove</AlertDialogAction></AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            </li>
-                        ))}
-                    </ul>
-                ) : <p className="text-sm text-muted-foreground text-center py-4">No teams have joined yet.</p>}
-
-                <div className="mt-4 space-y-2 border-t pt-4">
-                     {availableTeams.length > 0 ? (
-                        <>
-                        <Select onValueChange={setSelectedTeam} value={selectedTeam}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a team to add" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {availableTeams.map(team => (
-                                    <SelectItem key={team.id} value={team.name}>{team.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Button onClick={handleJoin} disabled={!selectedTeam} className="w-full">
-                            <Plus className="mr-2 h-4 w-4" /> Add Saved Team
-                        </Button>
-                        </>
-                    ) : (
-                        <p className="text-sm text-muted-foreground text-center">All your saved teams have already joined this tournament.</p>
+                <div className="space-y-2">
+                    <div className="flex gap-2">
+                        <Input 
+                            placeholder="Search to add a team..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                        />
+                        <Button onClick={handleSearch}><Search className="h-4 w-4" /></Button>
+                    </div>
+                    {searchResults.length > 0 && (
+                        <div className="border rounded-md max-h-40 overflow-y-auto">
+                            {searchResults.map(team => (
+                                <div key={team.id} className="p-2 flex justify-between items-center hover:bg-secondary">
+                                    <span>{team.name}</span>
+                                    <Button size="sm" onClick={() => handleAddTeam(team)}>Add</Button>
+                                </div>
+                            ))}
+                        </div>
                     )}
+                </div>
+
+                <div className="mt-4 border-t pt-4">
+                    {tournament.participatingTeams?.length > 0 ? (
+                        <ul className="space-y-2 max-h-48 overflow-y-auto">
+                            {tournament.participatingTeams.map(teamName => (
+                                <li key={teamName} className="flex items-center justify-between p-2 bg-secondary rounded-md">
+                                    <span>{teamName}</span>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader><AlertDialogTitle>Remove Team?</AlertDialogTitle><AlertDialogDescription>This will remove "{teamName}" from the tournament and any groups it's in. Are you sure?</AlertDialogDescription></AlertDialogHeader>
+                                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveTeam(teamName)}>Remove</AlertDialogAction></AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : <p className="text-sm text-muted-foreground text-center py-4">No teams have joined yet.</p>}
                 </div>
             </CardContent>
         </Card>

@@ -4,10 +4,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential } from 'firebase/auth';
 import { auth, db, storage } from '@/lib/firebase';
-import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useRouter } from 'next/navigation';
-import type { UserProfile } from '@/lib/types';
+import type { UserProfile, Team } from '@/lib/types';
 
 interface AuthContextType {
   user: User | null;
@@ -23,6 +23,7 @@ interface AuthContextType {
   uploadTeamLogo: (teamId: string, file: File) => Promise<string>;
   uploadTournamentImage: (tournamentId: string, file: File, type: 'logo' | 'cover') => Promise<string>;
   searchUsers: (searchTerm: string) => Promise<UserProfile[]>;
+  searchTeams: (searchTerm: string) => Promise<Team[]>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -165,6 +166,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return Array.from(usersMap.values());
   };
 
+  const searchTeams = async (searchTerm: string): Promise<Team[]> => {
+    const teamsRef = collection(db, 'teams');
+    const q = query(teamsRef, where('name', '>=', searchTerm), where('name', '<=', searchTerm + '\uf8ff'));
+    
+    const querySnapshot = await getDocs(q);
+    const teams: Team[] = [];
+    querySnapshot.forEach(doc => {
+        teams.push({ id: doc.id, ...doc.data() } as Team);
+    });
+    
+    return teams;
+};
+
+
   const value = {
     user,
     userProfile,
@@ -179,6 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     uploadTeamLogo,
     uploadTournamentImage,
     searchUsers,
+    searchTeams,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
