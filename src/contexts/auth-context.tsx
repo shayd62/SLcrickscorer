@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential } from 'firebase/auth';
 import { auth, db, storage } from '@/lib/firebase';
-import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useRouter } from 'next/navigation';
 import type { UserProfile, Team } from '@/lib/types';
@@ -25,6 +25,7 @@ interface AuthContextType {
   uploadTournamentImage: (tournamentId: string, file: File, type: 'logo' | 'cover') => Promise<string>;
   searchUsers: (searchTerm: string) => Promise<UserProfile[]>;
   searchTeams: (searchTerm: string) => Promise<Team[]>;
+  handleUserCleanup: () => Promise<{deleted: number, duplicates: number}>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -112,9 +113,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const registerNewPlayer = async (name: string, phoneNumber: string): Promise<UserProfile> => {
-    const userDocRef = doc(db, 'users', phoneNumber);
-    const userDoc = await getDoc(userDocRef);
-    if (userDoc.exists()) {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where("phoneNumber", "==", phoneNumber));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
         throw new Error("A player with this phone number is already registered.");
     }
 
@@ -229,6 +232,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const lowercasedSearchTerm = searchTerm.toLowerCase();
     return allTeams.filter(team => team.name.toLowerCase().includes(lowercasedSearchTerm));
   };
+  
+  const handleUserCleanup = async () => {
+    console.log("Starting user cleanup...");
+    const usersRef = collection(db, 'users');
+    const snapshot = await getDocs(usersRef);
+    
+    const phoneMap = new Map<string, UserProfile[]>();
+
+    // Group users by phone number
+    snapshot.forEach(doc => {
+        const user = { id: doc.id, ...doc.data() } as UserProfile;
+        if (user.phoneNumber) {
+            const existing = phoneMap.get(user.phoneNumber) || [];
+            phoneMap.set(user.phoneNumber, [...existing, user]);
+        }
+    });
+
+    let duplicates = 0;
+    let deleted = 0;
+
+    for (const [phone, users] of phoneMap.entries()) {
+        if (users.length > 1) {
+            duplicates += users.length -1;
+            // Assuming the first one is the one to keep.
+            const usersToDelete = users.slice(1);
+            for (const userToDelete of usersToDelete) {
+                try {
+                    await deleteDoc(doc(db, 'users', userToDelete.id));
+                    console.log(`Deleted user ${userToDelete.name} with phone ${phone}`);
+                    deleted++;
+                } catch (error) {
+                    console.error(`Failed to delete user ${userToDelete.id}`, error);
+                }
+            }
+        }
+    }
+    console.log(`Cleanup complete. Found ${duplicates} duplicates, deleted ${deleted}.`);
+    return { deleted, duplicates };
+};
 
 
   const value = {
@@ -247,6 +289,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     uploadTournamentImage,
     searchUsers,
     searchTeams,
+    handleUserCleanup,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

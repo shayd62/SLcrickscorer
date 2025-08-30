@@ -4,16 +4,18 @@
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, User, Mail, Phone, MapPin, Edit, Shield, GanttChartSquare } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, MapPin, Edit, Shield, GanttChartSquare, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import withAuth from '@/components/with-auth';
 import Image from 'next/image';
 import { CricketBatIcon, CricketBallIcon } from '@/components/icons';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 function ProfilePage() {
     const router = useRouter();
-    const { user, userProfile, loading } = useAuth();
+    const { user, userProfile, loading, handleUserCleanup } = useAuth();
+    const { toast } = useToast();
     
     if (loading) {
         return <div className="flex items-center justify-center min-h-screen">Loading profile...</div>
@@ -23,6 +25,17 @@ function ProfilePage() {
         // This should ideally not happen if withAuth is working correctly
         return <div className="flex items-center justify-center min-h-screen">User not found.</div>
     }
+
+    const runCleanup = async () => {
+        try {
+            toast({ title: 'Starting Cleanup...', description: 'Please wait while we clean up duplicate users.' });
+            const { deleted, duplicates } = await handleUserCleanup();
+            toast({ title: 'Cleanup Complete!', description: `Found ${duplicates} duplicates and deleted ${deleted} of them.` });
+        } catch (error: any) {
+            toast({ title: 'Cleanup Failed', description: error.message, variant: 'destructive' });
+        }
+    };
+
 
     return (
         <div className="min-h-screen bg-secondary/30 text-foreground font-body">
@@ -87,6 +100,9 @@ function ProfilePage() {
                                 )}
                             </CardContent>
                         </Card>
+                        <Button variant="destructive" onClick={runCleanup} className="w-full">
+                            <Trash2 className="mr-2 h-4 w-4" /> Run User Cleanup
+                        </Button>
                     </CardContent>
                 </Card>
             </main>
