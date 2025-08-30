@@ -212,7 +212,15 @@ function EditTeamPage() {
   
   const handleShowPin = () => {
     if (!team) return;
-    const pin = team.id.slice(-4);
+    
+    let hash = 0;
+    for (let i = 0; i < team.id.length; i++) {
+        const char = team.id.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0; // Convert to 32bit integer
+    }
+    const pin = (Math.abs(hash) % 10000).toString().padStart(4, '0');
+
     toast({
       title: `Team PIN for ${team.name}`,
       description: `Your 4-digit PIN is: ${pin}`,
