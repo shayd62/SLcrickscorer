@@ -33,6 +33,26 @@ const tournamentSchema = z.object({
 
 type TournamentFormValues = z.infer<typeof tournamentSchema>;
 
+const removeUndefined = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefined);
+  }
+  if (obj !== null && typeof obj === 'object') {
+    return Object.keys(obj).reduce((acc, key) => {
+      const value = obj[key];
+      if (value !== undefined) {
+        const nested = removeUndefined(value);
+        if (nested !== undefined) {
+            acc[key] = nested;
+        }
+      }
+      return acc;
+    }, {} as {[key: string]: any});
+  }
+  return obj;
+};
+
+
 export default function CreateTournamentPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -64,7 +84,8 @@ export default function CreateTournamentPage() {
     };
 
     try {
-      await setDoc(doc(db, "tournaments", tournamentId), tournamentData);
+      const cleanedData = removeUndefined(tournamentData);
+      await setDoc(doc(db, "tournaments", tournamentId), cleanedData);
       toast({
         title: "Tournament Created!",
         description: `The tournament "${data.name}" has been created successfully.`,
