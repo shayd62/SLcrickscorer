@@ -209,6 +209,15 @@ function EditTeamPage() {
       description: "A shareable link for your team has been copied to your clipboard.",
     });
   };
+  
+  const handleShowPin = () => {
+    if (!team) return;
+    const pin = team.id.slice(-4);
+    toast({
+      title: `Team PIN for ${team.name}`,
+      description: `Your 4-digit PIN is: ${pin}`,
+    });
+  };
 
   if (!team) {
     return <div className="flex justify-center items-center h-screen">Loading team...</div>
@@ -239,7 +248,7 @@ function EditTeamPage() {
                     <Share2 className="mr-2 h-4 w-4" />
                     <span>Share</span>
                 </DropdownMenuItem>
-                 <DropdownMenuItem>
+                 <DropdownMenuItem onClick={handleShowPin}>
                     <Pin className="mr-2 h-4 w-4" />
                     <span>Pin</span>
                 </DropdownMenuItem>
