@@ -169,15 +169,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const searchTeams = async (searchTerm: string): Promise<Team[]> => {
     if (!user) return [];
 
+    const teamsRef = collection(db, 'teams');
+    const q = query(teamsRef, where("userId", "==", user.uid));
+    const allTeamsSnapshot = await getDocs(q);
+    const allTeams = allTeamsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
+
     // Check if searchTerm is a 4-digit PIN
     if (/^\d{4}$/.test(searchTerm)) {
         const pinToFind = parseInt(searchTerm, 10);
-        const teamsRef = collection(db, 'teams');
-        const q = query(teamsRef, where("userId", "==", user.uid));
-        const allTeamsSnapshot = await getDocs(q);
         
-        for (const doc of allTeamsSnapshot.docs) {
-            const team = { id: doc.id, ...doc.data() } as Team;
+        for (const team of allTeams) {
             let hash = 0;
             for (let i = 0; i < team.id.length; i++) {
                 const char = team.id.charCodeAt(i);
@@ -193,21 +194,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Otherwise, search by name
-    const teamsRef = collection(db, 'teams');
-    const q = query(
-        teamsRef, 
-        where('userId', '==', user.uid),
-        where('name', '>=', searchTerm), 
-        where('name', '<=', searchTerm + '\uf8ff')
-    );
-    
-    const querySnapshot = await getDocs(q);
-    const teams: Team[] = [];
-    querySnapshot.forEach(doc => {
-        teams.push({ id: doc.id, ...doc.data() } as Team);
-    });
-    
-    return teams;
+    const lowercasedSearchTerm = searchTerm.toLowerCase();
+    return allTeams.filter(team => team.name.toLowerCase().includes(lowercasedSearchTerm));
   };
 
 
