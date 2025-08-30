@@ -25,7 +25,6 @@ interface AuthContextType {
   uploadTournamentImage: (tournamentId: string, file: File, type: 'logo' | 'cover') => Promise<string>;
   searchUsers: (searchTerm: string) => Promise<UserProfile[]>;
   searchTeams: (searchTerm: string) => Promise<Team[]>;
-  handleUserCleanup: () => Promise<{deleted: number, duplicates: number}>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -105,19 +104,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const createUserProfile = async (uid: string, data: Omit<UserProfile, 'uid' | 'id'>) => {
-    // Use phone number as the document ID
+    // Use phone number as the document ID to enforce uniqueness
     const docId = data.phoneNumber;
+    const userDocRef = doc(db, 'users', docId);
+
+    const docSnap = await getDoc(userDocRef);
+    if (docSnap.exists()) {
+        throw new Error("A user with this phone number already exists.");
+    }
+
     const profileData = { uid, ...data };
-    await setDoc(doc(db, 'users', docId), profileData);
+    await setDoc(userDocRef, profileData);
     setUserProfile({ id: docId, ...profileData, uid });
   };
 
   const registerNewPlayer = async (name: string, phoneNumber: string): Promise<UserProfile> => {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where("phoneNumber", "==", phoneNumber));
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
+    // Check if player already exists by phone number (which is the document ID)
+    const userDocRef = doc(db, 'users', phoneNumber);
+    const docSnap = await getDoc(userDocRef);
+    if (docSnap.exists()) {
         throw new Error("A player with this phone number is already registered.");
     }
 
@@ -133,12 +138,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         phoneNumber: phoneNumber,
         gender: 'Other', // Default value
     };
-
-    const docId = phoneNumber;
-    await setDoc(doc(db, 'users', docId), profileData);
+    
+    await setDoc(userDocRef, profileData);
 
     const newUserProfile: UserProfile = {
-        id: docId,
+        id: phoneNumber,
         ...profileData
     };
 
@@ -232,46 +236,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const lowercasedSearchTerm = searchTerm.toLowerCase();
     return allTeams.filter(team => team.name.toLowerCase().includes(lowercasedSearchTerm));
   };
-  
-  const handleUserCleanup = async (): Promise<{deleted: number, duplicates: number}> => {
-    console.log("Starting user cleanup...");
-    const usersRef = collection(db, 'users');
-    const snapshot = await getDocs(usersRef);
-    
-    const phoneMap = new Map<string, UserProfile[]>();
-
-    // Group users by phone number
-    snapshot.forEach(doc => {
-        const user = { id: doc.id, ...doc.data() } as UserProfile;
-        if (user.phoneNumber) {
-            const existing = phoneMap.get(user.phoneNumber) || [];
-            phoneMap.set(user.phoneNumber, [...existing, user]);
-        }
-    });
-
-    let duplicates = 0;
-    let deleted = 0;
-
-    for (const [phone, users] of phoneMap.entries()) {
-        if (users.length > 1) {
-            duplicates += users.length - 1;
-            // Assuming the first one is the one to keep. A better approach might be to sort by creation date if available.
-            const usersToDelete = users.slice(1);
-            for (const userToDelete of usersToDelete) {
-                try {
-                    await deleteDoc(doc(db, 'users', userToDelete.id));
-                    console.log(`Deleted user ${userToDelete.name} with phone ${phone}`);
-                    deleted++;
-                } catch (error) {
-                    console.error(`Failed to delete user ${userToDelete.id}`, error);
-                }
-            }
-        }
-    }
-    console.log(`Cleanup complete. Found ${duplicates} duplicates, deleted ${deleted}.`);
-    return { deleted, duplicates };
-};
-
 
   const value = {
     user,
@@ -289,7 +253,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     uploadTournamentImage,
     searchUsers,
     searchTeams,
-    handleUserCleanup,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
