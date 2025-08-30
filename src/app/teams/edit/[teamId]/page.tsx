@@ -1,14 +1,14 @@
 
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Plus, Trash2, Users, ArrowLeft, Trophy, MapPin, ChevronRight, UserPlus, Settings, Pencil, Share2, Pin } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import type { Team, UserProfile, MatchState } from '@/lib/types';
+import type { Team, UserProfile, MatchState, Innings, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, FielderLeaderboardStat } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, arrayRemove, arrayUnion, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
@@ -34,7 +34,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 import { PlayerSearchDialog } from '@/components/player-search-dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
+const formatOvers = (balls: number, ballsPerOver: number = 6) => `${Math.floor(balls / ballsPerOver)}.${balls % ballsPerOver}`;
 
 function MatchResultCard({ match, currentTeamName }: { match: MatchState, currentTeamName: string }) {
     const router = useRouter();
@@ -63,6 +65,90 @@ function MatchResultCard({ match, currentTeamName }: { match: MatchState, curren
     );
 }
 
+function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
+    if (stats.length === 0) {
+        return <p className="text-muted-foreground text-center py-8">No batting data available yet.</p>;
+    }
+    
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Player</TableHead>
+                    <TableHead className="text-center">Runs</TableHead>
+                    <TableHead className="text-right">SR</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {stats.map(player => (
+                    <TableRow key={player.playerId}>
+                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="text-center font-bold">{player.runs}</TableCell>
+                        <TableCell className="text-right">{player.strikeRate.toFixed(2)}</TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+}
+
+function BowlerLeaderboard({ stats }: { stats: BowlerLeaderboardStat[] }) {
+    if (stats.length === 0) {
+        return <p className="text-muted-foreground text-center py-8">No bowling data available yet.</p>;
+    }
+    
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Player</TableHead>
+                    <TableHead className="text-center">Wickets</TableHead>
+                    <TableHead className="text-right">Econ</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {stats.map(player => (
+                    <TableRow key={player.playerId}>
+                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="text-center font-bold">{player.wickets}</TableCell>
+                        <TableCell className="text-right">{player.economy.toFixed(2)}</TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+}
+
+function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
+    if (stats.length === 0) {
+        return <p className="text-muted-foreground text-center py-8">No fielding data available yet.</p>;
+    }
+    
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Player</TableHead>
+                    <TableHead className="text-center">Catches</TableHead>
+                    <TableHead className="text-center">Run Outs</TableHead>
+                    <TableHead className="text-right">Stumpings</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {stats.map(player => (
+                    <TableRow key={player.playerId}>
+                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="text-center font-bold">{player.catches}</TableCell>
+                        <TableCell className="text-center">{player.runOuts}</TableCell>
+                        <TableCell className="text-right">{player.stumpings}</TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+}
+
+
 function EditTeamPage() {
   const router = useRouter();
   const params = useParams();
@@ -71,8 +157,111 @@ function EditTeamPage() {
   const [team, setTeam] = useState<Team | null>(null);
   const [matches, setMatches] = useState<MatchState[]>([]);
   const [isPlayerSearchOpen, setPlayerSearchOpen] = useState(false);
+  const [batterStats, setBatterStats] = useState<BatterLeaderboardStat[]>([]);
+  const [bowlerStats, setBowlerStats] = useState<BowlerLeaderboardStat[]>([]);
+  const [fielderStats, setFielderStats] = useState<FielderLeaderboardStat[]>([]);
+
   
   const teamId = params.teamId as string;
+
+  const calculateLeaderboards = useCallback((completedMatches: MatchState[], currentTeam: Team) => {
+    const batterPlayerStats: { [playerId: string]: { name: string; runs: number; balls: number; matches: Set<string> } } = {};
+    const bowlerPlayerStats: { [playerId: string]: { name: string; balls: number; runsConceded: number; wickets: number; matches: Set<string> } } = {};
+    const fielderPlayerStats: { [playerId: string]: { name: string; catches: number; runOuts: number; stumpings: number; matches: Set<string> } } = {};
+
+    const teamPlayerIds = new Set(currentTeam.players.map(p => p.id));
+
+    for (const matchData of completedMatches) {
+        const processInnings = (innings: Innings) => {
+            if (!innings) return;
+            
+            // Batting Stats for team members
+            for (const batsman of Object.values(innings.batsmen) as Batsman[]) {
+                if (teamPlayerIds.has(batsman.id) && (batsman.balls > 0 || batsman.isOut)) {
+                     if (!batterPlayerStats[batsman.id]) {
+                        batterPlayerStats[batsman.id] = { name: batsman.name, runs: 0, balls: 0, matches: new Set() };
+                    }
+                    batterPlayerStats[batsman.id].runs += batsman.runs;
+                    batterPlayerStats[batsman.id].balls += batsman.balls;
+                    batterPlayerStats[batsman.id].matches.add(matchData.id!);
+                }
+            }
+
+            // Bowling and Fielding Stats for team members
+            for (const bowler of Object.values(innings.bowlers) as Bowler[]) {
+                if (teamPlayerIds.has(bowler.id) && bowler.balls > 0) {
+                     if (!bowlerPlayerStats[bowler.id]) {
+                        bowlerPlayerStats[bowler.id] = { name: bowler.name, balls: 0, runsConceded: 0, wickets: 0, matches: new Set() };
+                    }
+                    bowlerPlayerStats[bowler.id].balls += bowler.balls;
+                    bowlerPlayerStats[bowler.id].runsConceded += bowler.runsConceded;
+                    bowlerPlayerStats[bowler.id].wickets += bowler.wickets;
+                    bowlerPlayerStats[bowler.id].matches.add(matchData.id!);
+                }
+            }
+            
+            // Fielding from dismissals
+            for (const batsman of Object.values(innings.batsmen) as Batsman[]) {
+              if (batsman.isOut && batsman.outInfo?.fielderId && teamPlayerIds.has(batsman.outInfo.fielderId)) {
+                  const fielderId = batsman.outInfo.fielderId;
+                  const fielder = currentTeam.players.find(p => p.id === fielderId);
+                  if (fielder) {
+                      if (!fielderPlayerStats[fielderId]) {
+                          fielderPlayerStats[fielderId] = { name: fielder.name, catches: 0, runOuts: 0, stumpings: 0, matches: new Set() };
+                      }
+                      fielderPlayerStats[fielderId].matches.add(matchData.id!);
+                      if (batsman.outInfo.method === 'Caught') fielderPlayerStats[fielderId].catches++;
+                      else if (batsman.outInfo.method === 'Run out') fielderPlayerStats[fielderId].runOuts++;
+                      else if (batsman.outInfo.method === 'Stumped') fielderPlayerStats[fielderId].stumpings++;
+                  }
+              }
+            }
+        };
+        
+        processInnings(matchData.innings1);
+        if (matchData.innings2) {
+            processInnings(matchData.innings2);
+        }
+    }
+    
+    setBatterStats(Object.entries(batterPlayerStats)
+        .map(([playerId, data]) => ({
+            playerId,
+            playerName: data.name,
+            teamName: currentTeam.name,
+            matches: data.matches.size,
+            runs: data.runs,
+            balls: data.balls,
+            strikeRate: data.balls > 0 ? (data.runs / data.balls) * 100 : 0
+        }))
+        .sort((a, b) => b.runs - a.runs));
+
+    setBowlerStats(Object.entries(bowlerPlayerStats)
+         .map(([playerId, data]) => ({
+            playerId,
+            playerName: data.name,
+            teamName: currentTeam.name,
+            matches: data.matches.size,
+            overs: formatOvers(data.balls),
+            wickets: data.wickets,
+            runsConceded: data.runsConceded,
+            economy: data.balls > 0 ? (data.runsConceded / (data.balls / 6)) : 0
+        }))
+        .sort((a, b) => b.wickets - a.wickets || a.economy - b.economy));
+    
+    setFielderStats(Object.entries(fielderPlayerStats)
+        .map(([playerId, data]) => ({
+            playerId,
+            playerName: data.name,
+            teamName: currentTeam.name,
+            matches: data.matches.size,
+            catches: data.catches,
+            runOuts: data.runOuts,
+            stumpings: data.stumpings
+        }))
+        .sort((a, b) => (b.catches + b.runOuts + b.stumpings) - (a.catches + a.runOuts + a.stumpings)));
+
+  }, []);
   
   useEffect(() => {
     if (teamId && user) {
@@ -113,6 +302,7 @@ function EditTeamPage() {
                 });
                 
                 setMatches(teamMatches);
+                calculateLeaderboards(teamMatches, teamData);
 
             } else {
                 toast({ title: "Error", description: "Team not found.", variant: "destructive" });
@@ -121,7 +311,7 @@ function EditTeamPage() {
         };
         fetchTeamAndMatches();
     }
-  }, [teamId, router, toast, user]);
+  }, [teamId, router, toast, user, calculateLeaderboards]);
 
   const handlePlayerDelete = async (playerToRemoveId: string) => {
     if (!team) return;
@@ -309,9 +499,10 @@ function EditTeamPage() {
         </div>
 
         <Tabs defaultValue="players" className="w-full max-w-md mt-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="matches">Matches</TabsTrigger>
                 <TabsTrigger value="players">Players</TabsTrigger>
+                <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
             </TabsList>
             <TabsContent value="matches" className="mt-4 space-y-2">
                 {matches.length > 0 ? (
@@ -364,6 +555,20 @@ function EditTeamPage() {
                     <UserPlus className="mr-2 h-4 w-4" />
                     Add Player
                 </Button>
+            </TabsContent>
+            <TabsContent value="leaderboard" className="mt-4 space-y-4">
+                 <Card>
+                    <CardHeader><CardTitle>Top Batters</CardTitle></CardHeader>
+                    <CardContent><BatterLeaderboard stats={batterStats} /></CardContent>
+                </Card>
+                <Card>
+                    <CardHeader><CardTitle>Top Bowlers</CardTitle></CardHeader>
+                    <CardContent><BowlerLeaderboard stats={bowlerStats} /></CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader><CardTitle>Top Fielders</CardTitle></CardHeader>
+                    <CardContent><FielderLeaderboard stats={fielderStats} /></CardContent>
+                </Card>
             </TabsContent>
         </Tabs>
       </main>
