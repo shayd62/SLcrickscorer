@@ -8,7 +8,7 @@ import { Plus, Trash2, Users, ArrowLeft, Trophy, MapPin, ChevronRight, UserPlus,
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import type { Team, UserProfile, MatchState, Innings, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, FielderLeaderboardStat, AllRounderLeaderboardStat } from '@/lib/types';
+import type { Team, UserProfile, MatchState, Innings, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, FielderLeaderboardStat, AllRounderLeaderboardStat, Player } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, arrayRemove, arrayUnion, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
@@ -75,7 +75,9 @@ function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
             <TableHeader>
                 <TableRow>
                     <TableHead>Player</TableHead>
+                    <TableHead className="text-center">M</TableHead>
                     <TableHead className="text-center">Runs</TableHead>
+                    <TableHead className="text-center">B</TableHead>
                     <TableHead className="text-right">SR</TableHead>
                 </TableRow>
             </TableHeader>
@@ -83,7 +85,9 @@ function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
                 {stats.map(player => (
                     <TableRow key={player.playerId}>
                         <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="text-center">{player.matches}</TableCell>
                         <TableCell className="text-center font-bold">{player.runs}</TableCell>
+                        <TableCell className="text-center">{player.balls}</TableCell>
                         <TableCell className="text-right">{player.strikeRate.toFixed(2)}</TableCell>
                     </TableRow>
                 ))}
@@ -198,6 +202,11 @@ function EditTeamPage() {
     const bowlerPlayerStats: { [playerId: string]: { name: string; balls: number; runsConceded: number; wickets: number; matches: Set<string> } } = {};
     const fielderPlayerStats: { [playerId: string]: { name: string; catches: number; runOuts: number; stumpings: number; matches: Set<string> } } = {};
 
+    // Initialize all players for the batting leaderboard
+    currentTeam.players.forEach(player => {
+        batterPlayerStats[player.id] = { name: player.name, runs: 0, balls: 0, matches: new Set() };
+    });
+
     const teamPlayerIds = new Set(currentTeam.players.map(p => p.id));
 
     for (const matchData of completedMatches) {
@@ -297,14 +306,14 @@ function EditTeamPage() {
     
     setAllRounderStats(Object.values(allPlayers)
         .map(player => {
-            const batting = batterPlayerStats[player.name] || { runs: 0 };
-            const bowling = bowlerPlayerStats[player.name] || { wickets: 0 };
-            const fielding = fielderPlayerStats[player.name] || { catches: 0, runOuts: 0, stumpings: 0 };
+            const batting = Object.values(batterPlayerStats).find(p => p.name === player.name) || { runs: 0 };
+            const bowling = Object.values(bowlerPlayerStats).find(p => p.name === player.name) || { wickets: 0 };
+            const fielding = Object.values(fielderPlayerStats).find(p => p.name === player.name) || { catches: 0, runOuts: 0, stumpings: 0 };
             
             const points = (batting.runs * 1) + (bowling.wickets * 20) + ((fielding.catches + fielding.runOuts + fielding.stumpings) * 10);
 
             return {
-                playerId: player.name,
+                playerId: player.name, // Using name as ID for simplicity here, would need consistent IDs
                 playerName: player.name,
                 teamName: player.team,
                 matches: player.matches.size,
@@ -406,7 +415,7 @@ function EditTeamPage() {
         return;
     }
 
-    const newPlayer = {
+    const newPlayer: Player = {
         id: player.uid,
         name: player.name,
     };
