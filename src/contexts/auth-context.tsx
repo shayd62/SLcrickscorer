@@ -167,8 +167,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const searchTeams = async (searchTerm: string): Promise<Team[]> => {
+    if (!user) return [];
+
+    // Check if searchTerm is a 4-digit PIN
+    if (/^\d{4}$/.test(searchTerm)) {
+        const pinToFind = parseInt(searchTerm, 10);
+        const teamsRef = collection(db, 'teams');
+        const q = query(teamsRef, where("userId", "==", user.uid));
+        const allTeamsSnapshot = await getDocs(q);
+        
+        for (const doc of allTeamsSnapshot.docs) {
+            const team = { id: doc.id, ...doc.data() } as Team;
+            let hash = 0;
+            for (let i = 0; i < team.id.length; i++) {
+                const char = team.id.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash |= 0;
+            }
+            const generatedPin = (Math.abs(hash) % 10000);
+            if (generatedPin === pinToFind) {
+                return [team]; // Return the found team in an array
+            }
+        }
+        return []; // No team found for this PIN
+    }
+
+    // Otherwise, search by name
     const teamsRef = collection(db, 'teams');
-    const q = query(teamsRef, where('name', '>=', searchTerm), where('name', '<=', searchTerm + '\uf8ff'));
+    const q = query(
+        teamsRef, 
+        where('userId', '==', user.uid),
+        where('name', '>=', searchTerm), 
+        where('name', '<=', searchTerm + '\uf8ff')
+    );
     
     const querySnapshot = await getDocs(q);
     const teams: Team[] = [];
@@ -177,7 +208,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     
     return teams;
-};
+  };
 
 
   const value = {
