@@ -84,6 +84,13 @@ function CreateTeamPage() {
             finalData.logoUrl = logoUrl;
         }
 
+        // Remove undefined fields from finalData
+        Object.keys(finalData).forEach(key => {
+            if (finalData[key] === undefined) {
+                delete finalData[key];
+            }
+        });
+
         await addDoc(collection(db, "teams"), finalData);
         toast({
             title: "Team Created!",

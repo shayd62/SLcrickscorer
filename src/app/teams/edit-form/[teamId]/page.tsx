@@ -114,6 +114,13 @@ function EditTeamFormPage() {
             finalData.logoUrl = logoUrl;
         }
 
+        // Remove undefined fields from finalData
+        Object.keys(finalData).forEach(key => {
+            if (finalData[key] === undefined) {
+                delete finalData[key];
+            }
+        });
+
         const teamRef = doc(db, 'teams', teamId);
         await updateDoc(teamRef, finalData);
 
