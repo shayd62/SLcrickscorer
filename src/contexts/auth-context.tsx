@@ -112,6 +112,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const registerNewPlayer = async (name: string, phoneNumber: string): Promise<UserProfile> => {
+    const userDocRef = doc(db, 'users', phoneNumber);
+    const userDoc = await getDoc(userDocRef);
+    if (userDoc.exists()) {
+        throw new Error("A player with this phone number is already registered.");
+    }
+
     const dummyEmail = `${phoneNumber}@cricmate.com`;
     const defaultPassword = 'password123'; // Or any default password logic
 
