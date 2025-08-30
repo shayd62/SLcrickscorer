@@ -13,7 +13,7 @@ import { Plus, Trash2, Users, ArrowLeft, Camera, ChevronRight } from 'lucide-rea
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, addDoc, collection, updateDoc } from "firebase/firestore";
 import { useAuth } from '@/contexts/auth-context';
 import type { UserProfile } from '@/lib/types';
 import { PlayerSearchDialog } from '@/components/player-search-dialog';
@@ -74,35 +74,45 @@ function CreateTeamPage() {
         toast({ title: "Not Authenticated", description: "You must be logged in to create a team.", variant: "destructive" });
         return;
     }
-    
-    // Generate a unique ID for the new team first
-    const teamDocRef = doc(collection(db, "teams"));
-    const teamId = teamDocRef.id;
-
-    let finalData: any = { ...data, userId: user.uid, players: [], id: teamId };
 
     try {
-        if(logoFile) {
-            const logoUrl = await uploadTeamLogo(teamId, logoFile);
-            finalData.logoUrl = logoUrl;
-        }
+        // Prepare team data, excluding the logo URL for now
+        const teamData: any = {
+            ...data,
+            userId: user.uid,
+            players: [],
+            logoUrl: '', // Will be updated later if a logo is uploaded
+        };
 
-        // Remove undefined fields from finalData
-        Object.keys(finalData).forEach(key => {
-            if (finalData[key] === undefined) {
-                delete finalData[key];
+        // Remove undefined fields
+        Object.keys(teamData).forEach(key => {
+            if (teamData[key] === undefined) {
+                delete teamData[key];
             }
         });
 
-        await setDoc(teamDocRef, finalData);
+        // Add the new team to Firestore to get a document reference
+        const teamDocRef = await addDoc(collection(db, "teams"), teamData);
+        const teamId = teamDocRef.id;
+
+        // If a logo file was selected, upload it now
+        if (logoFile) {
+            const logoUrl = await uploadTeamLogo(teamId, logoFile);
+            // Update the team document with the new logo URL
+            await updateDoc(teamDocRef, { logoUrl: logoUrl, id: teamId });
+        } else {
+             await updateDoc(teamDocRef, { id: teamId });
+        }
+
         toast({
             title: "Team Created!",
             description: `Team "${data.name}" has been created successfully.`,
         });
         router.push('/teams');
+
     } catch (e) {
         console.error("Error adding document: ", e);
-         toast({
+        toast({
             title: "Error creating team",
             description: "Could not save team to Firestore.",
             variant: "destructive"
