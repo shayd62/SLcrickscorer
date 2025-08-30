@@ -30,7 +30,11 @@ function ProfilePage() {
         try {
             toast({ title: 'Starting Cleanup...', description: 'Please wait while we clean up duplicate users.' });
             const { deleted, duplicates } = await handleUserCleanup();
-            toast({ title: 'Cleanup Complete!', description: `Found ${duplicates} duplicates and deleted ${deleted} of them.` });
+            if(duplicates > 0) {
+              toast({ title: 'Cleanup Complete!', description: `Found ${duplicates} duplicates and deleted ${deleted} of them.` });
+            } else {
+              toast({ title: 'No Duplicates Found', description: 'Your user data is already clean.'});
+            }
         } catch (error: any) {
             toast({ title: 'Cleanup Failed', description: error.message, variant: 'destructive' });
         }
@@ -69,7 +73,7 @@ function ProfilePage() {
                     <CardContent className="space-y-4">
                         <div className="flex items-center gap-4 p-3 bg-secondary/50 rounded-lg">
                             <Mail className="h-5 w-5 text-muted-foreground" />
-                            <span className="text-sm">{userProfile.email}</span>
+                            <span className="text-sm">{userProfile.email || 'No email provided'}</span>
                         </div>
                          <div className="flex items-center gap-4 p-3 bg-secondary/50 rounded-lg">
                             <Phone className="h-5 w-5 text-muted-foreground" />

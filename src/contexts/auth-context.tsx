@@ -233,7 +233,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return allTeams.filter(team => team.name.toLowerCase().includes(lowercasedSearchTerm));
   };
   
-  const handleUserCleanup = async () => {
+  const handleUserCleanup = async (): Promise<{deleted: number, duplicates: number}> => {
     console.log("Starting user cleanup...");
     const usersRef = collection(db, 'users');
     const snapshot = await getDocs(usersRef);
@@ -254,8 +254,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     for (const [phone, users] of phoneMap.entries()) {
         if (users.length > 1) {
-            duplicates += users.length -1;
-            // Assuming the first one is the one to keep.
+            duplicates += users.length - 1;
+            // Assuming the first one is the one to keep. A better approach might be to sort by creation date if available.
             const usersToDelete = users.slice(1);
             for (const userToDelete of usersToDelete) {
                 try {
