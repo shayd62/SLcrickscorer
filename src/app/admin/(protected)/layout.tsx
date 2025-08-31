@@ -1,4 +1,6 @@
 
+'use client';
+
 import AdminSidebar from '@/components/admin-sidebar';
 import withAuth from '@/components/with-auth';
 import React, { Suspense } from 'react';
