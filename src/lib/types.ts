@@ -1,5 +1,4 @@
 
-
 export interface Player {
   id: string; // This should be the user's UID
   name: string;
@@ -63,6 +62,9 @@ export interface TournamentMatch {
 export interface Tournament {
   id: string;
   name: string;
+  ownerUid?: string;
+  status?: 'pending' | 'approved' | 'blocked';
+  plan?: 'free' | 'pro' | 'enterprise';
   location?: string;
   description?: string;
   numberOfTeams?: string;
@@ -81,6 +83,7 @@ export interface Tournament {
   userId?: string;
   groups?: TournamentGroup[];
   matches?: TournamentMatch[];
+  createdAt?: any;
 }
 
 export interface TournamentPoints {
@@ -263,4 +266,41 @@ export interface UserProfile {
   isWicketKeeper?: boolean;
   photoURL?: string;
   role?: 'admin' | 'user';
+}
+
+// New types for the admin panel
+export type AdminRole = "super_admin" | "org_admin" | "scorer" | "viewer";
+
+export interface AdminUser {
+  uid: string;
+  email: string;
+  name: string;
+  roles: AdminRole[];
+  status: "active" | "suspended";
+  createdAt: any; // Firestore timestamp
+  lastActivity?: any;
+}
+
+export interface Invoice {
+    id: string;
+    tournamentId: string;
+    amount: number;
+    currency: string;
+    period: { start: any; end: any; };
+    status: 'paid' | 'pending' | 'overdue';
+}
+
+export interface Log {
+    id: string;
+    level: 'info' | 'warn' | 'error';
+    message: string;
+    context?: Record<string, any>;
+    createdAt: any;
+}
+
+export interface FeatureFlag {
+    id: string;
+    key: string;
+    enabled: boolean;
+    description?: string;
 }

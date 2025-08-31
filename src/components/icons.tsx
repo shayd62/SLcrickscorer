@@ -1,3 +1,4 @@
+
 import type { SVGProps } from "react";
 
 export const CricketBatIcon = (props: SVGProps<SVGSVGElement>) => (
@@ -32,3 +33,12 @@ export const TargetIcon = (props: SVGProps<SVGSVGElement>) => (
     <circle cx="12" cy="12" r="2" />
   </svg>
 );
+
+export const CricLogo = (props: SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M12 2a10 10 0 1 0 10 10" />
+        <path d="M12 2a10 10 0 0 0-3.37 19.46" strokeDasharray="3 3" />
+        <path d="m9 9 6 6" />
+        <path d="m9 15 6-6" />
+    </svg>
+)

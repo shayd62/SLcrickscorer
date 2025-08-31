@@ -1,0 +1,114 @@
+
+'use client';
+
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Users, Trophy, Gamepad2, UserCheck, AreaChart, BarChart } from "lucide-react";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+
+const kpiData = [
+    { title: 'Total Users', value: '1,250', icon: Users, change: '+12.5%' },
+    { title: 'Total Tournaments', value: '82', icon: Trophy, change: '+5' },
+    { title: 'Matches Played', value: '1,421', icon: Gamepad2, change: '+50 this week' },
+    { title: 'Active Today', value: '189', icon: UserCheck, change: '-3%' },
+];
+
+const chartData = [
+  { month: "January", desktop: 186 },
+  { month: "February", desktop: 305 },
+  { month: "March", desktop: 237 },
+  { month: "April", desktop: 73 },
+  { month: "May", desktop: 209 },
+  { month: "June", desktop: 214 },
+];
+
+const recentApprovals = [
+    { id: 'T7', name: 'Summer Smash 2024', owner: 'john.doe@example.com', status: 'pending' },
+    { id: 'U5', name: 'Jane Smith', owner: 'jane.smith@example.com', status: 'approved' },
+    { id: 'T8', name: 'Winter Cup', owner: 'sam.wilson@example.com', status: 'pending' },
+];
+
+export default function AdminDashboard() {
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold">Welcome back, Admin!</h1>
+        <p className="text-gray-500">Here's a snapshot of your platform's activity.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {kpiData.map((item) => (
+          <Card key={item.title}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
+              <item.icon className="h-5 w-5 text-gray-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{item.value}</div>
+              <p className="text-xs text-gray-500">{item.change}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>User Growth</CardTitle>
+            <CardDescription>Monthly active users trend.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-80">
+             <ResponsiveContainer width="100%" height="100%">
+                 <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <defs>
+                        <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0}/>
+                        </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip content={<ChartTooltipContent />} />
+                    <Area type="monotone" dataKey="desktop" stroke="var(--color-primary)" fillOpacity={1} fill="url(#colorUv)" />
+                </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Approvals</CardTitle>
+            <CardDescription>Tournaments awaiting your review.</CardDescription>
+          </CardHeader>
+          <CardContent>
+             <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {recentApprovals.map(item => (
+                        <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell>
+                                <Badge variant={item.status === 'pending' ? 'destructive' : 'default'}>{item.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                                <Button variant="outline" size="sm">View</Button>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
