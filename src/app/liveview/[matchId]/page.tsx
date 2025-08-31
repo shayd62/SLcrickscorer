@@ -295,33 +295,90 @@ function BattingCardTicker({ match }: { match: MatchState }) {
   if (!currentInningsData) return null;
 
   const battingTeamConfig = currentInningsData.battingTeam === 'team1' ? match.config.team1 : match.config.team2;
-  const battingTeamPlayers = battingTeamConfig.players.map(p => {
-    const batsmanData = currentInningsData.batsmen[p.id];
-    return {
-      ...p,
-      runs: batsmanData?.runs || 0,
-      balls: batsmanData?.balls || 0,
-      isOut: batsmanData?.isOut || false,
-    };
-  });
+  
+  const getDismissalText = (batsman: Batsman) => {
+    if (!batsman.isOut || !batsman.outInfo) return 'not out';
+    
+    const { method, by, fielderId } = batsman.outInfo;
+    const bowlerName = currentInningsData.bowlers[by]?.name;
+    const bowlingTeamPlayers = Object.values(currentInningsData.bowlers);
+
+    switch (method) {
+      case 'Caught':
+        const fielderName = currentInningsData.bowlers[fielderId!]?.name || bowlingTeamPlayers.find(p => p.id === fielderId)?.name;
+        return `c ${fielderName || ''} b ${bowlerName || ''}`;
+      case 'Bowled':
+        return `b ${bowlerName || ''}`;
+      case 'LBW':
+        return `lbw b ${bowlerName || ''}`;
+      case 'Stumped':
+        const stumperName = currentInningsData.bowlers[fielderId!]?.name || bowlingTeamPlayers.find(p => p.id === fielderId)?.name;
+        return `st ${stumperName || ''} b ${bowlerName || ''}`;
+      case 'Run out':
+         const runoutFielder = currentInningsData.bowlers[fielderId!]?.name || bowlingTeamPlayers.find(p => p.id === fielderId)?.name;
+        return `run out (${runoutFielder || ''})`;
+      case 'Retired':
+        return 'retired hurt';
+      default:
+        return method;
+    }
+  };
+
+  const batsmenInOrder = battingTeamConfig.players.map(p => currentInningsData.batsmen[p.id]).filter(Boolean);
+  const batsmenBatted = batsmenInOrder.filter(b => b.balls > 0 || b.isOut);
+  const batsmenNotBatted = batsmenInOrder.filter(b => b.balls === 0 && !b.isOut);
+
+  const extras = useMemo(() => {
+    return currentInningsData.timeline.reduce((acc, event) => {
+      if (event.isExtra) {
+        if(event.extraType === 'wd') acc += match.config.wideBall.run;
+        if(event.extraType === 'nb') acc += match.config.noBall.run;
+      }
+      return acc;
+    }, 0);
+  }, [currentInningsData.timeline, match.config]);
+
 
   return (
-    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 w-[600px] bg-white rounded-lg shadow-lg text-black font-sans">
-      <div className="relative bg-blue-900 text-white text-center text-2xl font-bold py-2">
-        <div className="absolute -top-2 left-0 w-full h-full bg-blue-900 transform -skew-y-2"></div>
-        <p className="relative">{battingTeamConfig.name}</p>
-      </div>
-      <div className="p-2">
-        <div className="bg-cyan-300 rounded-t-md">
-           {battingTeamPlayers.map(player => (
-              <div key={player.id} className="flex justify-between px-4 py-1 border-b border-white/50">
-                <span className={cn("font-bold", player.id === match.onStrikeId && "text-blue-800")}>{player.name}{player.id === match.onStrikeId ? '*' : ''}</span>
-                <div className="flex gap-4">
-                  <span>{player.runs}</span>
-                  <span>{player.balls}</span>
+    <div className="fixed inset-0 flex items-center justify-center bg-black/90 p-4 font-sans">
+      <div className="w-[800px] h-[500px] bg-[#0f172a] text-white rounded-lg shadow-2xl flex flex-col">
+        {/* Header */}
+        <div className="p-4">
+          <h1 className="text-3xl font-bold uppercase">{battingTeamConfig.name}</h1>
+          <p className="text-sm uppercase text-gray-400">
+            {match.config.tournamentId || 'Friendly Match'}
+            {match.config.matchNumber && `, Match ${match.config.matchNumber}`}
+          </p>
+        </div>
+
+        {/* Batting Table */}
+        <div className="flex-grow px-4 overflow-y-auto">
+          <div className="divide-y divide-gray-700/50">
+            {batsmenBatted.map(player => (
+                <div key={player.id} className={cn("grid grid-cols-12 gap-2 py-1.5 text-lg", !player.isOut && "bg-yellow-400/80 text-black rounded-md px-2")}>
+                  <div className="col-span-5 font-semibold uppercase">{player.name}</div>
+                  <div className="col-span-5 text-sm self-center text-gray-300">{getDismissalText(player)}</div>
+                  <div className="col-span-1 text-right font-bold">{player.runs}</div>
+                  <div className="col-span-1 text-right text-gray-300">{player.balls}</div>
+                </div>
+            ))}
+          </div>
+           {batsmenNotBatted.length > 0 && (
+              <div className="mt-4 pt-2 border-t border-gray-700/50">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-1">
+                   {batsmenNotBatted.map(player => (
+                      <div key={player.id} className="text-lg uppercase text-gray-400">{player.name}</div>
+                   ))}
                 </div>
               </div>
-          ))}
+           )}
+        </div>
+        
+        {/* Footer */}
+        <div className="bg-red-600 p-3 mt-auto grid grid-cols-3 items-center text-center">
+          <div className="font-bold text-lg">EXTRAS {extras}</div>
+          <div className="font-bold text-lg">OVERS {formatOvers(currentInningsData.balls)}</div>
+          <div className="font-bold text-3xl">TOTAL {currentInningsData.score}-{currentInningsData.wickets}</div>
         </div>
       </div>
     </div>
