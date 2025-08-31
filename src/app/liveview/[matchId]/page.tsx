@@ -343,30 +343,75 @@ function BowlingCardTicker({ match }: { match: MatchState }) {
     return bowler.balls > 0 ? (bowler.runsConceded / (bowler.balls / 6)).toFixed(2) : '0.00';
   }
 
+  const fallOfWickets = currentInningsData.fallOfWickets || [];
+
+  const extras = useMemo(() => {
+    return currentInningsData.timeline.reduce((acc, event) => {
+      if (event.isExtra) {
+        if(event.extraType === 'wd') acc += match.config.wideBall.run;
+        if(event.extraType === 'nb') acc += match.config.noBall.run;
+      }
+      return acc;
+    }, 0);
+  }, [currentInningsData.timeline, match.config]);
+  
   return (
-    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 w-[600px] bg-white rounded-lg shadow-lg text-black font-sans">
-      <div className="relative bg-indigo-900 text-white text-center text-2xl font-bold py-2">
-        <div className="absolute -top-2 left-0 w-full h-full bg-indigo-900 transform -skew-y-2"></div>
-        <p className="relative">{bowlingTeamConfig.name}</p>
-      </div>
-      <div className="p-2">
-        <div className="bg-purple-200 rounded-t-md">
-          <div className="grid grid-cols-6 px-4 py-2 bg-purple-900 text-white font-bold text-xs uppercase">
-            <div className="col-span-2">Bowler</div>
-            <div className="text-center">Dot Balls</div>
-            <div className="text-center">Overs</div>
-            <div className="text-center">Runs</div>
-            <div className="text-center">Wickets</div>
+    <div className="fixed inset-0 flex items-center justify-center bg-black/90 p-4 font-sans">
+      <div className="w-[800px] h-[500px] bg-[#0f172a] text-white rounded-lg shadow-2xl flex flex-col">
+        {/* Header */}
+        <div className="p-4">
+          <h1 className="text-3xl font-bold uppercase">{bowlingTeamConfig.name}</h1>
+          <p className="text-sm uppercase text-gray-400">
+            {match.config.tournamentId || 'Friendly Match'}
+            {match.config.matchNumber && `, Match ${match.config.matchNumber}`}
+          </p>
+        </div>
+
+        {/* Bowling Table */}
+        <div className="flex-grow px-4">
+          <div className="bg-[#1f2937] p-2 grid grid-cols-6 gap-2 text-center font-bold text-sm text-cyan-400">
+            <div className="col-span-1 text-left"></div>
+            <div>Overs</div>
+            <div>Dots</div>
+            <div>Runs</div>
+            <div>Wkts</div>
+            <div>Econ</div>
           </div>
-           {bowlersWithStats.map(bowler => (
-              <div key={bowler.id} className="grid grid-cols-6 items-center px-4 py-1 border-b border-purple-300/50">
-                <span className="font-bold col-span-2">{bowler.name}</span>
-                <span className="text-center">{getDotBalls(bowler.id)}</span>
-                <span className="text-center">{formatOvers(bowler.balls)}</span>
-                <span className="text-center">{bowler.runsConceded}</span>
-                <span className="text-center">{bowler.wickets}</span>
+          <div className="divide-y divide-gray-700">
+            {bowlersWithStats.map(bowler => (
+              <div key={bowler.id} className="p-2 grid grid-cols-6 gap-2 text-center items-center">
+                <div className="text-left font-semibold text-base uppercase">{bowler.name}</div>
+                <div>{formatOvers(bowler.balls)}</div>
+                <div>{getDotBalls(bowler.id)}</div>
+                <div>{bowler.runsConceded}</div>
+                <div>{bowler.wickets}</div>
+                <div>{getEconomy(bowler)}</div>
               </div>
-          ))}
+            ))}
+          </div>
+        </div>
+        
+        {/* Fall of Wickets */}
+        <div className="px-4 py-2">
+            <div className="grid grid-cols-10 gap-x-1 text-center">
+              <div className="font-bold text-sm text-green-400 col-span-1 self-center">Wkts</div>
+              {fallOfWickets.map((_, index) => (
+                <div key={index} className="bg-green-700/50 text-white font-semibold py-1 rounded-sm">{index + 1}</div>
+              ))}
+            </div>
+             <div className="grid grid-cols-10 gap-x-1 text-center mt-0.5">
+              <div className="font-bold text-sm text-red-400 col-span-1 self-center">Runs</div>
+              {fallOfWickets.map((wicket, index) => (
+                <div key={index} className="bg-red-700/50 text-white font-semibold py-1 rounded-sm">{wicket.score}</div>
+              ))}
+            </div>
+        </div>
+
+        {/* Footer */}
+        <div className="bg-red-600 p-3 mt-auto grid grid-cols-3 items-center text-center">
+          <div className="font-bold text-lg">EXTRAS {extras}</div>
+          <div className="font-bold text-lg">OVERS {formatOvers(currentInningsData.balls)}</div>
+          <div className="font-bold text-3xl">TOTAL {currentInningsData.score}-{currentInningsData.wickets}</div>
         </div>
       </div>
     </div>
@@ -531,7 +576,7 @@ export default function LiveViewPage() {
                   <div className="col-span-1 bg-blue-500/80 p-2 flex flex-col justify-center">
                     <div className="flex justify-between font-semibold">
                           <p className="truncate">{currentBowler?.name}</p>
-                          <p>{currentBowler?.wickets}/{currentBowler?.runsConceded} ({formatOvers(currentBowler?.balls || 0)})</p>
+                          <p>{currentBowler?.wickets}/{currentBowler?.runsConceded}</p>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                           <p className="text-xs">This Over:</p>
@@ -544,6 +589,7 @@ export default function LiveViewPage() {
                               })}
                           </div>
                       </div>
+                      <p className="text-xs mt-0.5">({formatOvers(currentBowler?.balls || 0)})</p>
                   </div>
 
                   {/* Bowling Team */}
@@ -578,4 +624,3 @@ export default function LiveViewPage() {
     </div>
   );
 }
-
