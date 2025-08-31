@@ -3,15 +3,30 @@
 
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, BarChart, Shield, LogOut } from 'lucide-react';
+import { Users, BarChart, Shield, LogOut, DatabaseZap } from 'lucide-react';
 import withAuth from '@/components/with-auth';
+import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 
 function AdminDashboardPage() {
-  const { user, userProfile, logout, loading } = useAuth();
+  const { user, userProfile, logout, loading, resetDatabase } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     if (!loading) {
@@ -26,8 +41,28 @@ function AdminDashboardPage() {
         router.replace('/matches');
       }
     }
-  }, [user, userProfile, loading, router]);
+  }, [user, userProfile, loading, router, toast]);
   
+  const handleResetDatabase = async () => {
+    setIsResetting(true);
+    try {
+        await resetDatabase();
+        toast({
+            title: "Database Reset Successful",
+            description: "All matches, teams, and tournaments have been cleared.",
+        });
+    } catch (error) {
+        console.error("Failed to reset database:", error);
+        toast({
+            title: "Database Reset Failed",
+            description: "An error occurred while trying to reset the database.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsResetting(false);
+    }
+  };
+
   if (loading || userProfile?.role !== 'admin') {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
@@ -70,6 +105,35 @@ function AdminDashboardPage() {
             </CardHeader>
             <CardContent>
                <Button className="w-full">Adjust Settings</Button>
+            </CardContent>
+          </Card>
+          <Card className="md:col-span-2 lg:col-span-3">
+             <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-destructive"><DatabaseZap /> Danger Zone</CardTitle>
+                <CardDescription>Critical operations that can result in data loss.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="destructive" disabled={isResetting}>
+                            {isResetting ? 'Resetting...' : 'Reset Database'}
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete all matches, teams, and tournament data from the database.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleResetDatabase}>
+                                Yes, reset the database
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </CardContent>
           </Card>
         </div>

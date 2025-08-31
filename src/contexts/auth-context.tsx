@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential } from 'firebase/auth';
 import { auth, db, storage } from '@/lib/firebase';
-import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useRouter } from 'next/navigation';
 import type { UserProfile, Team } from '@/lib/types';
@@ -25,6 +25,7 @@ interface AuthContextType {
   uploadTournamentImage: (tournamentId: string, file: File, type: 'logo' | 'cover') => Promise<string>;
   searchUsers: (searchTerm: string) => Promise<UserProfile[]>;
   searchTeams: (searchTerm: string) => Promise<Team[]>;
+  resetDatabase: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -236,6 +237,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const lowercasedSearchTerm = searchTerm.toLowerCase();
     return allTeams.filter(team => team.name.toLowerCase().includes(lowercasedSearchTerm));
   };
+  
+   const resetDatabase = async () => {
+    const collectionsToDelete = ['matches', 'teams', 'tournaments'];
+    for (const collectionName of collectionsToDelete) {
+      const q = query(collection(db, collectionName));
+      const querySnapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      querySnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+    }
+  };
 
   const value = {
     user,
@@ -253,6 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     uploadTournamentImage,
     searchUsers,
     searchTeams,
+    resetDatabase,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
