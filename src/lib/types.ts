@@ -262,4 +262,5 @@ export interface UserProfile {
   bowlingStyle?: 'Right-arm' | 'Left-arm';
   isWicketKeeper?: boolean;
   photoURL?: string;
+  role?: 'admin' | 'user';
 }
