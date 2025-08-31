@@ -2,9 +2,9 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Users, Trophy, Gamepad2, UserCheck, AreaChart, BarChart } from "lucide-react";
+import { Users, Trophy, Gamepad2, UserCheck, AreaChart as AreaChartIcon } from "lucide-react";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,13 @@ const chartData = [
   { month: "May", desktop: 209 },
   { month: "June", desktop: 214 },
 ];
+
+const chartConfig = {
+  desktop: {
+    label: "Desktop",
+    color: "hsl(var(--primary))",
+  },
+};
 
 const recentApprovals = [
     { id: 'T7', name: 'Summer Smash 2024', owner: 'john.doe@example.com', status: 'pending' },
@@ -61,21 +68,36 @@ export default function AdminDashboard() {
             <CardDescription>Monthly active users trend.</CardDescription>
           </CardHeader>
           <CardContent className="h-80">
-             <ResponsiveContainer width="100%" height="100%">
-                 <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <defs>
-                        <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0}/>
-                        </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip content={<ChartTooltipContent />} />
-                    <Area type="monotone" dataKey="desktop" stroke="var(--color-primary)" fillOpacity={1} fill="url(#colorUv)" />
-                </AreaChart>
-            </ResponsiveContainer>
+             <ChartContainer config={chartConfig}>
+              <AreaChart
+                accessibilityLayer
+                data={chartData}
+                margin={{
+                  left: 12,
+                  right: 12,
+                }}
+              >
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="month"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  tickFormatter={(value) => value.slice(0, 3)}
+                />
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent indicator="dot" />}
+                />
+                <Area
+                  dataKey="desktop"
+                  type="natural"
+                  fill="var(--color-desktop)"
+                  fillOpacity={0.4}
+                  stroke="var(--color-desktop)"
+                />
+              </AreaChart>
+            </ChartContainer>
           </CardContent>
         </Card>
         <Card>
