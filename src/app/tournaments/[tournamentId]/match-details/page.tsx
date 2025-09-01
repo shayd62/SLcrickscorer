@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
@@ -288,12 +287,12 @@ function MatchDetailsContent() {
             return;
         }
 
-        const team1WithIds = { ...team1, players: squad1 };
-        const team2WithIds = { ...team2, players: squad2 };
+        const team1WithSquad = { ...team1, players: squad1 };
+        const team2WithSquad = { ...team2, players: squad2 };
 
         const config: MatchConfig = {
-            team1: team1WithIds,
-            team2: team2WithIds,
+            team1: team1WithSquad,
+            team2: team2WithSquad,
             oversPerInnings: data.overs,
             playersPerSide: squad1.length,
             toss: { // Dummy toss, will be decided on next page
@@ -533,3 +532,5 @@ export default function MatchDetailsPage() {
         </Suspense>
     )
 }
+
+    
