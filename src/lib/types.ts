@@ -260,6 +260,7 @@ export interface UserProfile {
   email?: string;
   phoneNumber: string;
   address?: string | null;
+  age?: number;
   gender: 'Male' | 'Female' | 'Other';
   battingStyle?: 'Right-handed' | 'Left-handed';
   bowlingStyle?: 'Right-arm' | 'Left-arm';

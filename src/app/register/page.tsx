@@ -22,6 +22,7 @@ const registerSchema = z.object({
   phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits.'),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
   address: z.string().optional(),
+  age: z.coerce.number().positive('Age must be a positive number.').optional(),
   gender: z.enum(['Male', 'Female', 'Other'], { required_error: 'Gender is required.' }),
   battingStyle: z.enum(['Right-handed', 'Left-handed']).optional(),
   bowlingStyle: z.enum(['Right-arm', 'Left-arm']).optional(),
@@ -66,6 +67,7 @@ function RegisterPage() {
         email: data.email, // Store the real email if provided, otherwise it's undefined
         phoneNumber: data.phoneNumber,
         address: data.address,
+        age: data.age,
         gender: data.gender,
         battingStyle: data.battingStyle,
         bowlingStyle: data.bowlingStyle,
@@ -95,6 +97,12 @@ function RegisterPage() {
               <Label htmlFor="name">Name</Label>
               <Input id="name" {...form.register('name')} />
               {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="age">Age (Optional)</Label>
+              <Input id="age" type="number" {...form.register('age')} />
+              {form.formState.errors.age && <p className="text-destructive text-sm">{form.formState.errors.age.message}</p>}
             </div>
 
             <div className="space-y-2">
