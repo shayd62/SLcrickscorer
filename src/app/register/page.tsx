@@ -92,7 +92,7 @@ function RegisterPage() {
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="name">Name</Label>
               <Input id="name" {...form.register('name')} />
               {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
             </div>
