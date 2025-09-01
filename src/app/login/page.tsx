@@ -77,7 +77,12 @@ function LoginPage() {
                 {emailForm.formState.errors.email && <p className="text-destructive text-sm">{emailForm.formState.errors.email.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex justify-between items-center">
+                    <Label htmlFor="password">Password</Label>
+                    <Link href="/forgot-password" passHref>
+                      <span className="text-sm underline cursor-pointer">Forgot Password?</span>
+                    </Link>
+                </div>
                 <Input id="password" type="password" {...emailForm.register('password')} />
                 {emailForm.formState.errors.password && <p className="text-destructive text-sm">{emailForm.formState.errors.password.message}</p>}
               </div>
@@ -91,7 +96,12 @@ function LoginPage() {
                 {phoneForm.formState.errors.phoneNumber && <p className="text-destructive text-sm">{phoneForm.formState.errors.phoneNumber.message}</p>}
               </div>
                <div className="space-y-2">
-                <Label htmlFor="phone-password">Password</Label>
+                 <div className="flex justify-between items-center">
+                    <Label htmlFor="phone-password">Password</Label>
+                     <Link href="/forgot-password" passHref>
+                      <span className="text-sm underline cursor-pointer">Forgot Password?</span>
+                    </Link>
+                </div>
                 <Input id="phone-password" type="password" {...phoneForm.register('password')} />
                 {phoneForm.formState.errors.password && <p className="text-destructive text-sm">{phoneForm.formState.errors.password.message}</p>}
               </div>

@@ -2,7 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential } from 'firebase/auth';
+import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, db, storage } from '@/lib/firebase';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -17,6 +17,7 @@ interface AuthContextType {
   signUpWithEmail: (email: string, password: string) => Promise<any>;
   signInWithEmail: (email: string, password: string) => Promise<any>;
   signInWithPhoneAndPassword: (phoneNumber: string, password: string) => Promise<any>;
+  sendPasswordReset: (email: string) => Promise<void>;
   createUserProfile: (uid: string, data: Omit<UserProfile, 'uid' | 'id'>) => Promise<void>;
   registerNewPlayer: (name: string, phoneNumber: string) => Promise<UserProfile>;
   updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => Promise<void>;
@@ -80,6 +81,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithEmail = (email: string, password: string) => {
     return signInWithEmailAndPassword(auth, email, password);
+  };
+  
+  const sendPasswordReset = (email: string) => {
+    return sendPasswordResetEmail(auth, email);
   };
 
   const signInWithPhoneAndPassword = async (phoneNumber: string, password: string) => {
@@ -259,6 +264,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUpWithEmail,
     signInWithEmail,
     signInWithPhoneAndPassword,
+    sendPasswordReset,
     createUserProfile,
     registerNewPlayer,
     updateUserProfile,
