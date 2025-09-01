@@ -19,7 +19,7 @@ interface AuthContextType {
   signInWithPhoneAndPassword: (phoneNumber: string, password: string) => Promise<any>;
   sendPasswordReset: (email: string) => Promise<void>;
   createUserProfile: (uid: string, data: Omit<UserProfile, 'uid' | 'id'>) => Promise<void>;
-  registerNewPlayer: (name: string, phoneNumber: string) => Promise<UserProfile>;
+  registerNewPlayer: (name: string, phoneNumber: string, email?: string) => Promise<UserProfile>;
   updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => Promise<void>;
   uploadProfilePicture: (uid: string, file: File) => Promise<string>;
   uploadTeamLogo: (teamId: string, file: File) => Promise<string>;
@@ -124,7 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile({ id: docId, ...profileData, uid });
   };
 
-  const registerNewPlayer = async (name: string, phoneNumber: string): Promise<UserProfile> => {
+  const registerNewPlayer = async (name: string, phoneNumber: string, email?: string): Promise<UserProfile> => {
     // Check if player already exists by phone number (which is the document ID)
     const userDocRef = doc(db, 'users', phoneNumber);
     const docSnap = await getDoc(userDocRef);
@@ -132,16 +132,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error("A player with this phone number is already registered.");
     }
 
-    const dummyEmail = `${phoneNumber}@cricmate.com`;
+    const emailToRegister = email || `${phoneNumber}@cricmate.com`;
     const defaultPassword = 'password123'; // Or any default password logic
 
-    const userCredential = await createUserWithEmailAndPassword(auth, dummyEmail, defaultPassword);
+    const userCredential = await createUserWithEmailAndPassword(auth, emailToRegister, defaultPassword);
     const user = userCredential.user;
 
     const profileData: Omit<UserProfile, 'id'> = {
         uid: user.uid,
         name: name,
         phoneNumber: phoneNumber,
+        email: email || undefined,
         gender: 'Other', // Default value
     };
     

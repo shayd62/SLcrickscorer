@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 const newPlayerSchema = z.object({
     name: z.string().min(1, 'Name is required.'),
     phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits.'),
+    email: z.string().email('Invalid email address.').optional().or(z.literal('')),
 });
 type NewPlayerFormValues = z.infer<typeof newPlayerSchema>;
 
@@ -37,7 +38,7 @@ function NewPlayerDialog({ onPlayerCreated }: { onPlayerCreated: (player: UserPr
 
     const handleCreatePlayer = async (data: NewPlayerFormValues) => {
         try {
-            const newUserProfile = await registerNewPlayer(data.name, data.phoneNumber);
+            const newUserProfile = await registerNewPlayer(data.name, data.phoneNumber, data.email);
             toast({ title: "Player Created!", description: `${data.name} has been registered.` });
             onPlayerCreated(newUserProfile);
             setOpen(false);
@@ -70,6 +71,11 @@ function NewPlayerDialog({ onPlayerCreated }: { onPlayerCreated: (player: UserPr
                         <Label htmlFor="new-player-phone">Phone Number</Label>
                         <Input id="new-player-phone" {...form.register('phoneNumber')} />
                         {form.formState.errors.phoneNumber && <p className="text-destructive text-sm">{form.formState.errors.phoneNumber.message}</p>}
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="new-player-email">Email (Optional)</Label>
+                        <Input id="new-player-email" type="email" {...form.register('email')} />
+                        {form.formState.errors.email && <p className="text-destructive text-sm">{form.formState.errors.email.message}</p>}
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
