@@ -497,25 +497,27 @@ function TargetTicker({ match }: { match: MatchState }) {
   );
 }
 
-function TeamSquadTicker({ match }: { match: MatchState }) {
+function TeamSquadTicker({ match, teamType }: { match: MatchState, teamType: 'batting' | 'bowling' }) {
   const currentInningsData = match.currentInnings === 'innings1' ? match.innings1 : match.innings2;
   if (!currentInningsData) return null;
 
-  const battingTeamConfig = currentInningsData.battingTeam === 'team1' ? match.config.team1 : match.config.team2;
-  const players = battingTeamConfig.players.slice(0, 11);
-  const extraPlayers = battingTeamConfig.players.slice(11);
+  const teamKey = teamType === 'batting' ? currentInningsData.battingTeam : currentInningsData.bowlingTeam;
+  const teamConfig = teamKey === 'team1' ? match.config.team1 : match.config.team2;
+  
+  const players = teamConfig.players.slice(0, 11);
+  const extraPlayers = teamConfig.players.slice(11);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/70 p-4 font-sans backdrop-blur-sm">
       <div className="w-full max-w-4xl bg-white text-black rounded-lg shadow-2xl flex flex-col">
         {/* Header */}
         <div className="p-4 flex justify-between items-center border-b">
-          <Image src={battingTeamConfig.logoUrl || "https://picsum.photos/seed/bmc-left/80/80"} alt="Team Logo" width={80} height={80} className="rounded-full" data-ai-hint="cricket club" />
+          <Image src={teamConfig.logoUrl || "https://picsum.photos/seed/bmc-left/80/80"} alt="Team Logo" width={80} height={80} className="rounded-full" data-ai-hint="cricket club" />
           <div className="text-center">
-            <h1 className="text-3xl font-bold uppercase">{battingTeamConfig.name}</h1>
-            <p className="text-sm text-gray-600">{battingTeamConfig.city || 'Mohimagonj, Gobindogonj, Gaibandha.'}</p>
+            <h1 className="text-3xl font-bold uppercase">{teamConfig.name}</h1>
+            <p className="text-sm text-gray-600">{teamConfig.city || 'Mohimagonj, Gobindogonj, Gaibandha.'}</p>
           </div>
-          <Image src={battingTeamConfig.logoUrl || "https://picsum.photos/seed/bmc-right/80/80"} alt="Team Logo" width={80} height={80} className="rounded-full" data-ai-hint="cricket club" />
+          <Image src={teamConfig.logoUrl || "https://picsum.photos/seed/bmc-right/80/80"} alt="Team Logo" width={80} height={80} className="rounded-full" data-ai-hint="cricket club" />
         </div>
 
         {/* Squad Table */}
@@ -628,7 +630,8 @@ export default function LiveViewPage() {
     if (activeTicker === 'battingCard') return <BattingCardTicker match={match} />;
     if (activeTicker === 'bowlingCard') return <BowlingCardTicker match={match} />;
     if (activeTicker === 'target') return <TargetTicker match={match} />;
-    if (activeTicker === 'teamSquad') return <TeamSquadTicker match={match} />;
+    if (activeTicker === 'teamSquad') return <TeamSquadTicker match={match} teamType="batting" />;
+    if (activeTicker === 'bowlingTeamSquad') return <TeamSquadTicker match={match} teamType="bowling" />;
     return null;
   }, [match]);
 
