@@ -43,6 +43,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (user) {
         setUser(user);
         const usersRef = collection(db, 'users');
+        // A user's profile is stored with their phone number as the document ID.
+        // We can't query by UID directly anymore if we don't know the phone number.
+        // We will try to find the user by their Auth email, which could be real or dummy.
         const q = query(usersRef, where("uid", "==", user.uid));
         const querySnapshot = await getDocs(q);
 
@@ -50,14 +53,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const userDoc = querySnapshot.docs[0];
             setUserProfile({ id: userDoc.id, uid: user.uid, ...userDoc.data() } as UserProfile);
         } else {
-          // Fallback for older data structure, can be removed later
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDoc = await getDoc(userDocRef);
-          if (userDoc.exists()) {
-            setUserProfile({ id: userDoc.id, uid: user.uid, ...userDoc.data() } as UserProfile);
-          } else {
-            setUserProfile(null);
-          }
+          // This case might happen if the profile hasn't been created yet or there's an inconsistency.
+          setUserProfile(null);
         }
 
       } else {
@@ -87,26 +84,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const usersRef = collection(db, "users");
     const isEmail = emailOrPhone.includes('@');
     
-    let userProfileToReset: UserProfile | null = null;
+    let userDocToReset: UserProfile | null = null;
+    
+    const q = isEmail 
+        ? query(usersRef, where("email", "==", emailOrPhone))
+        : query(usersRef, where("phoneNumber", "==", emailOrPhone));
 
-    if (isEmail) {
-        const q = query(usersRef, where("email", "==", emailOrPhone));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-            userProfileToReset = querySnapshot.docs[0].data() as UserProfile;
-        }
-    } else {
-        const q = query(usersRef, where("phoneNumber", "==", emailOrPhone));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-            userProfileToReset = querySnapshot.docs[0].data() as UserProfile;
-        }
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+        userDocToReset = querySnapshot.docs[0].data() as UserProfile;
     }
     
-    if (userProfileToReset) {
+    if (userDocToReset) {
       // Determine the email to send the reset link to.
       // If the user has a real email, use that. Otherwise, use the dummy one.
-      const emailForAuth = userProfileToReset.email || `${userProfileToReset.phoneNumber}@cricmate.com`;
+      const emailForAuth = userDocToReset.email || `${userDocToReset.phoneNumber}@cricmate.com`;
       try {
         await sendPasswordResetEmail(auth, emailForAuth);
       } catch (error: any) {
