@@ -17,7 +17,7 @@ interface AuthContextType {
   signUpWithEmail: (email: string, password: string) => Promise<any>;
   signInWithEmail: (email: string, password: string) => Promise<any>;
   signInWithPhoneAndPassword: (phoneNumber: string, password: string) => Promise<any>;
-  sendPasswordReset: (email: string) => Promise<void>;
+  sendPasswordReset: (emailOrPhone: string) => Promise<void>;
   createUserProfile: (uid: string, data: Omit<UserProfile, 'uid' | 'id'>) => Promise<void>;
   registerNewPlayer: (name: string, phoneNumber: string, email?: string) => Promise<UserProfile>;
   updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => Promise<void>;
@@ -83,8 +83,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return signInWithEmailAndPassword(auth, email, password);
   };
   
-  const sendPasswordReset = (email: string) => {
-    return sendPasswordResetEmail(auth, email);
+  const sendPasswordReset = async (emailOrPhone: string) => {
+    const usersRef = collection(db, "users");
+    const isEmail = emailOrPhone.includes('@');
+    
+    let userProfileToReset: UserProfile | null = null;
+
+    if (isEmail) {
+        const q = query(usersRef, where("email", "==", emailOrPhone));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            userProfileToReset = querySnapshot.docs[0].data() as UserProfile;
+        }
+    } else {
+        const q = query(usersRef, where("phoneNumber", "==", emailOrPhone));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            userProfileToReset = querySnapshot.docs[0].data() as UserProfile;
+        }
+    }
+    
+    if (userProfileToReset) {
+      // Determine the email to send the reset link to.
+      // If the user has a real email, use that. Otherwise, use the dummy one.
+      const emailForAuth = userProfileToReset.email || `${userProfileToReset.phoneNumber}@cricmate.com`;
+      try {
+        await sendPasswordResetEmail(auth, emailForAuth);
+      } catch (error: any) {
+        // We can swallow this error to avoid leaking information about which emails are registered.
+        console.error("Firebase sendPasswordResetEmail error:", error.message);
+      }
+    } else {
+        // If no user is found, we don't do anything and don't throw an error.
+        // This is a security measure to prevent account enumeration.
+        console.log(`Password reset requested for non-existent user: ${emailOrPhone}`);
+    }
   };
 
   const signInWithPhoneAndPassword = async (phoneNumber: string, password: string) => {
@@ -288,5 +321,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-    

@@ -16,7 +16,7 @@ import { Mail, MessageSquare, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const forgotPasswordSchema = z.object({
-  email: z.string().email('Please enter a valid email address.'),
+  emailOrPhone: z.string().min(1, 'Please enter your email or phone number.'),
 });
 
 type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
@@ -37,14 +37,15 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (data: ForgotPasswordFormValues) => {
     setIsSubmitting(true);
     try {
-      await sendPasswordReset(data.email);
-      setIsSubmitted(true);
+      // The sendPasswordReset function now handles both email and phone
+      await sendPasswordReset(data.emailOrPhone);
+      setIsSubmitted(true); // Show success message regardless of whether user exists
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      // We generally don't want to show specific errors here for security reasons
+      // but for debugging, you might log it or show a generic error.
+      // For the user, we will always show the same success message.
+      console.error("Password reset error:", error);
+      setIsSubmitted(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -69,16 +70,16 @@ export default function ForgotPasswordPage() {
         return (
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="emailOrPhone">Email or Phone Number</Label>
               <Input
-                id="email"
-                type="email"
-                {...form.register('email')}
-                placeholder="you@example.com"
+                id="emailOrPhone"
+                type="text"
+                {...form.register('emailOrPhone')}
+                placeholder="you@example.com or +11234567890"
               />
-              {form.formState.errors.email && (
+              {form.formState.errors.emailOrPhone && (
                 <p className="text-destructive text-sm">
-                  {form.formState.errors.email.message}
+                  {form.formState.errors.emailOrPhone.message}
                 </p>
               )}
             </div>
