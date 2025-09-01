@@ -1,4 +1,5 @@
 
+
 export interface Player {
   id: string; // This should be the user's UID
   name: string;
@@ -247,7 +248,7 @@ export interface MatchState {
   isBowlerChangeRequired?: boolean;
   isEndOfInnings?: boolean;
   id?: string;
-  activeTicker?: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | null;
+  activeTicker?: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | 'teamSquad' | null;
   revisedOvers?: number;
   userId?: string;
 }

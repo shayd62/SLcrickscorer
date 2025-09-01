@@ -497,6 +497,69 @@ function TargetTicker({ match }: { match: MatchState }) {
   );
 }
 
+function TeamSquadTicker({ match }: { match: MatchState }) {
+  const currentInningsData = match.currentInnings === 'innings1' ? match.innings1 : match.innings2;
+  if (!currentInningsData) return null;
+
+  const battingTeamConfig = currentInningsData.battingTeam === 'team1' ? match.config.team1 : match.config.team2;
+  const players = battingTeamConfig.players.slice(0, 11);
+  const extraPlayers = battingTeamConfig.players.slice(11);
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/70 p-4 font-sans backdrop-blur-sm">
+      <div className="w-full max-w-4xl bg-white text-black rounded-lg shadow-2xl flex flex-col">
+        {/* Header */}
+        <div className="p-4 flex justify-between items-center border-b">
+          <Image src={battingTeamConfig.logoUrl || "https://picsum.photos/seed/bmc-left/80/80"} alt="Team Logo" width={80} height={80} className="rounded-full" data-ai-hint="cricket club" />
+          <div className="text-center">
+            <h1 className="text-3xl font-bold uppercase">{battingTeamConfig.name}</h1>
+            <p className="text-sm text-gray-600">{battingTeamConfig.city || 'Mohimagonj, Gobindogonj, Gaibandha.'}</p>
+          </div>
+          <Image src={battingTeamConfig.logoUrl || "https://picsum.photos/seed/bmc-right/80/80"} alt="Team Logo" width={80} height={80} className="rounded-full" data-ai-hint="cricket club" />
+        </div>
+
+        {/* Squad Table */}
+        <div className="flex-grow p-4">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b">
+                <th className="p-2 text-left font-semibold">S.L NO</th>
+                <th className="p-2 text-left font-semibold">Player name</th>
+                <th className="p-2 text-left font-semibold">Matches</th>
+                <th className="p-2 text-left font-semibold">Runs</th>
+                <th className="p-2 text-left font-semibold">Best</th>
+                <th className="p-2 text-left font-semibold">Wickets</th>
+                <th className="p-2 text-left font-semibold">Best</th>
+              </tr>
+            </thead>
+            <tbody>
+              {players.map((player, index) => (
+                <tr key={player.id} className="border-b">
+                  <td className="p-2">{index + 1}</td>
+                  <td className="p-2 font-medium">{player.name}</td>
+                  <td className="p-2"></td>
+                  <td className="p-2"></td>
+                  <td className="p-2"></td>
+                  <td className="p-2"></td>
+                  <td className="p-2"></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        {/* Footer */}
+        {extraPlayers.length > 0 && (
+          <div className="p-4 border-t">
+            <h3 className="font-semibold">Extra Players</h3>
+            <p className="text-gray-700">{extraPlayers.map(p => p.name).join(', ')}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 export default function LiveViewPage() {
   const [match, setMatch] = useState<MatchState | null>(null);
@@ -565,6 +628,7 @@ export default function LiveViewPage() {
     if (activeTicker === 'battingCard') return <BattingCardTicker match={match} />;
     if (activeTicker === 'bowlingCard') return <BowlingCardTicker match={match} />;
     if (activeTicker === 'target') return <TargetTicker match={match} />;
+    if (activeTicker === 'teamSquad') return <TeamSquadTicker match={match} />;
     return null;
   }, [match]);
 
