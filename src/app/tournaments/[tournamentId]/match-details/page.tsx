@@ -483,7 +483,7 @@ function MatchDetailsContent() {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Select Squad for {editingTeamData?.name}</DialogTitle>
-                        <DialogDescription>Select the players who will be playing in this match.</DialogDescription>
+                        <DialogDescription>{editingSquadData.length}/{editingTeamData?.players?.length || 0} players selected.</DialogDescription>
                     </DialogHeader>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
