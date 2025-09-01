@@ -99,6 +99,9 @@ function EditProfilePage() {
         const photoURL = await uploadProfilePicture(user.uid, selectedFile);
         finalData.photoURL = photoURL;
       }
+      
+      // Do not allow email to be changed
+      delete (finalData as any).email;
 
       await updateUserProfile(user.uid, finalData);
       toast({ title: "Profile Updated!", description: "Your profile has been successfully updated." });
@@ -153,7 +156,7 @@ function EditProfilePage() {
 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
+                    <Label htmlFor="name">Name</Label>
                     <Input id="name" {...form.register('name')} />
                     {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
                     </div>
@@ -170,8 +173,8 @@ function EditProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email (Optional)</Label>
-                  <Input id="email" type="email" {...form.register('email')} />
+                  <Label htmlFor="email">Email (Cannot be changed)</Label>
+                  <Input id="email" type="email" {...form.register('email')} disabled />
                   {form.formState.errors.email && <p className="text-destructive text-sm">{form.formState.errors.email.message}</p>}
                 </div>
 
@@ -242,3 +245,5 @@ function EditProfilePage() {
 }
 
 export default withAuth(EditProfilePage);
+
+    

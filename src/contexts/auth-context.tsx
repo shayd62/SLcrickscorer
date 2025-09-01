@@ -100,56 +100,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const userDoc = querySnapshot.docs[0];
     const userData = userDoc.data() as UserProfile;
 
-    if (!userData.email) {
-        // This case handles users who registered with phone only (and have a dummy email)
-        const dummyEmail = `${phoneNumber}@cricmate.com`;
-        return signInWithEmailAndPassword(auth, dummyEmail, password);
-    }
+    // Use the actual email if it exists, otherwise construct the dummy email for auth
+    const emailForAuth = userData.email || `${phoneNumber}@cricmate.com`;
     
-    return signInWithEmailAndPassword(auth, userData.email, password);
+    return signInWithEmailAndPassword(auth, emailForAuth, password);
   };
 
   const createUserProfile = async (uid: string, data: Omit<UserProfile, 'uid' | 'id'>) => {
-    // Use phone number as the document ID to enforce uniqueness
-    const docId = data.phoneNumber;
+    const docId = data.phoneNumber; // Use phone number as the document ID
     const userDocRef = doc(db, 'users', docId);
 
     const docSnap = await getDoc(userDocRef);
-    if (docSnap.exists()) {
-        throw new Error("A user with this phone number already exists.");
-    }
 
-    const profileData = { uid, ...data };
-    await setDoc(userDocRef, profileData);
-    setUserProfile({ id: docId, ...profileData, uid });
+    if (docSnap.exists() && docSnap.data().isPlaceholder) {
+        // This is a placeholder profile, let's claim it by updating it with the new auth UID
+        const profileData = { uid, ...data, isPlaceholder: false };
+        await updateDoc(userDocRef, profileData);
+        setUserProfile({ id: docId, ...profileData, uid });
+
+    } else if(docSnap.exists() && !docSnap.data().isPlaceholder) {
+        throw new Error("A user with this phone number already exists.");
+    } else {
+        // This is a brand new user
+        const profileData = { uid, ...data, isPlaceholder: false };
+        await setDoc(userDocRef, profileData);
+        setUserProfile({ id: docId, ...profileData, uid });
+    }
   };
 
   const registerNewPlayer = async (name: string, phoneNumber: string, email?: string): Promise<UserProfile> => {
-    // Check if player already exists by phone number (which is the document ID)
+    // This function creates a "placeholder" profile that can be claimed later.
     const userDocRef = doc(db, 'users', phoneNumber);
     const docSnap = await getDoc(userDocRef);
+
     if (docSnap.exists()) {
         throw new Error("A player with this phone number is already registered.");
     }
 
-    const emailToRegister = email || `${phoneNumber}@cricmate.com`;
-    const defaultPassword = 'password123'; // Or any default password logic
-
-    const userCredential = await createUserWithEmailAndPassword(auth, emailToRegister, defaultPassword);
-    const user = userCredential.user;
-
-    const profileData: Omit<UserProfile, 'id'> = {
-        uid: user.uid,
+    const profileData: Omit<UserProfile, 'id'|'uid'> & { isPlaceholder: boolean } = {
         name: name,
         phoneNumber: phoneNumber,
         email: email || undefined,
         gender: 'Other', // Default value
+        isPlaceholder: true, // Mark as a placeholder
     };
     
-    await setDoc(userDocRef, profileData);
+    await setDoc(userDocRef, profileData as any);
 
     const newUserProfile: UserProfile = {
         id: phoneNumber,
+        uid: `placeholder-${Date.now()}`, // Temporary UID
+        isPlaceholder: true,
         ...profileData
     };
 
@@ -201,12 +202,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       nameSnapshot.forEach(doc => {
           const userData = { id: doc.id, ...doc.data()} as UserProfile;
-          usersMap.set(userData.uid, userData);
+          if (userData.uid) usersMap.set(userData.uid, userData);
       });
       
       phoneSnapshot.forEach(doc => {
           const userData = { id: doc.id, ...doc.data() } as UserProfile;
-          usersMap.set(userData.uid, userData);
+          if (userData.uid) usersMap.set(userData.uid, userData);
       });
 
       return Array.from(usersMap.values());
@@ -287,3 +288,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+    

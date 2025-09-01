@@ -51,7 +51,7 @@ function RegisterPage() {
     let emailToRegister = data.email;
 
     if (!emailToRegister) {
-      // If no email is provided, create a dummy one from the phone number
+      // If no email is provided, create a dummy one from the phone number for auth
       emailToRegister = `${data.phoneNumber}@cricmate.com`;
     }
 
@@ -199,3 +199,5 @@ function RegisterPage() {
 }
 
 export default RegisterPage;
+
+    

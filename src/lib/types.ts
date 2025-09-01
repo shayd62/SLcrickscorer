@@ -257,6 +257,7 @@ export interface UserProfile {
   id: string; // The document ID, which is the phone number
   uid: string;
   name: string;
+  shortName?: string;
   email?: string;
   phoneNumber: string;
   address?: string | null;
@@ -267,6 +268,7 @@ export interface UserProfile {
   isWicketKeeper?: boolean;
   photoURL?: string;
   role?: 'admin' | 'user';
+  isPlaceholder?: boolean;
 }
 
 // New types for the admin panel
@@ -305,3 +307,5 @@ export interface FeatureFlag {
     enabled: boolean;
     description?: string;
 }
+
+    
