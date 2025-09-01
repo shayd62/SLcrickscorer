@@ -18,7 +18,6 @@ import { Switch } from '@/components/ui/switch';
 
 const registerSchema = z.object({
   name: z.string().min(1, 'Name is required.'),
-  shortName: z.string().optional(),
   email: z.string().email('Invalid email address.').optional().or(z.literal('')),
   phoneNumber: z.string().min(10, 'Phone number must be at least 10 digits.'),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
@@ -64,7 +63,6 @@ function RegisterPage() {
 
       const profileData = {
         name: data.name,
-        shortName: data.shortName,
         email: data.email, // Store the real email if provided, otherwise it's undefined
         phoneNumber: data.phoneNumber,
         address: data.address,
@@ -93,16 +91,10 @@ function RegisterPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input id="name" {...form.register('name')} />
-                  {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
-                </div>
-                 <div className="space-y-2">
-                  <Label htmlFor="shortName">Short Name</Label>
-                  <Input id="shortName" {...form.register('shortName')} />
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name</Label>
+              <Input id="name" {...form.register('name')} />
+              {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
             </div>
 
             <div className="space-y-2">

@@ -257,7 +257,6 @@ export interface UserProfile {
   id: string; // The document ID, which is the phone number
   uid: string;
   name: string;
-  shortName?: string;
   email?: string;
   phoneNumber: string;
   address?: string | null;
