@@ -562,6 +562,64 @@ function TeamSquadTicker({ match, teamType }: { match: MatchState, teamType: 'ba
   );
 }
 
+function BatterCareerTicker({ batter }: { batter: Batsman }) {
+  // Placeholder data - replace with real career stats later
+  const careerStats = {
+    matches: 8,
+    runs: 282,
+    fifties: 4,
+    hundreds: 0,
+    average: 40.28,
+    fours: 26,
+    sixes: 4,
+    photoUrl: `https://picsum.photos/seed/${batter.id}/200/300`
+  };
+
+  const statItems = [
+    { label: 'MATCHES', value: careerStats.matches },
+    { label: 'RUNS', value: careerStats.runs },
+    { label: '50s / 100s', value: `${careerStats.fifties} - ${careerStats.hundreds}` },
+    { label: 'AVERAGE', value: careerStats.average.toFixed(2) },
+    { label: 'FOURS', value: careerStats.fours },
+    { label: 'SIXES', value: careerStats.sixes },
+  ];
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 font-sans z-50">
+      <div
+        className="w-full max-w-2xl h-auto bg-cover bg-center rounded-lg shadow-2xl flex flex-col p-4"
+        style={{ backgroundImage: "url('/green-bg.jpg')", backgroundColor: '#0c4a24' }}
+      >
+        <div className="text-center mb-4">
+          <h1 className="text-4xl font-extrabold text-white uppercase tracking-wider" style={{ WebkitTextStroke: '1px black' }}>
+            {batter.name}
+          </h1>
+        </div>
+        <div className="flex gap-4">
+          <div className="w-1/3">
+            <Image
+              src={careerStats.photoUrl}
+              alt={batter.name}
+              width={200}
+              height={300}
+              className="rounded-lg border-4 border-yellow-400 object-cover"
+              data-ai-hint="cricket player"
+            />
+          </div>
+          <div className="w-2/3 flex flex-col justify-center gap-2">
+            {statItems.map(stat => (
+              <div key={stat.label} className="bg-green-700/80 rounded-lg p-2 flex justify-between items-center text-white border-2 border-green-400/50">
+                <span className="text-sm font-semibold uppercase">{stat.label}</span>
+                <span className="text-2xl font-bold">{stat.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 export default function LiveViewPage() {
   const [match, setMatch] = useState<MatchState | null>(null);
@@ -632,6 +690,7 @@ export default function LiveViewPage() {
     if (activeTicker === 'target') return <TargetTicker match={match} />;
     if (activeTicker === 'teamSquad') return <TeamSquadTicker match={match} teamType="batting" />;
     if (activeTicker === 'bowlingTeamSquad') return <TeamSquadTicker match={match} teamType="bowling" />;
+    if (activeTicker === 'batterCareer' && onStrikeBatsman) return <BatterCareerTicker batter={onStrikeBatsman} />;
     return null;
   }, [match]);
 
