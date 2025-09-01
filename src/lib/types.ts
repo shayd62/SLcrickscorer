@@ -248,7 +248,7 @@ export interface MatchState {
   isBowlerChangeRequired?: boolean;
   isEndOfInnings?: boolean;
   id?: string;
-  activeTicker?: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | 'teamSquad' | 'bowlingTeamSquad' | 'batterCareer' | null;
+  activeTicker?: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | 'teamSquad' | 'bowlingTeamSquad' | 'batterCareer' | 'nonStrikerCareer' | null;
   revisedOvers?: number;
   userId?: string;
 }

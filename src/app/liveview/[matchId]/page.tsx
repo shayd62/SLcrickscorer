@@ -691,6 +691,7 @@ export default function LiveViewPage() {
     if (activeTicker === 'teamSquad') return <TeamSquadTicker match={match} teamType="batting" />;
     if (activeTicker === 'bowlingTeamSquad') return <TeamSquadTicker match={match} teamType="bowling" />;
     if (activeTicker === 'batterCareer' && onStrikeBatsman) return <BatterCareerTicker batter={onStrikeBatsman} />;
+    if (activeTicker === 'nonStrikerCareer' && nonStrikeBatsman) return <BatterCareerTicker batter={nonStrikeBatsman} />;
     return null;
   }, [match]);
 
