@@ -4,7 +4,7 @@
 import withAuth from "@/components/with-auth";
 import { useAuth } from "@/contexts/auth-context";
 import type { MatchState, Tournament, TournamentMatch } from "@/lib/types";
-import { collection, onSnapshot, query, where, doc, deleteDoc, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, deleteDoc, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -195,7 +195,7 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
 
 
     return (
-        <Card className="rounded-lg shadow-sm cursor-pointer" onClick={() => router.push(`/scorecard/${match.id}`)}>
+        <Card className="rounded-lg shadow-sm cursor-pointer" onClick={() => router.push(`/match-analysis/${match.id}`)}>
             <CardContent className="p-4 space-y-3">
                 <div className="flex justify-between items-center text-primary font-semibold">
                     <p>{config.tournamentId || 'Friendly Match'}</p>
@@ -327,7 +327,7 @@ function HomePage() {
             setLoading(false);
         });
         
-        const completedQuery = query(collection(db, "matches"), where("matchOver", "==", true));
+        const completedQuery = query(collection(db, "matches"), where("matchOver", "==", true), orderBy("endTime", "desc"));
         const completedUnsubscribe = onSnapshot(completedQuery, (querySnapshot) => {
             const completedMatchesData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
             setCompletedMatches(completedMatchesData);
