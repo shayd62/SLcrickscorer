@@ -27,6 +27,7 @@ import { Input } from './ui/input';
 import ScorecardDisplay from './scorecard-display';
 import { predictWinProbability, PredictWinProbabilityInput, PredictWinProbabilityOutput } from '@/ai/flows/predict-win-probability';
 import { useToast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 
 
 type Action =
@@ -418,34 +419,72 @@ function BallEventDisplay({ event }: { event: BallEvent }) {
     );
 }
 
-function ChangeBowlerDialog({ open, onBowlerSelect, bowlingTeam, currentBowlerId }: { open: boolean, onBowlerSelect: (bowlerId: string) => void, bowlingTeam: { name: string, players: Player[]}, currentBowlerId: string }) {
+function ChangeBowlerDialog({ open, onBowlerSelect, bowlingTeam, currentBowlerId, innings, config }: { open: boolean, onBowlerSelect: (bowlerId: string) => void, bowlingTeam: { name: string, players: Player[]}, currentBowlerId: string, innings: Innings, config: MatchConfig }) {
   const [selectedBowler, setSelectedBowler] = useState('');
+  const [showQuotaAlert, setShowQuotaAlert] = useState(false);
+
+  const maxOversPerBowler = Math.ceil(config.oversPerInnings * 0.2);
 
   const availableBowlers = bowlingTeam.players.filter(p => p.id !== currentBowlerId);
 
+  const handleSelect = (bowlerId: string) => {
+    const bowler = innings.bowlers[bowlerId];
+    const oversBowled = Math.floor(bowler.balls / config.ballsPerOver);
+
+    if (oversBowled >= maxOversPerBowler) {
+      setSelectedBowler(bowlerId);
+      setShowQuotaAlert(true);
+    } else {
+      onBowlerSelect(bowlerId);
+    }
+  };
+
+  const selectedBowlerName = innings.bowlers[selectedBowler]?.name || '';
+
   return (
-    <Dialog open={open}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Over Complete!</DialogTitle>
-          <DialogDescription>Select the next bowler.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <Label htmlFor="bowler-select">Choose a bowler for the next over</Label>
-          <Select onValueChange={setSelectedBowler} value={selectedBowler}>
-            <SelectTrigger id="bowler-select">
-              <SelectValue placeholder="Select a bowler" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableBowlers.map(bowler => (
-                <SelectItem key={bowler.id} value={bowler.id}>{bowler.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button onClick={() => onBowlerSelect(selectedBowler)} disabled={!selectedBowler}>Confirm Bowler</Button>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open && !showQuotaAlert}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Over Complete!</DialogTitle>
+            <DialogDescription>Select the next bowler.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Label htmlFor="bowler-select">Choose a bowler for the next over</Label>
+            <Select onValueChange={handleSelect}>
+              <SelectTrigger id="bowler-select">
+                <SelectValue placeholder="Select a bowler" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableBowlers.map(bowler => (
+                  <SelectItem key={bowler.id} value={bowler.id}>{bowler.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showQuotaAlert} onOpenChange={setShowQuotaAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bowling Quota Reached</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedBowlerName} has already bowled their maximum of {maxOversPerBowler} overs. Do you want to continue with this bowler?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              onBowlerSelect(selectedBowler);
+              setShowQuotaAlert(false);
+            }}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 
@@ -538,14 +577,16 @@ function WicketDialog({
     if (!currentInnings) return [];
     
     // Get IDs of players who are already out
-    const outPlayerIds = Object.values(currentInnings.batsmen)
+    const outPlayerIds = new Set(
+      Object.values(currentInnings.batsmen)
         .filter(b => b.isOut)
-        .map(b => b.id);
+        .map(b => b.id)
+    );
         
     // Also exclude the players currently at the crease (striker and non-striker)
-    const atCreaseIds = [onStrikeBatsmanId, nonStrikeBatsmanId];
+    const atCreaseIds = new Set([onStrikeBatsmanId, nonStrikeBatsmanId]);
 
-    return battingTeam.players.filter(p => !outPlayerIds.includes(p.id) && !atCreaseIds.includes(p.id));
+    return battingTeam.players.filter(p => !outPlayerIds.has(p.id) && !atCreaseIds.has(p.id));
   }, [battingTeam.players, currentInnings, onStrikeBatsmanId, nonStrikeBatsmanId]);
 
   const dismissalTypes = ['Bowled', 'Caught', 'LBW', 'Run out', 'Stumped', 'Hit wicket', 'Obstructing the field', 'Handled the ball', 'Timed out'];
@@ -1133,6 +1174,8 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
         onBowlerSelect={handleBowlerChange}
         bowlingTeam={bowlingTeam}
         currentBowlerId={state.currentBowlerId}
+        innings={currentInnings}
+        config={state.config}
       />
       {nextInningsBattingTeam && nextInningsBowlingTeam && (
           <NextInningsSetupDialog
