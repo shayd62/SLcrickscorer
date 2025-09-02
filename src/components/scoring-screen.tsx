@@ -518,8 +518,12 @@ function WicketDialog({ open, onOpenChange, onWicketConfirm, battingTeam, bowlin
 
   const availableBatsmen = useMemo(() => {
     if (!currentInnings) return [];
-    return battingTeam.players.filter(p => !currentInnings.batsmen[p.id]?.isOut);
-  }, [battingTeam, currentInnings]);
+    // A player is available if they are not marked as out in the current innings state.
+    const outPlayerIds = Object.values(currentInnings.batsmen)
+        .filter(b => b.isOut)
+        .map(b => b.id);
+    return battingTeam.players.filter(p => !outPlayerIds.includes(p.id));
+  }, [battingTeam.players, currentInnings]);
 
   const dismissalTypes = ['Bowled', 'Caught', 'LBW', 'Run out', 'Stumped', 'Hit wicket', 'Obstructing the field', 'Handled the ball', 'Timed out'];
   const fielderNeededDismissals = ['Caught', 'Run out', 'Stumped'];
@@ -1336,3 +1340,4 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
     </div>
   );
 }
+
