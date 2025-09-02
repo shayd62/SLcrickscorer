@@ -57,24 +57,25 @@ function ActiveMatchCard({ match, onDelete, currentUserId }: { match: MatchState
   const firstBattingTeamInfo = config[firstBattingTeamKey];
   const secondBattingTeamInfo = config[secondBattingTeamKey];
 
-  const firstBattingScore = innings1;
-  const secondBattingScore = innings2;
-  
   const firstBattingData = {
-      score: firstBattingScore.score,
-      wickets: firstBattingScore.wickets,
-      overs: formatOvers(firstBattingScore.balls, config.ballsPerOver)
+      score: innings1.score,
+      wickets: innings1.wickets,
+      overs: formatOvers(innings1.balls, config.ballsPerOver)
   };
 
-  const secondBattingData = secondBattingScore ? {
-      score: secondBattingScore.score,
-      wickets: secondBattingScore.wickets,
-      overs: formatOvers(secondBattingScore.balls, config.ballsPerOver)
+  const secondBattingData = innings2 ? {
+      score: innings2.score,
+      wickets: innings2.wickets,
+      overs: formatOvers(innings2.balls, config.ballsPerOver)
   } : { score: 0, wickets: 0, overs: '0.0' };
 
 
   const runsNeeded = target && innings2 ? target - innings2.score : 0;
   const chasingTeam = innings2 ? (innings2.battingTeam === 'team1' ? config.team1 : config.team2) : null;
+  
+  const tossWinner = config.toss.winner === 'team1' ? config.team1.name : config.team2.name;
+  const tossResult = `${tossWinner} won the toss and chose to ${config.toss.decision}.`;
+
 
   return (
     <Card className="rounded-lg shadow-sm cursor-pointer" onClick={handleNavigation}>
@@ -101,8 +102,10 @@ function ActiveMatchCard({ match, onDelete, currentUserId }: { match: MatchState
             </div>
         </div>
 
-        {innings2 && runsNeeded > 0 && chasingTeam && (
-             <p className="text-sm text-destructive font-medium">{chasingTeam.name} need {runsNeeded} runs to win</p>
+        {innings2 && runsNeeded > 0 && chasingTeam ? (
+             <p className="text-sm text-destructive font-medium pt-1 border-t">{chasingTeam.name} need {runsNeeded} runs to win</p>
+        ) : (
+            <p className="text-sm text-muted-foreground pt-1 border-t">{tossResult}</p>
         )}
       </CardContent>
        {isCreator && (
