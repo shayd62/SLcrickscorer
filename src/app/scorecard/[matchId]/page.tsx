@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import ScorecardDisplay from '@/components/scorecard-display';
 import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 
 function ScorecardPage() {
@@ -20,22 +20,18 @@ function ScorecardPage() {
     const matchId = params.matchId as string;
     if (!matchId) return;
 
-    const fetchMatch = async () => {
-        const matchDocRef = doc(db, 'matches', matchId);
-        try {
-            const docSnap = await getDoc(matchDocRef);
-            if (docSnap.exists()) {
-                setMatch(docSnap.data() as MatchState);
-            } else {
-                console.log("No such document!");
-                router.push('/');
-            }
-        } catch (e) {
-            console.error("Failed to load match from firestore", e);
+    const unsub = onSnapshot(doc(db, "matches", matchId), (doc) => {
+        if (doc.exists()) {
+            setMatch({ ...doc.data() as MatchState, id: doc.id });
+        } else {
+            console.log("No such document!");
+            router.push('/');
         }
-    };
-    
-    fetchMatch();
+    }, (error) => {
+      console.error("Failed to load match from firestore", error);
+    });
+
+    return () => unsub();
   }, [params.matchId, router]);
 
   if (!match) {

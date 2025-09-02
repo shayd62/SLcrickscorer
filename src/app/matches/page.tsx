@@ -51,24 +51,28 @@ function ActiveMatchCard({ match, onDelete, currentUserId }: { match: MatchState
     }
   };
 
-  const getTeamScore = (teamKey: 'team1' | 'team2') => {
-      if (innings1.battingTeam === teamKey) {
-          return { score: innings1.score, wickets: innings1.wickets, overs: formatOvers(innings1.balls, config.ballsPerOver) };
-      }
-      if (innings2 && innings2.battingTeam === teamKey) {
-          return { score: innings2.score, wickets: innings2.wickets, overs: formatOvers(innings2.balls, config.ballsPerOver) };
-      }
-       if (innings1.bowlingTeam === teamKey) {
-          return { score: innings1.score, wickets: innings1.wickets, overs: formatOvers(innings1.balls, config.ballsPerOver), isOpponent: true };
-      }
-      return { score: 0, wickets: 0, overs: '0.0'};
+  const getScore = (teamKey: 'team1' | 'team2') => {
+    if (innings1.battingTeam === teamKey) {
+        return { score: innings1.score, wickets: innings1.wickets, overs: formatOvers(innings1.balls, config.ballsPerOver) };
+    }
+    if (innings2 && innings2.battingTeam === teamKey) {
+        return { score: innings2.score, wickets: innings2.wickets, overs: formatOvers(innings2.balls, config.ballsPerOver) };
+    }
+    // If not batting in either innings, they must be the bowling team
+    if (innings2 && innings2.bowlingTeam === teamKey) {
+        return { score: innings2.score, wickets: innings2.wickets, overs: formatOvers(innings2.balls, config.ballsPerOver), isOpponentScore: true };
+    }
+     if (innings1.bowlingTeam === teamKey) {
+        return { score: innings1.score, wickets: innings1.wickets, overs: formatOvers(innings1.balls, config.ballsPerOver), isOpponentScore: true };
+    }
+    return { score: 0, wickets: 0, overs: '0.0'};
   }
-  
-  const team1Score = getTeamScore('team1');
-  const team2Score = getTeamScore('team2');
 
-  const team1Data = team1Score.isOpponent ? team2Score : team1Score;
-  const team2Data = team2Score.isOpponent ? team1Score : team2Score;
+  const team1Score = innings1.battingTeam === 'team1' ? innings1 : (innings2 && innings2.battingTeam === 'team1' ? innings2 : null);
+  const team2Score = innings1.battingTeam === 'team2' ? innings1 : (innings2 && innings2.battingTeam === 'team2' ? innings2 : null);
+
+  const team1Data = team1Score ? { score: team1Score.score, wickets: team1Score.wickets, overs: formatOvers(team1Score.balls, config.ballsPerOver) } : { score: 0, wickets: 0, overs: '0.0'};
+  const team2Data = team2Score ? { score: team2Score.score, wickets: team2Score.wickets, overs: formatOvers(team2Score.balls, config.ballsPerOver) } : { score: 0, wickets: 0, overs: '0.0'};
 
   const runsNeeded = target && innings2 ? target - innings2.score : 0;
   const battingTeamInInnings2 = innings2?.battingTeam;
@@ -191,8 +195,8 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
     // Innings 2: team B bats. innings2.battingTeam is team B.
     // We want to show Team A's score, which is in innings1.
     // We want to show Team B's score, which is in innings2.
-    const team1Score = innings1.battingTeam === 'team1' ? innings1 : innings2;
-    const team2Score = innings1.battingTeam === 'team2' ? innings1 : innings2;
+    const team1Score = innings1.battingTeam === 'team1' ? innings1 : (innings2 && innings2.battingTeam === 'team1' ? innings2 : innings1);
+    const team2Score = innings1.battingTeam === 'team2' ? innings1 : (innings2 && innings2.battingTeam === 'team2' ? innings2 : innings2);
     
     const getTeamScore = (teamKey: 'team1' | 'team2') => {
         const i1 = innings1.battingTeam === teamKey ? innings1 : (innings2 && innings2.battingTeam === teamKey ? innings2 : null);
