@@ -410,8 +410,7 @@ function HomePage() {
                     <div className="grid grid-cols-2 gap-4">
                         <Link href="/setup">
                             <Button className="w-full h-20 text-lg" variant="outline">
-                                <Plus className="mr-2 h-6 w-6" />
-                                Create New Match
+                                + Match
                             </Button>
                         </Link>
                         <Link href="/teams">
@@ -472,3 +471,4 @@ function HomePage() {
 export default withAuth(HomePage);
 
     
+
