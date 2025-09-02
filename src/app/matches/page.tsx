@@ -171,46 +171,28 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
     const isCreator = match.userId === currentUserId;
 
     const winnerKey = match.winner;
-    const team1Won = winnerKey === 'team1';
-    const team2Won = winnerKey === 'team2';
     
-    const getScore = (innings: typeof innings1, teamKey: 'team1' | 'team2') => {
-        if (innings.battingTeam === teamKey) {
-            return { score: innings.score, wickets: innings.wickets, overs: formatOvers(innings.balls, config.ballsPerOver) };
-        }
-        if (innings2 && innings2.battingTeam === teamKey) {
-             return { score: innings2.score, wickets: innings2.wickets, overs: formatOvers(innings2.balls, config.ballsPerOver) };
-        }
-        // Find the batting innings of the other team to display opponent score
-        if (innings1.bowlingTeam === teamKey) {
-            return { score: innings1.score, wickets: innings1.wickets, overs: formatOvers(innings1.balls, config.ballsPerOver) };
-        }
-        if (innings2 && innings2.bowlingTeam === teamKey) {
-            return { score: innings2.score, wickets: innings2.wickets, overs: formatOvers(innings2.balls, config.ballsPerOver) };
-        }
-        return { score: 0, wickets: 0, overs: '0.0'};
-    }
-    
-    // This logic is tricky. Let's trace it.
-    // Innings 1: team A bats. innings1.battingTeam is team A.
-    // Innings 2: team B bats. innings2.battingTeam is team B.
-    // We want to show Team A's score, which is in innings1.
-    // We want to show Team B's score, which is in innings2.
-    const team1Score = innings1.battingTeam === 'team1' ? innings1 : (innings2 && innings2.battingTeam === 'team1' ? innings2 : innings1);
-    const team2Score = innings1.battingTeam === 'team2' ? innings1 : (innings2 && innings2.battingTeam === 'team2' ? innings2 : innings2);
-    
-    const getTeamScore = (teamKey: 'team1' | 'team2') => {
-        const i1 = innings1.battingTeam === teamKey ? innings1 : (innings2 && innings2.battingTeam === teamKey ? innings2 : null);
-        const i2 = innings1.battingTeam !== teamKey ? innings1 : (innings2 && innings2.battingTeam !== teamKey ? innings2 : null);
+    // Determine which team batted first
+    const firstInningsTeamKey = innings1.battingTeam;
+    const secondInningsTeamKey = firstInningsTeamKey === 'team1' ? 'team2' : 'team1';
 
-        if (i1) {
-            return { score: i1.score, wickets: i1.wickets, overs: formatOvers(i1.balls, config.ballsPerOver) };
-        }
-        return { score: i2?.score || 0, wickets: i2?.wickets || 0, overs: formatOvers(i2?.balls || 0, config.ballsPerOver) };
-    }
+    const firstInningsTeamInfo = config[firstInningsTeamKey];
+    const secondInningsTeamInfo = config[secondInningsTeamKey];
+
+    const firstInningsIsWinner = winnerKey === firstInningsTeamKey;
+    const secondInningsIsWinner = winnerKey === secondInningsTeamKey;
+
+    const firstInningsScore = {
+        score: innings1.score,
+        wickets: innings1.wickets,
+    };
     
-    const finalTeam1Score = getTeamScore('team1');
-    const finalTeam2Score = getTeamScore('team2');
+    const secondInningsScore = innings2 ? {
+        score: innings2.score,
+        wickets: innings2.wickets,
+        overs: formatOvers(innings2.balls, config.ballsPerOver),
+    } : { score: 0, wickets: 0, overs: '0.0' };
+
 
     return (
         <Card className="rounded-lg shadow-sm cursor-pointer" onClick={() => router.push(`/scorecard/${match.id}`)}>
@@ -226,19 +208,19 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <Image src="https://picsum.photos/seed/t1-flag/24/16" width={24} height={16} alt={`${config.team1.name} flag`} className="rounded-sm" data-ai-hint="cricket team" />
-                            <span className={cn("text-lg", team1Won && "font-bold")}>{config.team1.name}</span>
+                            <Image src="https://picsum.photos/seed/t1-flag/24/16" width={24} height={16} alt={`${firstInningsTeamInfo.name} flag`} className="rounded-sm" data-ai-hint="cricket team" />
+                            <span className={cn("text-lg", firstInningsIsWinner && "font-bold")}>{firstInningsTeamInfo.name}</span>
                         </div>
-                        <div className="font-bold text-lg">{finalTeam1Score.score}/{finalTeam1Score.wickets}</div>
+                        <div className="font-bold text-lg">{firstInningsScore.score}/{firstInningsScore.wickets}</div>
                     </div>
                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                             <Image src="https://picsum.photos/seed/t2-flag/24/16" width={24} height={16} alt={`${config.team2.name} flag`} className="rounded-sm" data-ai-hint="cricket team" />
-                            <span className={cn("text-lg", team2Won && "font-bold")}>{config.team2.name}</span>
+                             <Image src="https://picsum.photos/seed/t2-flag/24/16" width={24} height={16} alt={`${secondInningsTeamInfo.name} flag`} className="rounded-sm" data-ai-hint="cricket team" />
+                            <span className={cn("text-lg", secondInningsIsWinner && "font-bold")}>{secondInningsTeamInfo.name}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                             {innings2 && <span className="font-normal text-muted-foreground text-sm">({finalTeam2Score.overs}/{config.oversPerInnings} ov, T:{target})</span>}
-                             <span className="font-bold text-lg">{finalTeam2Score.score}/{finalTeam2Score.wickets}</span>
+                             {innings2 && <span className="font-normal text-muted-foreground text-sm">({secondInningsScore.overs}/{config.oversPerInnings} ov, T:{target})</span>}
+                             <span className="font-bold text-lg">{secondInningsScore.score}/{secondInningsScore.wickets}</span>
                         </div>
                     </div>
                 </div>
