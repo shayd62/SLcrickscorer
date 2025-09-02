@@ -251,6 +251,7 @@ export interface MatchState {
   activeTicker?: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | 'teamSquad' | 'bowlingTeamSquad' | 'batterCareer' | 'nonStrikerCareer' | null;
   revisedOvers?: number;
   userId?: string;
+  startTime?: string;
 }
 
 export interface UserProfile {
@@ -315,4 +316,3 @@ export interface Feedback {
     userEmail?: string;
     createdAt: any; // Firestore Timestamp
 }
-    

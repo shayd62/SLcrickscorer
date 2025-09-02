@@ -25,6 +25,8 @@ import { db } from '@/lib/firebase';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { Input } from './ui/input';
 import ScorecardDisplay from './scorecard-display';
+import { predictWinProbability, PredictWinProbabilityInput, PredictWinProbabilityOutput } from '@/ai/flows/predict-win-probability';
+import { useToast } from '@/hooks/use-toast';
 
 
 type Action =
@@ -71,6 +73,12 @@ const matchReducer = (state: MatchState, action: Action): MatchState => {
   const newState = JSON.parse(JSON.stringify(state));
   const { config } = newState;
   const { ballsPerOver, noBall, wideBall } = config;
+
+  const setStartTimeIfNeeded = () => {
+    if (!newState.startTime) {
+      newState.startTime = new Date().toISOString();
+    }
+  };
   
   if (action.type === 'SETUP_NEXT_INNINGS') {
     const { innings1, config } = newState;
@@ -174,6 +182,7 @@ const matchReducer = (state: MatchState, action: Action): MatchState => {
 
   switch (action.type) {
     case 'BALL_EVENT': {
+      setStartTimeIfNeeded();
       const { runs, isExtra, extraType } = action.payload;
       const isLegalBall = !((extraType === 'wd' && wideBall.reball) || (extraType === 'nb' && noBall.reball));
       
@@ -235,6 +244,7 @@ const matchReducer = (state: MatchState, action: Action): MatchState => {
       return newState;
     }
     case 'WICKET': {
+      setStartTimeIfNeeded();
       const { dismissalType, newBatsmanId, fielderId } = action.payload;
       
       currentInnings.balls += 1;
@@ -828,6 +838,43 @@ function EventAnimation({ type, onAnimationEnd }: { type: 'four' | 'six' | 'wick
   );
 }
 
+function WinProbabilityDialog({ open, onOpenChange, prediction, isLoading }: { open: boolean; onOpenChange: (open: boolean) => void; prediction: PredictWinProbabilityOutput | null, isLoading: boolean }) {
+  if (!prediction && !isLoading) return null;
+  
+  return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Win Probability</DialogTitle>
+                  <DialogDescription>AI-powered prediction based on current match state.</DialogDescription>
+              </DialogHeader>
+              {isLoading ? (
+                <div className="py-8 text-center">Loading prediction...</div>
+              ) : prediction ? (
+                <div className="space-y-4">
+                  <div className="flex justify-around text-center">
+                    <div>
+                      <p className="text-3xl font-bold">{(prediction.team1WinProbability * 100).toFixed(0)}%</p>
+                      <p>Team 1</p>
+                    </div>
+                    <div>
+                      <p className="text-3xl font-bold">{(prediction.team2WinProbability * 100).toFixed(0)}%</p>
+                      <p>Team 2</p>
+                    </div>
+                  </div>
+                  <Card className="bg-secondary/50">
+                      <CardContent className="p-4">
+                          <p className="text-sm text-muted-foreground">Analyst Summary</p>
+                          <p>{prediction.matchSummary}</p>
+                      </CardContent>
+                  </Card>
+                </div>
+              ) : null}
+          </DialogContent>
+      </Dialog>
+  );
+}
+
 export default function ScoringScreen({ matchState: initialMatchState }: { matchState: MatchState }) {
   const [history, setHistory] = useState<MatchState[]>([]);
   const [currentStateIndex, setCurrentStateIndex] = useState(-1);
@@ -838,6 +885,10 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
   const [retireDialogOpen, setRetireDialogOpen] = useState(false);
   const [matchOverDialogOpen, setMatchOverDialogOpen] = useState(false);
   const [eventAnimation, setEventAnimation] = useState<'four' | 'six' | 'wicket' | null>(null);
+  const [winProbOpen, setWinProbOpen] = useState(false);
+  const [prediction, setPrediction] = useState<PredictWinProbabilityOutput | null>(null);
+  const [isPredicting, setIsPredicting] = useState(false);
+  const { toast } = useToast();
 
   const router = useRouter();
 
@@ -971,6 +1022,37 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
     router.push('/matches');
   }
 
+  const handleGetPrediction = async () => {
+      setIsPredicting(true);
+      setWinProbOpen(true);
+      setPrediction(null);
+      try {
+          const innings1 = state.innings1;
+          const innings2 = state.innings2;
+
+          const input: PredictWinProbabilityInput = {
+              team1Name: state.config.team1.name,
+              team2Name: state.config.team2.name,
+              team1Runs: innings1.score,
+              team2Runs: innings2?.score || 0,
+              wicketsLostTeam1: innings1.wickets,
+              wicketsLostTeam2: innings2?.wickets || 0,
+              oversRemainingTeam1: (state.config.oversPerInnings * 6 - innings1.balls) / 6,
+              oversRemainingTeam2: state.target ? ((state.revisedOvers || state.config.oversPerInnings) * 6 - (innings2?.balls || 0)) / 6 : 0,
+              targetScore: state.target || 0,
+          };
+
+          const result = await predictWinProbability(input);
+          setPrediction(result);
+      } catch (error: any) {
+          console.error("Prediction failed:", error);
+          toast({ title: 'Prediction Error', description: 'Could not fetch win probability.', variant: 'destructive' });
+          setWinProbOpen(false);
+      } finally {
+          setIsPredicting(false);
+      }
+  };
+
 
   const currentInnings = state.currentInnings === 'innings1' ? state.innings1 : state.innings2!;
   const battingTeam = currentInnings.battingTeam === 'team1' ? state.config.team1 : state.config.team2;
@@ -1038,6 +1120,12 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
         match={state}
         onGoHome={handleGoHome}
       />
+       <WinProbabilityDialog
+          open={winProbOpen}
+          onOpenChange={setWinProbOpen}
+          prediction={prediction}
+          isLoading={isPredicting}
+        />
 
       <Card className="rounded-2xl shadow-lg border-none">
         <CardContent className="p-4">
@@ -1149,6 +1237,14 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
                   onClick={() => updateState({ type: 'END_INNINGS_MANUALLY' })}
                   >
                   End Innings
+              </Button>
+              <Button
+                variant="outline"
+                className="h-10 rounded-lg text-xs shadow-sm col-span-2"
+                onClick={handleGetPrediction}
+                disabled={isPredicting}
+              >
+                {isPredicting ? 'Calculating...' : 'Get Prediction'}
               </Button>
            </div>
         </div>
