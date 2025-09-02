@@ -10,12 +10,11 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-export const SubmitFeedbackInputSchema = z.object({
-  feedback: z.string().min(10, "Feedback must be at least 10 characters long."),
-  userId: z.string().optional(),
-  userEmail: z.string().optional(),
-});
-export type SubmitFeedbackInput = z.infer<typeof SubmitFeedbackInputSchema>;
+export type SubmitFeedbackInput = {
+  feedback: string;
+  userId?: string;
+  userEmail?: string;
+};
 
 export async function submitFeedback(input: SubmitFeedbackInput): Promise<{ success: boolean }> {
   return submitFeedbackFlow(input);
@@ -24,7 +23,11 @@ export async function submitFeedback(input: SubmitFeedbackInput): Promise<{ succ
 const submitFeedbackFlow = ai.defineFlow(
   {
     name: 'submitFeedbackFlow',
-    inputSchema: SubmitFeedbackInputSchema,
+    inputSchema: z.object({
+      feedback: z.string().min(10, "Feedback must be at least 10 characters long."),
+      userId: z.string().optional(),
+      userEmail: z.string().optional(),
+    }),
     outputSchema: z.object({ success: z.boolean() }),
   },
   async (input) => {
