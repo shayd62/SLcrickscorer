@@ -9,6 +9,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export type SubmitFeedbackInput = {
   feedback: string;
@@ -32,8 +34,17 @@ const submitFeedbackFlow = ai.defineFlow(
   },
   async (input) => {
     console.log("New feedback received:", input);
-    // In a real application, you would save this to a database,
-    // send an email, or create a ticket in a support system.
-    return { success: true };
+    
+    try {
+      await addDoc(collection(db, 'feedback'), {
+        ...input,
+        createdAt: serverTimestamp(),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error("Error saving feedback to Firestore:", error);
+      // In a real application, you might want to handle this error more gracefully.
+      return { success: false };
+    }
   }
 );

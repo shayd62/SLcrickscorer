@@ -308,4 +308,11 @@ export interface FeatureFlag {
     description?: string;
 }
 
+export interface Feedback {
+    id: string;
+    feedback: string;
+    userId?: string;
+    userEmail?: string;
+    createdAt: any; // Firestore Timestamp
+}
     
