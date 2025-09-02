@@ -327,9 +327,15 @@ function HomePage() {
             setLoading(false);
         });
         
-        const completedQuery = query(collection(db, "matches"), where("matchOver", "==", true), orderBy("endTime", "desc"));
+        const completedQuery = query(collection(db, "matches"), where("matchOver", "==", true));
         const completedUnsubscribe = onSnapshot(completedQuery, (querySnapshot) => {
             const completedMatchesData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
+            // Sort client-side to avoid composite index
+            completedMatchesData.sort((a, b) => {
+              const timeA = a.endTime ? new Date(a.endTime).getTime() : 0;
+              const timeB = b.endTime ? new Date(b.endTime).getTime() : 0;
+              return timeB - timeA;
+            });
             setCompletedMatches(completedMatchesData);
         }, (error) => {
             console.error("Failed to fetch completed matches:", error);
