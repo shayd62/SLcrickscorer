@@ -511,25 +511,48 @@ function ExtrasDialog({ onExtraSelect, onOpenChange, open }: { open: boolean; on
   );
 }
 
-function WicketDialog({ open, onOpenChange, onWicketConfirm, battingTeam, bowlingTeam, onStrikeBatsmanId, currentInnings }: { open: boolean, onOpenChange: (open: boolean) => void, onWicketConfirm: (payload: { dismissalType: string, newBatsmanId: string, fielderId?: string }) => void, battingTeam: { name: string, players: (Player & {isOut?: boolean})[]}, bowlingTeam: { name: string, players: Player[]}, onStrikeBatsmanId: string, currentInnings: Innings | undefined }) {
+function WicketDialog({ 
+  open, 
+  onOpenChange, 
+  onWicketConfirm, 
+  battingTeam, 
+  bowlingTeam, 
+  onStrikeBatsmanId, 
+  nonStrikeBatsmanId,
+  currentInnings
+}: { 
+  open: boolean, 
+  onOpenChange: (open: boolean) => void, 
+  onWicketConfirm: (payload: { dismissalType: string, newBatsmanId: string, fielderId?: string }) => void, 
+  battingTeam: { name: string, players: (Player & {isOut?: boolean})[]}, 
+  bowlingTeam: { name: string, players: Player[]}, 
+  onStrikeBatsmanId: string, 
+  nonStrikeBatsmanId: string,
+  currentInnings?: Innings 
+}) {
   const [dismissalType, setDismissalType] = useState('');
   const [newBatsmanId, setNewBatsmanId] = useState('');
   const [fielderId, setFielderId] = useState<string | undefined>();
 
   const availableBatsmen = useMemo(() => {
     if (!currentInnings) return [];
-    // A player is available if they are not marked as out in the current innings state.
+    
+    // Get IDs of players who are already out
     const outPlayerIds = Object.values(currentInnings.batsmen)
         .filter(b => b.isOut)
         .map(b => b.id);
-    return battingTeam.players.filter(p => !outPlayerIds.includes(p.id));
-  }, [battingTeam.players, currentInnings]);
+        
+    // Also exclude the players currently at the crease (striker and non-striker)
+    const atCreaseIds = [onStrikeBatsmanId, nonStrikeBatsmanId];
+
+    return battingTeam.players.filter(p => !outPlayerIds.includes(p.id) && !atCreaseIds.includes(p.id));
+  }, [battingTeam.players, currentInnings, onStrikeBatsmanId, nonStrikeBatsmanId]);
 
   const dismissalTypes = ['Bowled', 'Caught', 'LBW', 'Run out', 'Stumped', 'Hit wicket', 'Obstructing the field', 'Handled the ball', 'Timed out'];
   const fielderNeededDismissals = ['Caught', 'Run out', 'Stumped'];
 
   const handleConfirm = () => {
-    if (dismissalType && (newBatsmanId || availableBatsmen.length <= 1)) {
+    if (dismissalType && (newBatsmanId || availableBatsmen.length === 0)) {
       onWicketConfirm({ dismissalType, newBatsmanId: newBatsmanId, fielderId });
       onOpenChange(false);
       setDismissalType('');
@@ -538,7 +561,7 @@ function WicketDialog({ open, onOpenChange, onWicketConfirm, battingTeam, bowlin
     }
   };
   
-  const isLastWicket = availableBatsmen.length <= 1;
+  const isLastWicket = availableBatsmen.length === 0 && currentInnings ? currentInnings.wickets < battingTeam.players.length - 2 : false;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -582,7 +605,7 @@ function WicketDialog({ open, onOpenChange, onWicketConfirm, battingTeam, bowlin
                     <SelectValue placeholder="Select next batsman" />
                 </SelectTrigger>
                 <SelectContent>
-                    {availableBatsmen.filter(p => p.id !== onStrikeBatsmanId).map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    {availableBatsmen.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>
                 </Select>
             </div>
@@ -1093,6 +1116,7 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
         battingTeam={battingTeamWithStatus}
         bowlingTeam={bowlingTeam}
         onStrikeBatsmanId={state.onStrikeId}
+        nonStrikeBatsmanId={state.nonStrikeId}
         currentInnings={currentInnings}
       />
       <RetireBatsmanDialog
@@ -1340,4 +1364,3 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
     </div>
   );
 }
-
