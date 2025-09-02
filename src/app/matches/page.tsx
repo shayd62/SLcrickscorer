@@ -51,32 +51,30 @@ function ActiveMatchCard({ match, onDelete, currentUserId }: { match: MatchState
     }
   };
 
-  const getScore = (teamKey: 'team1' | 'team2') => {
-    if (innings1.battingTeam === teamKey) {
-        return { score: innings1.score, wickets: innings1.wickets, overs: formatOvers(innings1.balls, config.ballsPerOver) };
-    }
-    if (innings2 && innings2.battingTeam === teamKey) {
-        return { score: innings2.score, wickets: innings2.wickets, overs: formatOvers(innings2.balls, config.ballsPerOver) };
-    }
-    // If not batting in either innings, they must be the bowling team
-    if (innings2 && innings2.bowlingTeam === teamKey) {
-        return { score: innings2.score, wickets: innings2.wickets, overs: formatOvers(innings2.balls, config.ballsPerOver), isOpponentScore: true };
-    }
-     if (innings1.bowlingTeam === teamKey) {
-        return { score: innings1.score, wickets: innings1.wickets, overs: formatOvers(innings1.balls, config.ballsPerOver), isOpponentScore: true };
-    }
-    return { score: 0, wickets: 0, overs: '0.0'};
-  }
+  const firstBattingTeamKey = innings1.battingTeam;
+  const secondBattingTeamKey = firstBattingTeamKey === 'team1' ? 'team2' : 'team1';
 
-  const team1Score = innings1.battingTeam === 'team1' ? innings1 : (innings2 && innings2.battingTeam === 'team1' ? innings2 : null);
-  const team2Score = innings1.battingTeam === 'team2' ? innings1 : (innings2 && innings2.battingTeam === 'team2' ? innings2 : null);
+  const firstBattingTeamInfo = config[firstBattingTeamKey];
+  const secondBattingTeamInfo = config[secondBattingTeamKey];
 
-  const team1Data = team1Score ? { score: team1Score.score, wickets: team1Score.wickets, overs: formatOvers(team1Score.balls, config.ballsPerOver) } : { score: 0, wickets: 0, overs: '0.0'};
-  const team2Data = team2Score ? { score: team2Score.score, wickets: team2Score.wickets, overs: formatOvers(team2Score.balls, config.ballsPerOver) } : { score: 0, wickets: 0, overs: '0.0'};
+  const firstBattingScore = innings1;
+  const secondBattingScore = innings2;
+  
+  const firstBattingData = {
+      score: firstBattingScore.score,
+      wickets: firstBattingScore.wickets,
+      overs: formatOvers(firstBattingScore.balls, config.ballsPerOver)
+  };
+
+  const secondBattingData = secondBattingScore ? {
+      score: secondBattingScore.score,
+      wickets: secondBattingScore.wickets,
+      overs: formatOvers(secondBattingScore.balls, config.ballsPerOver)
+  } : { score: 0, wickets: 0, overs: '0.0' };
+
 
   const runsNeeded = target && innings2 ? target - innings2.score : 0;
-  const battingTeamInInnings2 = innings2?.battingTeam;
-  const chasingTeam = battingTeamInInnings2 === 'team1' ? config.team1 : config.team2;
+  const chasingTeam = innings2 ? (innings2.battingTeam === 'team1' ? config.team1 : config.team2) : null;
 
   return (
     <Card className="rounded-lg shadow-sm cursor-pointer" onClick={handleNavigation}>
@@ -89,21 +87,21 @@ function ActiveMatchCard({ match, onDelete, currentUserId }: { match: MatchState
         <div className="space-y-2">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                     <Image src="https://picsum.photos/seed/sl-flag/24/16" width={24} height={16} alt={`${config.team1.shortName} flag`} className="rounded-sm" data-ai-hint="sri lanka flag" />
-                    <span className="font-semibold text-lg">{config.team1.shortName || config.team1.name}</span>
+                     <Image src="https://picsum.photos/seed/sl-flag/24/16" width={24} height={16} alt={`${firstBattingTeamInfo.shortName} flag`} className="rounded-sm" data-ai-hint="sri lanka flag" />
+                    <span className="font-semibold text-lg">{firstBattingTeamInfo.shortName || firstBattingTeamInfo.name}</span>
                 </div>
-                <div className="font-bold text-lg">{team1Data.score}-{team1Data.wickets} <span className="font-normal text-muted-foreground">({team1Data.overs})</span></div>
+                <div className="font-bold text-lg">{firstBattingData.score}-{firstBattingData.wickets} <span className="font-normal text-muted-foreground">({firstBattingData.overs})</span></div>
             </div>
             <div className="flex items-center justify-between">
                  <div className="flex items-center gap-2">
-                     <Image src="https://picsum.photos/seed/zim-flag/24/16" width={24} height={16} alt={`${config.team2.shortName} flag`} className="rounded-sm" data-ai-hint="zimbabwe flag" />
-                    <span className="font-semibold text-lg">{config.team2.shortName || config.team2.name}</span>
+                     <Image src="https://picsum.photos/seed/zim-flag/24/16" width={24} height={16} alt={`${secondBattingTeamInfo.shortName} flag`} className="rounded-sm" data-ai-hint="zimbabwe flag" />
+                    <span className="font-semibold text-lg">{secondBattingTeamInfo.shortName || secondBattingTeamInfo.name}</span>
                 </div>
-                <div className="font-bold text-lg">{team2Data.score}-{team2Data.wickets} <span className="font-normal text-muted-foreground">({team2Data.overs})</span></div>
+                <div className="font-bold text-lg">{secondBattingData.score}-{secondBattingData.wickets} <span className="font-normal text-muted-foreground">({secondBattingData.overs})</span></div>
             </div>
         </div>
 
-        {innings2 && runsNeeded > 0 && (
+        {innings2 && runsNeeded > 0 && chasingTeam && (
              <p className="text-sm text-destructive font-medium">{chasingTeam.name} need {runsNeeded} runs to win</p>
         )}
       </CardContent>
