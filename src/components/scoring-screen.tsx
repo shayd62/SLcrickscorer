@@ -39,7 +39,7 @@ type Action =
   | { type: 'SETUP_NEXT_INNINGS'; payload: { strikerId: string, nonStrikerId: string, bowlerId: string, revisedTarget?: number, revisedOvers?: number } }
   | { type: 'TOGGLE_TICKER'; payload: { ticker: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | 'teamSquad' | 'bowlingTeamSquad' | 'batterCareer' | 'nonStrikerCareer' } }
   | { type: 'RETIRE_BATSMAN'; payload: { retiringBatsmanId: string, newBatsmanId: string } }
-  | { type: 'END_INNINGS_MANUALLY' }
+  | { type: 'END_INNINGS_MANUALLY'; payload: { reason: string } }
   | { type: 'RESET_STATE'; payload: MatchState };
 
 const formatOvers = (balls: number, ballsPerOver: number = 6) => `${Math.floor(balls / ballsPerOver)}.${balls % ballsPerOver}`;
@@ -576,17 +576,14 @@ function WicketDialog({
   const availableBatsmen = useMemo(() => {
     if (!currentInnings) return [];
     
-    // Get IDs of players who are already out
-    const outPlayerIds = new Set(
+    // Get IDs of players who are already out or at the crease
+    const outOrCurrentIds = new Set(
       Object.values(currentInnings.batsmen)
-        .filter(b => b.isOut)
+        .filter(b => b.isOut || b.id === onStrikeBatsmanId || b.id === nonStrikeBatsmanId)
         .map(b => b.id)
     );
         
-    // Also exclude the players currently at the crease (striker and non-striker)
-    const atCreaseIds = new Set([onStrikeBatsmanId, nonStrikeBatsmanId]);
-
-    return battingTeam.players.filter(p => !outPlayerIds.has(p.id) && !atCreaseIds.has(p.id));
+    return battingTeam.players.filter(p => !outOrCurrentIds.has(p.id));
   }, [battingTeam.players, currentInnings, onStrikeBatsmanId, nonStrikeBatsmanId]);
 
   const dismissalTypes = ['Bowled', 'Caught', 'LBW', 'Run out', 'Stumped', 'Hit wicket', 'Obstructing the field', 'Handled the ball', 'Timed out'];
@@ -943,6 +940,58 @@ function WinProbabilityDialog({ open, onOpenChange, prediction, isLoading }: { o
   );
 }
 
+function EndInningsDialog({
+    open,
+    onOpenChange,
+    onConfirm
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onConfirm: (reason: string) => void;
+}) {
+    const [reason, setReason] = useState('');
+
+    const handleConfirm = () => {
+        if (reason) {
+            onConfirm(reason);
+            onOpenChange(false);
+            setReason('');
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>End First Innings?</DialogTitle>
+                    <DialogDescription>Please select a reason for ending the innings prematurely.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <Label htmlFor="reason-select">Reason</Label>
+                    <Select onValueChange={setReason} value={reason}>
+                        <SelectTrigger id="reason-select">
+                            <SelectValue placeholder="Select a reason" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Weather">Bad Weather</SelectItem>
+                            <SelectItem value="Pitch">Pitch Condition</SelectItem>
+                            <SelectItem value="Other">Other Reasons</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="ghost">Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={handleConfirm} disabled={!reason}>
+                        Confirm & End Innings
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export default function ScoringScreen({ matchState: initialMatchState }: { matchState: MatchState }) {
   const [history, setHistory] = useState<MatchState[]>([]);
   const [currentStateIndex, setCurrentStateIndex] = useState(-1);
@@ -956,6 +1005,7 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
   const [winProbOpen, setWinProbOpen] = useState(false);
   const [prediction, setPrediction] = useState<PredictWinProbabilityOutput | null>(null);
   const [isPredicting, setIsPredicting] = useState(false);
+  const [endInningsDialogOpen, setEndInningsDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const router = useRouter();
@@ -1121,6 +1171,13 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
       }
   };
 
+  const handleEndInningsClick = () => {
+    if (state.currentInnings === 'innings1') {
+        setEndInningsDialogOpen(true);
+    } else {
+        updateState({ type: 'END_INNINGS_MANUALLY', payload: { reason: 'Completed' } });
+    }
+  };
 
   const currentInnings = state.currentInnings === 'innings1' ? state.innings1 : state.innings2!;
   const battingTeam = currentInnings.battingTeam === 'team1' ? state.config.team1 : state.config.team2;
@@ -1196,6 +1253,11 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
           onOpenChange={setWinProbOpen}
           prediction={prediction}
           isLoading={isPredicting}
+        />
+        <EndInningsDialog
+            open={endInningsDialogOpen}
+            onOpenChange={setEndInningsDialogOpen}
+            onConfirm={(reason) => updateState({ type: 'END_INNINGS_MANUALLY', payload: { reason } })}
         />
 
       <Card className="rounded-2xl shadow-lg border-none">
@@ -1305,7 +1367,7 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
               <Button 
                   variant="outline" 
                   className="h-10 rounded-lg text-xs shadow-sm col-span-1"
-                  onClick={() => updateState({ type: 'END_INNINGS_MANUALLY' })}
+                  onClick={handleEndInningsClick}
                   >
                   End Innings
               </Button>
