@@ -13,7 +13,7 @@ import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Se
 import { useToast } from '@/hooks/use-toast';
 import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, Innings, FielderLeaderboardStat, Player, AllRounderLeaderboardStat } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayUnion, onSnapshot, collection, query, where, getDocs, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, onSnapshot, collection, query, where, getDocs, arrayRemove } from 'firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -391,6 +391,17 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
     );
 }
 
+function calculateBattingPoints(batsman: Batsman): number {
+    if (batsman.isOut && batsman.runs === 0 && batsman.balls > 0) {
+        return -2;
+    }
+    let points = batsman.runs;
+    points += (batsman.fours || 0) * 4;
+    points += (batsman.sixes || 0) * 6;
+    points += Math.floor(batsman.runs / 25) * 4;
+    return points;
+}
+
 function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
     if (stats.length === 0) {
         return <p className="text-muted-foreground text-center py-8">No batting data available yet. Complete some matches to see the leaderboard.</p>;
@@ -403,8 +414,7 @@ function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
                     <TableHead>Player</TableHead>
                     <TableHead className="text-center">Matches</TableHead>
                     <TableHead className="text-center">Runs</TableHead>
-                    <TableHead className="text-center">Balls</TableHead>
-                    <TableHead className="text-right">SR</TableHead>
+                    <TableHead className="text-right">Points</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -413,8 +423,7 @@ function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
                         <TableCell className="font-medium">{player.playerName}</TableCell>
                         <TableCell className="text-center">{player.matches}</TableCell>
                         <TableCell className="text-center font-bold">{player.runs}</TableCell>
-                        <TableCell className="text-center">{player.balls}</TableCell>
-                        <TableCell className="text-right">{player.strikeRate.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-bold">{player.points}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>
@@ -536,8 +545,8 @@ function TournamentDetailsPage() {
     const pastMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Completed'), [tournament?.matches]);
 
     const calculateLeaderboards = useCallback(async (completedMatches: TournamentMatch[]) => {
-        const batterPlayerStats: { [playerId: string]: { name: string; team: string; runs: number; balls: number; matches: Set<string> } } = {};
-        const bowlerPlayerStats: { [playerId: string]: { name: string; team: string; balls: number; runsConceded: number; wickets: number; matches: Set<string> } } = {};
+        const batterPlayerStats: { [playerId: string]: Batsman & { teamName: string; matches: Set<string> } } = {};
+        const bowlerPlayerStats: { [playerId: string]: Bowler & { teamName: string; matches: Set<string> } } = {};
         const fielderPlayerStats: { [playerId: string]: { name: string; team: string; catches: number; runOuts: number; stumpings: number; matches: Set<string> } } = {};
 
         for (const match of completedMatches) {
@@ -563,10 +572,14 @@ function TournamentDetailsPage() {
                     for (const batsman of Object.values(innings.batsmen) as Batsman[]) {
                         if (batsman.balls > 0 || batsman.isOut) {
                             if (!batterPlayerStats[batsman.id]) {
-                                batterPlayerStats[batsman.id] = { name: batsman.name, team: battingTeamName, runs: 0, balls: 0, matches: new Set() };
+                                batterPlayerStats[batsman.id] = { ...batsman, teamName: battingTeamName, matches: new Set() };
+                            } else {
+                                batterPlayerStats[batsman.id].runs += batsman.runs;
+                                batterPlayerStats[batsman.id].balls += batsman.balls;
+                                batterPlayerStats[batsman.id].fours += batsman.fours;
+                                batterPlayerStats[batsman.id].sixes += batsman.sixes;
+                                batterPlayerStats[batsman.id].isOut = batterPlayerStats[batsman.id].isOut || batsman.isOut;
                             }
-                            batterPlayerStats[batsman.id].runs += batsman.runs;
-                            batterPlayerStats[batsman.id].balls += batsman.balls;
                             batterPlayerStats[batsman.id].matches.add(match.id);
                         }
 
@@ -592,11 +605,12 @@ function TournamentDetailsPage() {
                     for (const bowler of Object.values(innings.bowlers) as Bowler[]) {
                         if (bowler.balls > 0) {
                              if (!bowlerPlayerStats[bowler.id]) {
-                                bowlerPlayerStats[bowler.id] = { name: bowler.name, team: bowlingTeamName, balls: 0, runsConceded: 0, wickets: 0, matches: new Set() };
+                                bowlerPlayerStats[bowler.id] = { ...bowler, teamName: bowlingTeamName, matches: new Set() };
+                            } else {
+                                bowlerPlayerStats[bowler.id].balls += bowler.balls;
+                                bowlerPlayerStats[bowler.id].runsConceded += bowler.runsConceded;
+                                bowlerPlayerStats[bowler.id].wickets += bowler.wickets;
                             }
-                            bowlerPlayerStats[bowler.id].balls += bowler.balls;
-                            bowlerPlayerStats[bowler.id].runsConceded += bowler.runsConceded;
-                            bowlerPlayerStats[bowler.id].wickets += bowler.wickets;
                             bowlerPlayerStats[bowler.id].matches.add(match.id);
                         }
                     }
@@ -609,24 +623,25 @@ function TournamentDetailsPage() {
             }
         }
         
-        const newBatterStats: BatterLeaderboardStat[] = Object.entries(batterPlayerStats)
-            .map(([playerId, data]) => ({
-                playerId,
+        const newBatterStats: BatterLeaderboardStat[] = Object.values(batterPlayerStats)
+            .map(data => ({
+                playerId: data.id,
                 playerName: data.name,
-                teamName: data.team,
+                teamName: data.teamName,
                 matches: data.matches.size,
                 runs: data.runs,
                 balls: data.balls,
-                strikeRate: data.balls > 0 ? (data.runs / data.balls) * 100 : 0
+                strikeRate: data.balls > 0 ? (data.runs / data.balls) * 100 : 0,
+                points: calculateBattingPoints(data)
             }))
-            .sort((a, b) => b.runs - a.runs);
+            .sort((a, b) => b.points - a.points);
         setBatterStats(newBatterStats);
 
-        const newBowlerStats: BowlerLeaderboardStat[] = Object.entries(bowlerPlayerStats)
-             .map(([playerId, data]) => ({
-                playerId,
+        const newBowlerStats: BowlerLeaderboardStat[] = Object.values(bowlerPlayerStats)
+             .map(data => ({
+                playerId: data.id,
                 playerName: data.name,
-                teamName: data.team,
+                teamName: data.teamName,
                 matches: data.matches.size,
                 overs: formatOvers(data.balls),
                 wickets: data.wickets,
@@ -649,21 +664,21 @@ function TournamentDetailsPage() {
             .sort((a, b) => (b.catches + b.runOuts + b.stumpings) - (a.catches + a.runOuts + a.stumpings));
         setFielderStats(newFielderStats);
 
-        const allPlayers: { [playerId: string]: { name: string; team: string; matches: Set<string> } } = {};
-        Object.values(batterPlayerStats).forEach(p => { if (!allPlayers[p.name]) allPlayers[p.name] = { name: p.name, team: p.team, matches: p.matches }});
-        Object.values(bowlerPlayerStats).forEach(p => { if (!allPlayers[p.name]) allPlayers[p.name] = { name: p.name, team: p.team, matches: p.matches }});
-        Object.values(fielderPlayerStats).forEach(p => { if (!allPlayers[p.name]) allPlayers[p.name] = { name: p.name, team: p.team, matches: p.matches }});
-
+        const allPlayers: { [playerId: string]: { id: string; name: string; team: string; matches: Set<string> } } = {};
+        Object.values(batterPlayerStats).forEach(p => { if (!allPlayers[p.id]) allPlayers[p.id] = { id: p.id, name: p.name, team: p.teamName, matches: p.matches }});
+        Object.values(bowlerPlayerStats).forEach(p => { if (!allPlayers[p.id]) allPlayers[p.id] = { id: p.id, name: p.name, team: p.teamName, matches: p.matches }});
+        
         const newAllRounderStats: AllRounderLeaderboardStat[] = Object.values(allPlayers)
             .map(player => {
-                const batting = Object.values(batterPlayerStats).find(p => p.name === player.name) || { runs: 0 };
-                const bowling = Object.values(bowlerPlayerStats).find(p => p.name === player.name) || { wickets: 0 };
-                const fielding = Object.values(fielderPlayerStats).find(p => p.name === player.name) || { catches: 0, runOuts: 0, stumpings: 0 };
+                const batting = batterPlayerStats[player.id] || { runs: 0, isOut: false, balls: 0, fours: 0, sixes: 0 };
+                const bowling = bowlerPlayerStats[player.id] || { wickets: 0 };
+                const fielding = fielderPlayerStats[player.id] || { catches: 0, runOuts: 0, stumpings: 0 };
                 
-                const points = (batting.runs * 1) + (bowling.wickets * 20) + ((fielding.catches + fielding.runOuts + fielding.stumpings) * 10);
+                const battingPoints = calculateBattingPoints(batting);
+                const points = battingPoints + (bowling.wickets * 20) + ((fielding.catches + fielding.runOuts + fielding.stumpings) * 10);
 
                 return {
-                    playerId: player.name, // Using name as ID for simplicity here, would need consistent IDs
+                    playerId: player.id,
                     playerName: player.name,
                     teamName: player.team,
                     matches: player.matches.size,

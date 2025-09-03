@@ -94,21 +94,35 @@ function MatchSummary({ match }: { match: MatchState }) {
     );
 }
 
+function calculateBattingPoints(batsman: Batsman): number {
+    if (batsman.isOut && batsman.runs === 0 && batsman.balls > 0) {
+        return -2;
+    }
+    let points = batsman.runs;
+    points += (batsman.fours || 0) * 4;
+    points += (batsman.sixes || 0) * 6;
+    points += Math.floor(batsman.runs / 25) * 4;
+    return points;
+}
+
 function MatchLeaderboard({ match }: { match: MatchState }) {
     const { innings1, innings2 } = match;
 
     const allBatsmen = useMemo(() => {
-        const batsmenMap = new Map<string, Batsman>();
+        const batsmenMap = new Map<string, Batsman & { points: number }>();
 
         const addBatsmen = (innings: Innings) => {
             Object.values(innings.batsmen).forEach(b => {
                 if (b.balls > 0 || b.isOut) {
-                    if (batsmenMap.has(b.id)) {
-                        const existing = batsmenMap.get(b.id)!;
+                    const existing = batsmenMap.get(b.id);
+                    if (existing) {
                         existing.runs += b.runs;
                         existing.balls += b.balls;
+                        existing.fours += b.fours;
+                        existing.sixes += b.sixes;
+                        existing.isOut = existing.isOut || b.isOut;
                     } else {
-                        batsmenMap.set(b.id, { ...b });
+                        batsmenMap.set(b.id, { ...b, points: 0 });
                     }
                 }
             });
@@ -117,7 +131,11 @@ function MatchLeaderboard({ match }: { match: MatchState }) {
         addBatsmen(innings1);
         if (innings2) addBatsmen(innings2);
         
-        return Array.from(batsmenMap.values()).sort((a, b) => b.runs - a.runs);
+        batsmenMap.forEach(b => {
+            b.points = calculateBattingPoints(b);
+        });
+
+        return Array.from(batsmenMap.values()).sort((a, b) => b.points - a.points);
     }, [innings1, innings2]);
 
     const allBowlers = useMemo(() => {
@@ -156,6 +174,7 @@ function MatchLeaderboard({ match }: { match: MatchState }) {
                                 <TableHead className="text-right">Runs</TableHead>
                                 <TableHead className="text-right">Balls</TableHead>
                                 <TableHead className="text-right">SR</TableHead>
+                                <TableHead className="text-right">Points</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -165,6 +184,7 @@ function MatchLeaderboard({ match }: { match: MatchState }) {
                                     <TableCell className="text-right font-bold">{b.runs}</TableCell>
                                     <TableCell className="text-right">{b.balls}</TableCell>
                                     <TableCell className="text-right">{b.balls > 0 ? (b.runs / b.balls * 100).toFixed(2) : '0.00'}</TableCell>
+                                    <TableCell className="text-right font-bold">{b.points}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>

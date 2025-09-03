@@ -105,6 +105,7 @@ export interface BatterLeaderboardStat {
     runs: number;
     balls: number;
     strikeRate: number;
+    points: number;
 }
 
 export interface BowlerLeaderboardStat {
@@ -252,6 +253,7 @@ export interface MatchState {
   revisedOvers?: number;
   userId?: string;
   startTime?: string;
+  endTime?: string;
 }
 
 export interface UserProfile {
