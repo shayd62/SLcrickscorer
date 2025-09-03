@@ -128,6 +128,7 @@ export interface FielderLeaderboardStat {
     catches: number;
     runOuts: number;
     stumpings: number;
+    points: number;
 }
 
 export interface AllRounderLeaderboardStat {

@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -259,7 +260,7 @@ function MatchLeaderboard({ match }: { match: MatchState }) {
                                     <TableCell className="text-right font-bold">{b.wickets}-{b.runsConceded}</TableCell>
                                     <TableCell className="text-right">{formatOvers(b.balls)}</TableCell>
                                     <TableCell className="text-right">{b.balls > 0 ? (b.runsConceded / (b.balls / 6)).toFixed(2) : '0.00'}</TableCell>
-                                    <TableCell className="text-right font-bold">{b.points}</TableCell>
+                                    <TableCell className="text-right font-bold">{b.points.toFixed(1)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
