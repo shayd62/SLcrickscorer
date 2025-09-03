@@ -117,6 +117,7 @@ export interface BowlerLeaderboardStat {
     wickets: number;
     runsConceded: number;
     economy: number;
+    points: number;
 }
 
 export interface FielderLeaderboardStat {
