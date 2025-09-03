@@ -402,6 +402,49 @@ function calculateBattingPoints(batsman: Batsman): number {
     return points;
 }
 
+function calculateBowlingPoints(bowler: Bowler, allInnings: Innings[], ballsPerOver: number): number {
+    let points = 0;
+    
+    // Dot balls
+    const dotBalls = allInnings.flatMap(i => i.timeline).filter(b => b.bowlerId === bowler.id && b.runs === 0 && !b.isExtra).length;
+    points += dotBalls * 0.5;
+
+    // Wickets
+    points += bowler.wickets * 20;
+
+    // Dismissal bonus
+    const dismissalBonus = allInnings.flatMap(i => i.timeline).filter(b => b.bowlerId === bowler.id && b.isWicket && (b.wicketType === 'Bowled' || b.wicketType === 'LBW')).length;
+    points += dismissalBonus * 6;
+    
+    // Wicket-taking bonus
+    if (bowler.wickets >= 5) {
+        points += 12;
+    } else if (bowler.wickets >= 4) {
+        points += 8;
+    } else if (bowler.wickets >= 3) {
+        points += 4;
+    }
+    
+    // Maiden overs
+    const maidenOvers = allInnings.reduce((totalMaidens, innings) => {
+        const bowlerEvents = innings.timeline.filter(e => e.bowlerId === bowler.id);
+        const overs = new Map<number, number>(); // Map<overIndex, runs>
+
+        bowlerEvents.forEach(e => {
+            const overIndex = Math.floor(e.ballInOver / ballsPerOver);
+            if (!overs.has(overIndex)) overs.set(overIndex, 0);
+            if (!e.isExtra || e.extraType === 'by' || e.extraType === 'lb') {
+                overs.set(overIndex, overs.get(overIndex)! + e.runs);
+            }
+        });
+
+        return totalMaidens + Array.from(overs.values()).filter(runs => runs === 0).length;
+    }, 0);
+    points += maidenOvers * 6;
+
+    return points;
+}
+
 function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
     if (stats.length === 0) {
         return <p className="text-muted-foreground text-center py-8">No batting data available yet. Complete some matches to see the leaderboard.</p>;
@@ -441,22 +484,16 @@ function BowlerLeaderboard({ stats }: { stats: BowlerLeaderboardStat[] }) {
             <TableHeader>
                 <TableRow>
                     <TableHead>Player</TableHead>
-                    <TableHead className="text-center">Matches</TableHead>
-                    <TableHead className="text-center">Overs</TableHead>
                     <TableHead className="text-center">Wickets</TableHead>
-                    <TableHead className="text-center">Runs</TableHead>
-                    <TableHead className="text-right">Econ</TableHead>
+                    <TableHead className="text-right">Points</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {stats.map(player => (
                     <TableRow key={player.playerId}>
                         <TableCell className="font-medium">{player.playerName}</TableCell>
-                        <TableCell className="text-center">{player.matches}</TableCell>
-                        <TableCell className="text-center">{player.overs}</TableCell>
                         <TableCell className="text-center font-bold">{player.wickets}</TableCell>
-                        <TableCell className="text-center">{player.runsConceded}</TableCell>
-                        <TableCell className="text-right">{player.economy.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-bold">{player.points}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>
@@ -544,9 +581,9 @@ function TournamentDetailsPage() {
     const upcomingMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Upcoming'), [tournament?.matches]);
     const pastMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Completed'), [tournament?.matches]);
 
-    const calculateLeaderboards = useCallback(async (completedMatches: TournamentMatch[]) => {
+    const calculateLeaderboards = useCallback(async (completedMatches: TournamentMatch[], currentTournament: Tournament) => {
         const batterPlayerStats: { [playerId: string]: Batsman & { teamName: string; matches: Set<string> } } = {};
-        const bowlerPlayerStats: { [playerId: string]: Bowler & { teamName: string; matches: Set<string> } } = {};
+        const bowlerPlayerStats: { [playerId: string]: Bowler & { teamName: string; matches: Set<string>, allInnings: Innings[] } } = {};
         const fielderPlayerStats: { [playerId: string]: { name: string; team: string; catches: number; runOuts: number; stumpings: number; matches: Set<string> } } = {};
 
         for (const match of completedMatches) {
@@ -605,13 +642,14 @@ function TournamentDetailsPage() {
                     for (const bowler of Object.values(innings.bowlers) as Bowler[]) {
                         if (bowler.balls > 0) {
                              if (!bowlerPlayerStats[bowler.id]) {
-                                bowlerPlayerStats[bowler.id] = { ...bowler, teamName: bowlingTeamName, matches: new Set() };
+                                bowlerPlayerStats[bowler.id] = { ...bowler, teamName: bowlingTeamName, matches: new Set(), allInnings: [] };
                             } else {
                                 bowlerPlayerStats[bowler.id].balls += bowler.balls;
                                 bowlerPlayerStats[bowler.id].runsConceded += bowler.runsConceded;
                                 bowlerPlayerStats[bowler.id].wickets += bowler.wickets;
                             }
                             bowlerPlayerStats[bowler.id].matches.add(match.id);
+                            bowlerPlayerStats[bowler.id].allInnings.push(innings);
                         }
                     }
                 }
@@ -646,9 +684,10 @@ function TournamentDetailsPage() {
                 overs: formatOvers(data.balls),
                 wickets: data.wickets,
                 runsConceded: data.runsConceded,
-                economy: data.balls > 0 ? (data.runsConceded / (data.balls / 6)) : 0
+                economy: data.balls > 0 ? (data.runsConceded / (data.balls / 6)) : 0,
+                points: calculateBowlingPoints(data, data.allInnings, currentTournament.oversPerInnings)
             }))
-            .sort((a, b) => b.wickets - a.wickets || a.economy - b.economy);
+            .sort((a, b) => b.points - a.points);
         setBowlerStats(newBowlerStats);
         
         const newFielderStats: FielderLeaderboardStat[] = Object.entries(fielderPlayerStats)
@@ -671,11 +710,12 @@ function TournamentDetailsPage() {
         const newAllRounderStats: AllRounderLeaderboardStat[] = Object.values(allPlayers)
             .map(player => {
                 const batting = batterPlayerStats[player.id] || { runs: 0, isOut: false, balls: 0, fours: 0, sixes: 0 };
-                const bowling = bowlerPlayerStats[player.id] || { wickets: 0 };
+                const bowling = bowlerPlayerStats[player.id] || { wickets: 0, allInnings: [] };
                 const fielding = fielderPlayerStats[player.id] || { catches: 0, runOuts: 0, stumpings: 0 };
                 
                 const battingPoints = calculateBattingPoints(batting);
-                const points = battingPoints + (bowling.wickets * 20) + ((fielding.catches + fielding.runOuts + fielding.stumpings) * 10);
+                const bowlingPoints = calculateBowlingPoints(bowling, bowling.allInnings, currentTournament.oversPerInnings);
+                const points = battingPoints + bowlingPoints + ((fielding.catches + fielding.runOuts + fielding.stumpings) * 10);
 
                 return {
                     playerId: player.id,
@@ -700,7 +740,7 @@ function TournamentDetailsPage() {
                 setTournament(tournamentData);
                 const completed = (tournamentData.matches || []).filter(m => m.status === 'Completed');
                 if (completed.length > 0) {
-                    calculateLeaderboards(completed);
+                    calculateLeaderboards(completed, tournamentData);
                 }
             } else {
                 toast({ title: "Error", description: "Tournament not found.", variant: "destructive" });

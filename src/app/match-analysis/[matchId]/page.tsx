@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import type { MatchState, Innings, Batsman, Bowler } from '@/lib/types';
+import type { MatchState, Innings, Batsman, Bowler, AllRounderLeaderboardStat, BowlerLeaderboardStat } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, BarChart2, ClipboardList, ListOrdered, Trophy, User } from 'lucide-react';
 import ScorecardDisplay from '@/components/scorecard-display';
@@ -105,6 +105,49 @@ function calculateBattingPoints(batsman: Batsman): number {
     return points;
 }
 
+function calculateBowlingPoints(bowler: Bowler, allInnings: Innings[], ballsPerOver: number): number {
+    let points = 0;
+    
+    // Dot balls
+    const dotBalls = allInnings.flatMap(i => i.timeline).filter(b => b.bowlerId === bowler.id && b.runs === 0 && !b.isExtra).length;
+    points += dotBalls * 0.5;
+
+    // Wickets
+    points += bowler.wickets * 20;
+
+    // Dismissal bonus
+    const dismissalBonus = allInnings.flatMap(i => i.timeline).filter(b => b.bowlerId === bowler.id && b.isWicket && (b.wicketType === 'Bowled' || b.wicketType === 'LBW')).length;
+    points += dismissalBonus * 6;
+    
+    // Wicket-taking bonus
+    if (bowler.wickets >= 5) {
+        points += 12;
+    } else if (bowler.wickets >= 4) {
+        points += 8;
+    } else if (bowler.wickets >= 3) {
+        points += 4;
+    }
+    
+    // Maiden overs
+    const maidenOvers = allInnings.reduce((totalMaidens, innings) => {
+        const bowlerEvents = innings.timeline.filter(e => e.bowlerId === bowler.id);
+        const overs = new Map<number, number>(); // Map<overIndex, runs>
+
+        bowlerEvents.forEach(e => {
+            const overIndex = Math.floor(e.ballInOver / ballsPerOver);
+            if (!overs.has(overIndex)) overs.set(overIndex, 0);
+            if (!e.isExtra || e.extraType === 'by' || e.extraType === 'lb') {
+                overs.set(overIndex, overs.get(overIndex)! + e.runs);
+            }
+        });
+
+        return totalMaidens + Array.from(overs.values()).filter(runs => runs === 0).length;
+    }, 0);
+    points += maidenOvers * 6;
+
+    return points;
+}
+
 function MatchLeaderboard({ match }: { match: MatchState }) {
     const { innings1, innings2 } = match;
 
@@ -139,7 +182,8 @@ function MatchLeaderboard({ match }: { match: MatchState }) {
     }, [innings1, innings2]);
 
     const allBowlers = useMemo(() => {
-        const bowlersMap = new Map<string, Bowler>();
+        const bowlersMap = new Map<string, Bowler & { points: number }>();
+        const allInnings = [innings1, innings2].filter(Boolean) as Innings[];
         
          const addBowlers = (innings: Innings) => {
             Object.values(innings.bowlers).forEach(b => {
@@ -150,7 +194,7 @@ function MatchLeaderboard({ match }: { match: MatchState }) {
                         existing.balls += b.balls;
                         existing.wickets += b.wickets;
                     } else {
-                        bowlersMap.set(b.id, { ...b });
+                        bowlersMap.set(b.id, { ...b, points: 0 });
                     }
                 }
             });
@@ -159,8 +203,12 @@ function MatchLeaderboard({ match }: { match: MatchState }) {
         addBowlers(innings1);
         if(innings2) addBowlers(innings2);
 
-        return Array.from(bowlersMap.values()).sort((a, b) => b.wickets - a.wickets || a.runsConceded - b.runsConceded);
-    }, [innings1, innings2]);
+        bowlersMap.forEach(b => {
+            b.points = calculateBowlingPoints(b, allInnings, match.config.ballsPerOver);
+        })
+
+        return Array.from(bowlersMap.values()).sort((a, b) => b.points - a.points);
+    }, [innings1, innings2, match.config.ballsPerOver]);
 
     return (
         <div className="space-y-6">
@@ -201,6 +249,7 @@ function MatchLeaderboard({ match }: { match: MatchState }) {
                                 <TableHead className="text-right">W-R</TableHead>
                                 <TableHead className="text-right">Overs</TableHead>
                                 <TableHead className="text-right">Econ</TableHead>
+                                <TableHead className="text-right">Points</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -210,6 +259,7 @@ function MatchLeaderboard({ match }: { match: MatchState }) {
                                     <TableCell className="text-right font-bold">{b.wickets}-{b.runsConceded}</TableCell>
                                     <TableCell className="text-right">{formatOvers(b.balls)}</TableCell>
                                     <TableCell className="text-right">{b.balls > 0 ? (b.runsConceded / (b.balls / 6)).toFixed(2) : '0.00'}</TableCell>
+                                    <TableCell className="text-right font-bold">{b.points}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
