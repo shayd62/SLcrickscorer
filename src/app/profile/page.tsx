@@ -4,7 +4,7 @@
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, User, Mail, Phone, MapPin, Edit, Shield, GanttChartSquare, Trash2 } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, MapPin, Edit, Shield, GanttChartSquare, Trash2, BarChart } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import withAuth from '@/components/with-auth';
 import Image from 'next/image';
@@ -56,6 +56,11 @@ function ProfilePage() {
                         <CardDescription>{userProfile.gender}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        <Link href={`/profile/${userProfile.id || user.uid}`}>
+                            <Button variant="outline" className="w-full">
+                                <BarChart2 className="mr-2 h-4 w-4" /> View Career Stats
+                            </Button>
+                        </Link>
                         <div className="flex items-center gap-4 p-3 bg-secondary/50 rounded-lg">
                             <Mail className="h-5 w-5 text-muted-foreground" />
                             <span className="text-sm">{userProfile.email || 'No email provided'}</span>

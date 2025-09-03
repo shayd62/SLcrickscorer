@@ -13,6 +13,7 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import Link from 'next/link';
 
 const formatOvers = (balls: number) => `${Math.floor(balls / 6)}.${balls % 6}`;
 
@@ -229,7 +230,9 @@ function MatchLeaderboard({ match }: { match: MatchState }) {
                         <TableBody>
                             {allBatsmen.slice(0, 5).map(b => (
                                 <TableRow key={b.id}>
-                                    <TableCell className="font-medium">{b.name}</TableCell>
+                                    <TableCell className="font-medium">
+                                       <Link href={`/profile/${b.id}`} className="hover:underline">{b.name}</Link>
+                                    </TableCell>
                                     <TableCell className="text-right font-bold">{b.runs}</TableCell>
                                     <TableCell className="text-right">{b.balls}</TableCell>
                                     <TableCell className="text-right">{b.balls > 0 ? (b.runs / b.balls * 100).toFixed(2) : '0.00'}</TableCell>
@@ -256,7 +259,9 @@ function MatchLeaderboard({ match }: { match: MatchState }) {
                         <TableBody>
                              {allBowlers.slice(0, 5).map(b => (
                                 <TableRow key={b.id}>
-                                    <TableCell className="font-medium">{b.name}</TableCell>
+                                    <TableCell className="font-medium">
+                                      <Link href={`/profile/${b.id}`} className="hover:underline">{b.name}</Link>
+                                    </TableCell>
                                     <TableCell className="text-right font-bold">{b.wickets}-{b.runsConceded}</TableCell>
                                     <TableCell className="text-right">{formatOvers(b.balls)}</TableCell>
                                     <TableCell className="text-right">{b.balls > 0 ? (b.runsConceded / (b.balls / 6)).toFixed(2) : '0.00'}</TableCell>

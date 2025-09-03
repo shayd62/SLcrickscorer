@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import type { Team, UserProfile, MatchState, Innings, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, FielderLeaderboardStat, AllRounderLeaderboardStat, Player } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayRemove, arrayUnion, collection, query, where, getDocs, deleteDoc } from 'firestore';
+import { doc, getDoc, updateDoc, arrayRemove, arrayUnion, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import Image from 'next/image';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -114,6 +114,19 @@ function calculateBowlingPoints(bowler: Bowler, allInnings: Innings[], ballsPerO
     return points;
 }
 
+function calculateFieldingPoints(stats: { catches: number; runOuts: number; stumpings: number; }): number {
+    let points = 0;
+    points += stats.catches * 8;
+    points += stats.stumpings * 12;
+    points += stats.runOuts * 8;
+
+    if (stats.catches >= 3) points += 6;
+    if (stats.stumpings >= 3) points += 12;
+    
+    return points;
+}
+
+
 function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
     if (stats.length === 0) {
         return <p className="text-muted-foreground text-center py-8">No batting data available yet.</p>;
@@ -132,7 +145,9 @@ function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
             <TableBody>
                 {stats.map(player => (
                     <TableRow key={player.playerId}>
-                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="font-medium">
+                           <Link href={`/profile/${player.playerId}`} className="hover:underline">{player.playerName}</Link>
+                        </TableCell>
                         <TableCell className="text-center">{player.matches}</TableCell>
                         <TableCell className="text-center font-bold">{player.runs}</TableCell>
                         <TableCell className="text-right font-bold">{player.points}</TableCell>
@@ -160,9 +175,11 @@ function BowlerLeaderboard({ stats }: { stats: BowlerLeaderboardStat[] }) {
             <TableBody>
                 {stats.map(player => (
                     <TableRow key={player.playerId}>
-                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                         <TableCell className="font-medium">
+                           <Link href={`/profile/${player.playerId}`} className="hover:underline">{player.playerName}</Link>
+                        </TableCell>
                         <TableCell className="text-center font-bold">{player.wickets}</TableCell>
-                        <TableCell className="text-right font-bold">{player.points}</TableCell>
+                        <TableCell className="text-right font-bold">{player.points.toFixed(1)}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>
@@ -183,15 +200,19 @@ function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
                     <TableHead className="text-center">Catches</TableHead>
                     <TableHead className="text-center">Run Outs</TableHead>
                     <TableHead className="text-right">Stumpings</TableHead>
+                     <TableHead className="text-right">Points</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {stats.map(player => (
                     <TableRow key={player.playerId}>
-                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="font-medium">
+                           <Link href={`/profile/${player.playerId}`} className="hover:underline">{player.playerName}</Link>
+                        </TableCell>
                         <TableCell className="text-center font-bold">{player.catches}</TableCell>
                         <TableCell className="text-center">{player.runOuts}</TableCell>
                         <TableCell className="text-right">{player.stumpings}</TableCell>
+                        <TableCell className="text-right font-bold">{player.points}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>
@@ -217,10 +238,12 @@ function AllRounderLeaderboard({ stats }: { stats: AllRounderLeaderboardStat[] }
             <TableBody>
                 {stats.map(player => (
                     <TableRow key={player.playerId}>
-                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link href={`/profile/${player.playerId}`} className="hover:underline">{player.playerName}</Link>
+                        </TableCell>
                         <TableCell className="text-center">{player.runs}</TableCell>
                         <TableCell className="text-center">{player.wickets}</TableCell>
-                        <TableCell className="text-right font-bold">{player.points}</TableCell>
+                        <TableCell className="text-right font-bold">{player.points.toFixed(1)}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>
@@ -342,9 +365,10 @@ function EditTeamPage() {
             matches: data.matches.size,
             catches: data.catches,
             runOuts: data.runOuts,
-            stumpings: data.stumpings
+            stumpings: data.stumpings,
+            points: calculateFieldingPoints(data)
         }))
-        .sort((a, b) => (b.catches + b.runOuts + b.stumpings) - (a.catches + a.runOuts + a.stumpings)));
+        .sort((a, b) => b.points - a.points));
     
     setAllRounderStats(Object.values(batterPlayerStats)
         .map(player => {
@@ -626,7 +650,9 @@ function EditTeamPage() {
                 {team.players.map(player => (
                     <Card key={player.id}>
                         <CardContent className="p-3 flex items-center justify-between">
-                            <span className="font-medium">{player.name}</span>
+                            <Link href={`/profile/${player.id}`} className="hover:underline font-medium">
+                                {player.name}
+                            </Link>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                     <Button variant="ghost" size="icon">

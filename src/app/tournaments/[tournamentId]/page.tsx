@@ -13,7 +13,7 @@ import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Se
 import { useToast } from '@/hooks/use-toast';
 import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, Innings, FielderLeaderboardStat, Player, AllRounderLeaderboardStat } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayUnion, onSnapshot, collection, query, where, getDocs, arrayRemove } from 'firestore';
+import { doc, getDoc, updateDoc, arrayUnion, onSnapshot, collection, query, where, getDocs, arrayRemove } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -445,6 +445,18 @@ function calculateBowlingPoints(bowler: Bowler, allInnings: Innings[], ballsPerO
     return points;
 }
 
+function calculateFieldingPoints(stats: { catches: number; runOuts: number; stumpings: number; }): number {
+    let points = 0;
+    points += stats.catches * 8;
+    points += stats.stumpings * 12;
+    points += stats.runOuts * 8;
+
+    if (stats.catches >= 3) points += 6;
+    if (stats.stumpings >= 3) points += 12;
+    
+    return points;
+}
+
 function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
     if (stats.length === 0) {
         return <p className="text-muted-foreground text-center py-8">No batting data available yet. Complete some matches to see the leaderboard.</p>;
@@ -463,7 +475,9 @@ function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
             <TableBody>
                 {stats.map(player => (
                     <TableRow key={player.playerId}>
-                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link href={`/profile/${player.playerId}`} className="hover:underline">{player.playerName}</Link>
+                        </TableCell>
                         <TableCell className="text-center">{player.matches}</TableCell>
                         <TableCell className="text-center font-bold">{player.runs}</TableCell>
                         <TableCell className="text-right font-bold">{player.points}</TableCell>
@@ -491,9 +505,11 @@ function BowlerLeaderboard({ stats }: { stats: BowlerLeaderboardStat[] }) {
             <TableBody>
                 {stats.map(player => (
                     <TableRow key={player.playerId}>
-                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="font-medium">
+                           <Link href={`/profile/${player.playerId}`} className="hover:underline">{player.playerName}</Link>
+                        </TableCell>
                         <TableCell className="text-center font-bold">{player.wickets}</TableCell>
-                        <TableCell className="text-right font-bold">{player.points}</TableCell>
+                        <TableCell className="text-right font-bold">{player.points.toFixed(1)}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>
@@ -515,16 +531,20 @@ function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
                     <TableHead className="text-center">Catches</TableHead>
                     <TableHead className="text-center">Run Outs</TableHead>
                     <TableHead className="text-right">Stumpings</TableHead>
+                    <TableHead className="text-right">Points</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {stats.map(player => (
                     <TableRow key={player.playerId}>
-                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="font-medium">
+                           <Link href={`/profile/${player.playerId}`} className="hover:underline">{player.playerName}</Link>
+                        </TableCell>
                         <TableCell className="text-center">{player.matches}</TableCell>
                         <TableCell className="text-center font-bold">{player.catches}</TableCell>
                         <TableCell className="text-center">{player.runOuts}</TableCell>
                         <TableCell className="text-right">{player.stumpings}</TableCell>
+                        <TableCell className="text-right font-bold">{player.points}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>
@@ -551,11 +571,13 @@ function AllRounderLeaderboard({ stats }: { stats: AllRounderLeaderboardStat[] }
             <TableBody>
                 {stats.map(player => (
                     <TableRow key={player.playerId}>
-                        <TableCell className="font-medium">{player.playerName}</TableCell>
+                        <TableCell className="font-medium">
+                           <Link href={`/profile/${player.playerId}`} className="hover:underline">{player.playerName}</Link>
+                        </TableCell>
                         <TableCell className="text-center">{player.matches}</TableCell>
                         <TableCell className="text-center">{player.runs}</TableCell>
                         <TableCell className="text-center">{player.wickets}</TableCell>
-                        <TableCell className="text-right font-bold">{player.points}</TableCell>
+                        <TableCell className="text-right font-bold">{player.points.toFixed(1)}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>
@@ -698,7 +720,8 @@ function TournamentDetailsPage() {
                 matches: data.matches.size,
                 catches: data.catches,
                 runOuts: data.runOuts,
-                stumpings: data.stumpings
+                stumpings: data.stumpings,
+                points: calculateFieldingPoints(data)
             }))
             .sort((a, b) => (b.catches + b.runOuts + b.stumpings) - (a.catches + a.runOuts + a.stumpings));
         setFielderStats(newFielderStats);
@@ -715,7 +738,8 @@ function TournamentDetailsPage() {
                 
                 const battingPoints = calculateBattingPoints(batting);
                 const bowlingPoints = calculateBowlingPoints(bowling, bowling.allInnings, currentTournament.oversPerInnings);
-                const points = battingPoints + bowlingPoints + ((fielding.catches + fielding.runOuts + fielding.stumpings) * 10);
+                const fieldingPoints = calculateFieldingPoints(fielding);
+                const points = battingPoints + bowlingPoints + fieldingPoints;
 
                 return {
                     playerId: player.id,
