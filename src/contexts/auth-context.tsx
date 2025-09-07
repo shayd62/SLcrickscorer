@@ -19,7 +19,7 @@ interface AuthContextType {
   signInWithPhoneAndPassword: (phoneNumber: string, password: string) => Promise<any>;
   sendPasswordReset: (emailOrPhone: string) => Promise<void>;
   createUserProfile: (uid: string, data: Omit<UserProfile, 'uid' | 'id'>) => Promise<void>;
-  registerNewPlayer: (name: string, phoneNumber: string, email?: string) => Promise<UserProfile>;
+  registerNewPlayer: (name: string, phoneNumber: string) => Promise<UserProfile>;
   updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => Promise<void>;
   uploadProfilePicture: (uid: string, file: File) => Promise<string>;
   uploadTeamLogo: (teamId: string, file: File) => Promise<string>;
@@ -151,7 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const registerNewPlayer = async (name: string, phoneNumber: string, email?: string): Promise<UserProfile> => {
+  const registerNewPlayer = async (name: string, phoneNumber: string): Promise<UserProfile> => {
     // This function creates a "placeholder" profile that can be claimed later.
     const userDocRef = doc(db, 'users', phoneNumber);
     const docSnap = await getDoc(userDocRef);
@@ -163,7 +163,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const profileData: Omit<UserProfile, 'id'|'uid'> & { isPlaceholder: boolean } = {
         name: name,
         phoneNumber: phoneNumber,
-        email: email || undefined,
         gender: 'Other', // Default value
         isPlaceholder: true, // Mark as a placeholder
     };
