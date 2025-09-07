@@ -241,17 +241,26 @@ function MyGamePage() {
 
         // Upcoming Matches
         const fetchUpcoming = async () => {
-            const tournamentsQuery = query(collection(db, "tournaments"), where("userId", "==", user.uid));
+            // First, get all the teams the current user owns
+            const userTeamsQuery = query(collection(db, "teams"), where("userId", "==", user.uid));
+            const userTeamsSnapshot = await getDocs(userTeamsQuery);
+            const userTeamNames = userTeamsSnapshot.docs.map(doc => doc.data().name);
+
+            // Then, get all tournaments
+            const tournamentsQuery = query(collection(db, "tournaments"));
             const tournamentsSnapshot = await getDocs(tournamentsQuery);
+            
             const allUpcoming: { match: TournamentMatch, tournamentName: string }[] = [];
             
             tournamentsSnapshot.forEach(doc => {
                 const tournament = doc.data() as Tournament;
                 if (tournament.matches) {
-                    const upcoming = tournament.matches
-                        .filter(m => m.status === 'Upcoming')
-                        .map(m => ({ match: m, tournamentName: tournament.name }));
-                    allUpcoming.push(...upcoming);
+                    const upcomingForUser = tournament.matches.filter(m => 
+                        m.status === 'Upcoming' && 
+                        (userTeamNames.includes(m.team1) || userTeamNames.includes(m.team2))
+                    ).map(m => ({ match: m, tournamentName: tournament.name }));
+                    
+                    allUpcoming.push(...upcomingForUser);
                 }
             });
             allUpcoming.sort((a, b) => new Date(a.match.date || 0).getTime() - new Date(b.match.date || 0).getTime());
