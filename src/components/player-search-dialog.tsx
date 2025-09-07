@@ -38,7 +38,7 @@ function NewPlayerDialog({ onPlayerCreated }: { onPlayerCreated: (player: UserPr
 
     const handleCreatePlayer = async (data: NewPlayerFormValues) => {
         try {
-            const newUserProfile = await registerNewPlayer(data.name, data.phoneNumber, data.email);
+            const newUserProfile = await registerNewPlayer(data.name, data.phoneNumber, data.email || undefined);
             toast({ title: "Player Created!", description: `${data.name} has been registered.` });
             onPlayerCreated(newUserProfile);
             setOpen(false);
