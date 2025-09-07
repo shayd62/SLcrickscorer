@@ -28,9 +28,6 @@ const registerSchema = z.object({
   bowlingStyle: z.enum(['Right-arm', 'Left-arm']).optional(),
   isWicketKeeper: z.boolean().optional(),
   photoURL: z.string().url().optional().or(z.literal('')),
-}).refine(data => data.email || data.phoneNumber, {
-  message: 'Either Email or Phone Number is required.',
-  path: ['email'],
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -199,5 +196,3 @@ function RegisterPage() {
 }
 
 export default RegisterPage;
-
-    
