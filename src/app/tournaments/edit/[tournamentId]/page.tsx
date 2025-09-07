@@ -45,6 +45,7 @@ const tournamentSchema = z.object({
   tournamentFormat: z.enum(['Round Robin', 'Knockout', 'League']).optional(),
   logoUrl: z.string().url().optional().or(z.literal('')),
   coverPhotoUrl: z.string().url().optional().or(z.literal('')),
+  numberOfTeams: z.string({ required_error: "Please select the number of teams." }),
 });
 
 type TournamentFormValues = z.infer<typeof tournamentSchema>;
@@ -330,6 +331,29 @@ function EditTournamentPage() {
                         </div>
                     )}
                 />
+              </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Number of Teams</Label>
+                    <Controller
+                      control={form.control}
+                      name="numberOfTeams"
+                      render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select number of teams" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[4, 6, 8, 10, 12, 16, 20].map(num => (
+                              <SelectItem key={num} value={String(num)}>{num} Teams</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    {form.formState.errors.numberOfTeams && <p className="text-destructive text-sm">{form.formState.errors.numberOfTeams.message}</p>}
+                  </div>
               </div>
               
               <div className="space-y-4">

@@ -335,7 +335,7 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2"><Users className="h-6 w-6 text-primary"/><span>Participating Teams ({tournament.participatingTeams?.length || 0})</span></div>
+                    <div className="flex items-center gap-2"><Users className="h-6 w-6 text-primary"/><span>Participating Teams ({tournament.participatingTeams?.length || 0}/{tournament.numberOfTeams || '...'})</span></div>
                     <Link href="/teams/create">
                         <Button variant="ghost" size="icon">
                             <Plus className="h-5 w-5" />
@@ -630,7 +630,7 @@ function TournamentDetailsPage() {
                 if (innings.batsmen) {
                     for (const batsman of Object.values(innings.batsmen) as Batsman[]) {
                         if (batsman.balls > 0 || batsman.isOut) {
-                            if (!batterPlayerStats[batsman.id]) {
+                             if (!batterPlayerStats[batsman.id]) {
                                 batterPlayerStats[batsman.id] = { ...batsman, teamName: battingTeamName, matches: new Set() };
                             } else {
                                 batterPlayerStats[batsman.id].runs += batsman.runs;
