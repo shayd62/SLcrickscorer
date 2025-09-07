@@ -369,20 +369,20 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
                         <Accordion type="single" collapsible className="w-full">
                             {participatingTeams.map(team => (
                                 <AccordionItem value={team.id} key={team.id}>
-                                    <AccordionTrigger>
-                                        <div className="flex justify-between items-center w-full pr-4">
-                                            <span>{team.name}</span>
-                                            <AlertDialog onOpenChange={(e) => e.stopPropagation()}>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader><AlertDialogTitle>Remove Team?</AlertDialogTitle><AlertDialogDescription>This will remove "{team.name}" from the tournament. Are you sure?</AlertDialogDescription></AlertDialogHeader>
-                                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveTeam(team.name)}>Remove</AlertDialogAction></AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </div>
-                                    </AccordionTrigger>
+                                    <div className="flex items-center w-full pr-4">
+                                        <AccordionTrigger className="flex-grow">
+                                            {team.name}
+                                        </AccordionTrigger>
+                                        <AlertDialog onOpenChange={(e) => e.stopPropagation()}>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader><AlertDialogTitle>Remove Team?</AlertDialogTitle><AlertDialogDescription>This will remove "{team.name}" from the tournament. Are you sure?</AlertDialogDescription></AlertDialogHeader>
+                                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveTeam(team.name)}>Remove</AlertDialogAction></AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
                                     <AccordionContent>
                                         <ul className="space-y-1 text-sm pl-4">
                                             {team.players.map(player => (
