@@ -68,7 +68,7 @@ export interface Tournament {
   plan?: 'free' | 'pro' | 'enterprise';
   location?: string;
   description?: string;
-  numberOfTeams?: string;
+  numberOfTeams: string;
   logoUrl?: string;
   coverPhotoUrl?: string;
   startDate: string;

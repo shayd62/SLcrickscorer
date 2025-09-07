@@ -21,7 +21,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Team, Tournament } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, getDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, getDoc, query, where, updateDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import Image from 'next/image';
@@ -36,7 +36,7 @@ const tournamentSchema = z.object({
     win: z.number().int(),
     loss: z.number().int(),
     draw: z.number().int(),
-    bonus: z.number().int().optional(),
+    bonus: z.number().optional(),
   }),
   prize: z.string().optional(),
   venue: z.string().optional(),
@@ -117,6 +117,7 @@ function EditTournamentPage() {
                     ...tournamentData,
                     startDate: new Date(tournamentData.startDate),
                     endDate: new Date(tournamentData.endDate),
+                    numberOfTeams: tournamentData.numberOfTeams, // Ensure this is set
                 });
                 if(tournamentData.logoUrl) setLogoPreview(tournamentData.logoUrl);
                 if(tournamentData.coverPhotoUrl) setCoverPreview(tournamentData.coverPhotoUrl);
@@ -159,24 +160,26 @@ function EditTournamentPage() {
             coverPhotoUrl = await uploadTournamentImage(tournamentId, coverFile, 'cover');
         }
 
-        const tournamentData: {[key: string]: any} = {
+        const tournamentRef = doc(db, "tournaments", tournamentId);
+        
+        const tournamentData = {
           ...data,
-          id: tournamentId,
           startDate: data.startDate.toISOString(),
           endDate: data.endDate.toISOString(),
-          userId: user.uid,
           logoUrl,
           coverPhotoUrl,
         };
-        
-        // Clean the object by removing keys with undefined values
-        Object.keys(tournamentData).forEach(key => {
-            if (tournamentData[key] === undefined || tournamentData[key] === '') {
-                delete tournamentData[key];
-            }
-        });
 
-        await setDoc(doc(db, "tournaments", tournamentId), tournamentData, { merge: true });
+        // Clean the object by removing keys with undefined values
+        const cleanedData: {[key: string]: any} = {};
+        for (const key in tournamentData) {
+            if ((tournamentData as any)[key] !== undefined && (tournamentData as any)[key] !== '') {
+                cleanedData[key] = (tournamentData as any)[key];
+            }
+        }
+        
+        await updateDoc(tournamentRef, cleanedData);
+
         toast({
             title: "Tournament Updated!",
             description: `The tournament "${data.name}" has been updated successfully.`,
