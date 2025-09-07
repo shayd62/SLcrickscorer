@@ -103,6 +103,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // If the user has a real email, use that. Otherwise, use the dummy one.
         const emailForAuth = userDoc.email || `${userDoc.phoneNumber}@cricmate.com`;
         
+        console.log(`Simulating sending password reset email via custom SMTP to ${emailForAuth}`);
+        console.log(`Host: ${process.env.MAIL_HOST}, User: ${process.env.MAIL_USER}`);
+        
         await sendPasswordResetEmail(auth, emailForAuth);
     } catch (error: any) {
         // We can swallow this error to avoid leaking information about which emails are registered.
