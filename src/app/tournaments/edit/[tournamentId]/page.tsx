@@ -31,7 +31,6 @@ const tournamentSchema = z.object({
   startDate: z.date({ required_error: "A start date is required."}),
   endDate: z.date({ required_error: "An end date is required."}),
   oversPerInnings: z.number().min(1).max(100),
-  participatingTeams: z.array(z.string()).min(2, 'At least 2 teams are required.'),
   pointsPolicy: z.object({
     win: z.number().int(),
     loss: z.number().int(),
@@ -68,7 +67,6 @@ function EditTournamentPage() {
     defaultValues: {
       name: '',
       oversPerInnings: 20,
-      participatingTeams: [],
       pointsPolicy: {
         win: 2,
         loss: 0,
@@ -192,7 +190,6 @@ function EditTournamentPage() {
     }
   };
 
-  const selectedTeams = form.watch('participatingTeams');
   const tournamentName = form.watch('name');
 
   return (
@@ -415,31 +412,6 @@ function EditTournamentPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Participating Teams</Label>
-                <Card className="max-h-48 overflow-y-auto">
-                    <CardContent className="p-4 grid grid-cols-2 gap-4">
-                        {availableTeams.map(team => (
-                           <div key={team.name} className="flex items-center space-x-2">
-                                <Checkbox
-                                    id={team.name}
-                                    checked={selectedTeams.includes(team.name)}
-                                    onCheckedChange={(checked) => {
-                                        return checked
-                                        ? form.setValue('participatingTeams', [...selectedTeams, team.name])
-                                        : form.setValue('participatingTeams', selectedTeams.filter(name => name !== team.name))
-                                    }}
-                                />
-                                <label htmlFor={team.name} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                    {team.name}
-                                </label>
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
-                 {form.formState.errors.participatingTeams && <p className="text-destructive text-sm">{form.formState.errors.participatingTeams.message}</p>}
-              </div>
-
                <div className="space-y-4">
                 <Label>Points Policy</Label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -474,5 +446,3 @@ function EditTournamentPage() {
 }
 
 export default EditTournamentPage;
-
-    
