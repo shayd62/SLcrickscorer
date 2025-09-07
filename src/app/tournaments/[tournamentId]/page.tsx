@@ -9,9 +9,9 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil, Radio, Star, ShieldAlert, User, Award, ChevronRight, Search } from 'lucide-react';
+import { ArrowLeft, Users, Plus, ListOrdered, BarChart2, ShieldCheck, Trash2, Settings, Gamepad2, Pencil, Radio, Star, ShieldAlert, User, Award, ChevronRight, Search, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, Innings, FielderLeaderboardStat, Player, AllRounderLeaderboardStat } from '@/lib/types';
+import type { Tournament, Team, TournamentPoints, TournamentGroup, TournamentMatch, MatchState, Batsman, Bowler, BatterLeaderboardStat, BowlerLeaderboardStat, Innings, FielderLeaderboardStat, Player, AllRounderLeaderboardStat, UserProfile } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, arrayUnion, onSnapshot, collection, query, where, getDocs, arrayRemove } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { PlayerSearchDialog } from '@/components/player-search-dialog';
 
 const formatOvers = (balls: number, ballsPerOver: number = 6) => `${Math.floor(balls / ballsPerOver)}.${balls % ballsPerOver}`;
 
@@ -239,7 +240,9 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
     const { toast } = useToast();
     const { user, searchTeams } = useAuth();
     const [participatingTeams, setParticipatingTeams] = useState<Team[]>([]);
-    
+    const [playerSearchOpen, setPlayerSearchOpen] = useState(false);
+    const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+
     useEffect(() => {
         const fetchTeamData = async () => {
             if (!tournament.participatingTeams || tournament.participatingTeams.length === 0) {
@@ -247,22 +250,15 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
                 return;
             }
             const teamsRef = collection(db, "teams");
-            // Firestore 'in' query is limited to 30 items. If more teams, need to chunk.
             const chunks = [];
             for (let i = 0; i < tournament.participatingTeams.length; i += 30) {
                 chunks.push(tournament.participatingTeams.slice(i, i + 30));
             }
-            
-            const teamPromises = chunks.map(chunk => 
-                getDocs(query(teamsRef, where("name", "in", chunk)))
-            );
-
+            const teamPromises = chunks.map(chunk => getDocs(query(teamsRef, where("name", "in", chunk))));
             const teamSnapshots = await Promise.all(teamPromises);
             const teams: Team[] = [];
             teamSnapshots.forEach(snapshot => {
-                snapshot.forEach(doc => {
-                    teams.push({ id: doc.id, ...doc.data() } as Team);
-                });
+                snapshot.forEach(doc => teams.push({ id: doc.id, ...doc.data() } as Team));
             });
             setParticipatingTeams(teams);
         };
@@ -282,35 +278,6 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
 
     const handleAddTeam = async (team: Team) => {
         try {
-            const teamToAdd = team;
-            
-            const teamsRef = collection(db, "teams");
-            const participatingTeamNames = tournament.participatingTeams || [];
-
-            if (participatingTeamNames.length > 0) {
-                const participatingTeamsQuery = query(teamsRef, where("name", "in", participatingTeamNames));
-                const participatingTeamsSnapshot = await getDocs(participatingTeamsQuery);
-
-                const existingPlayerIds = new Set<string>();
-                participatingTeamsSnapshot.forEach(doc => {
-                    const teamData = doc.data() as Team;
-                    teamData.players.forEach(p => existingPlayerIds.add(p.id));
-                });
-
-                const newPlayerIds = teamToAdd.players.map(p => p.id);
-                const duplicatePlayer = newPlayerIds.find(id => existingPlayerIds.has(id));
-
-                if (duplicatePlayer) {
-                    toast({
-                        title: "Duplicate Player Found",
-                        description: `A player from "${team.name}" is already in another team in this tournament. Each player can only be on one team.`,
-                        variant: "destructive",
-                        duration: 7000,
-                    });
-                    return;
-                }
-            }
-            
             await onUpdate({ participatingTeams: arrayUnion(team.name) });
             toast({ title: "Team Added!", description: `"${team.name}" has joined the tournament.` });
             setSearchTerm('');
@@ -321,26 +288,57 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
         }
     };
 
-
     const handleRemoveTeam = async (teamName: string) => {
         await onUpdate({ participatingTeams: arrayRemove(teamName) });
-        const updatedGroups = (tournament.groups || []).map(g => ({
-            ...g,
-            teams: g.teams.filter(t => t !== teamName)
-        }));
+        const updatedGroups = (tournament.groups || []).map(g => ({ ...g, teams: g.teams.filter(t => t !== teamName) }));
         await onUpdate({ groups: updatedGroups });
+    };
+
+    const handleOpenPlayerSearch = (team: Team) => {
+        setEditingTeam(team);
+        setPlayerSearchOpen(true);
+    };
+
+    const handleAddPlayerToTeam = async (player: UserProfile) => {
+        if (!editingTeam) return;
+        const isAlreadyAdded = editingTeam.players.some(p => p.id === player.uid);
+        if (isAlreadyAdded) {
+            toast({ title: "Player already in team", variant: "destructive" });
+            return;
+        }
+        const newPlayer: Player = { id: player.uid, name: player.name };
+        try {
+            const teamRef = doc(db, 'teams', editingTeam.id);
+            await updateDoc(teamRef, { players: arrayUnion(newPlayer) });
+            toast({ title: "Player Added!", description: `${newPlayer.name} has been added to ${editingTeam.name}.` });
+            // Refresh team data locally
+            setParticipatingTeams(prev => prev.map(t => t.id === editingTeam.id ? { ...t, players: [...t.players, newPlayer] } : t));
+        } catch (error) {
+            console.error("Error adding player: ", error);
+            toast({ title: "Error", description: "Could not add player.", variant: "destructive" });
+        }
+    };
+
+    const handleRemovePlayerFromTeam = async (team: Team, playerId: string) => {
+        const playerToRemove = team.players.find(p => p.id === playerId);
+        if (!playerToRemove) return;
+        try {
+            const teamRef = doc(db, "teams", team.id);
+            await updateDoc(teamRef, { players: arrayRemove(playerToRemove) });
+            setParticipatingTeams(prev => prev.map(t => t.id === team.id ? { ...t, players: t.players.filter(p => p.id !== playerId) } : t));
+            toast({ title: "Player Removed", description: `${playerToRemove.name} removed from ${team.name}.` });
+        } catch (e) {
+            console.error("Error removing player: ", e);
+            toast({ title: "Error", description: "Could not remove player.", variant: "destructive" });
+        }
     };
 
     return (
         <Card>
+            <PlayerSearchDialog open={playerSearchOpen} onOpenChange={setPlayerSearchOpen} onPlayerSelect={handleAddPlayerToTeam} />
             <CardHeader>
                 <CardTitle className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2"><Users className="h-6 w-6 text-primary"/><span>Participating Teams ({tournament.participatingTeams?.length || 0}/{tournament.numberOfTeams || '...'})</span></div>
-                    <Link href="/teams/create">
-                        <Button variant="ghost" size="icon">
-                            <Plus className="h-5 w-5" />
-                        </Button>
-                    </Link>
                 </CardTitle>
             </CardHeader>
             <CardContent>
@@ -368,22 +366,39 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
 
                 <div className="mt-4 border-t pt-4">
                     {participatingTeams.length > 0 ? (
-                        <ul className="space-y-2 max-h-48 overflow-y-auto">
+                        <Accordion type="single" collapsible className="w-full">
                             {participatingTeams.map(team => (
-                                <li key={team.id} className="flex items-center justify-between p-2 bg-secondary rounded-md">
-                                    <Link href={`/teams/edit/${team.id}`} className="hover:underline">
-                                        <span>{team.name}</span>
-                                    </Link>
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button></AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader><AlertDialogTitle>Remove Team?</AlertDialogTitle><AlertDialogDescription>This will remove "{team.name}" from the tournament and any groups it's in. Are you sure?</AlertDialogDescription></AlertDialogHeader>
-                                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveTeam(team.name)}>Remove</AlertDialogAction></AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </li>
+                                <AccordionItem value={team.id} key={team.id}>
+                                    <AccordionTrigger>
+                                        <div className="flex justify-between items-center w-full pr-4">
+                                            <span>{team.name}</span>
+                                            <AlertDialog onOpenChange={(e) => e.stopPropagation()}>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader><AlertDialogTitle>Remove Team?</AlertDialogTitle><AlertDialogDescription>This will remove "{team.name}" from the tournament. Are you sure?</AlertDialogDescription></AlertDialogHeader>
+                                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveTeam(team.name)}>Remove</AlertDialogAction></AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        <ul className="space-y-1 text-sm pl-4">
+                                            {team.players.map(player => (
+                                                <li key={player.id} className="flex justify-between items-center">
+                                                    <span>{player.name}</span>
+                                                    <Button variant="ghost" size="icon" onClick={() => handleRemovePlayerFromTeam(team, player.id)}><Trash2 className="h-3 w-3 text-destructive/70" /></Button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <Button variant="outline" size="sm" className="mt-2 w-full" onClick={() => handleOpenPlayerSearch(team)}>
+                                            <UserPlus className="mr-2 h-4 w-4" /> Add Player
+                                        </Button>
+                                    </AccordionContent>
+                                </AccordionItem>
                             ))}
-                        </ul>
+                        </Accordion>
                     ) : <p className="text-sm text-muted-foreground text-center py-4">No teams have joined yet.</p>}
                 </div>
             </CardContent>
