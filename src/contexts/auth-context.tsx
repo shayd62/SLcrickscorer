@@ -2,7 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential, sendPasswordResetEmail } from 'firebase/auth';
+import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential, sendPasswordResetEmail, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { auth, db, storage } from '@/lib/firebase';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -152,6 +152,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
     const registerNewPlayer = async (name: string, phoneNumber: string, email?: string): Promise<UserProfile> => {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            throw new Error("You must be logged in to register a new player.");
+        }
+        const currentUserEmail = currentUser.email;
+        if (!currentUserEmail) {
+            throw new Error("Current user does not have a valid email to re-authenticate.");
+        }
+
         const userDocRef = doc(db, 'users', phoneNumber);
         const docSnap = await getDoc(userDocRef);
 
@@ -159,36 +168,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error("A player with this phone number is already registered.");
         }
 
-        // Use the real email for auth if provided, otherwise create a dummy one.
         const emailForAuth = email || `${phoneNumber}@cricmate.com`;
-        // Use the phone number as a default temporary password.
         const tempPassword = phoneNumber;
-
-        // Create the user in Firebase Authentication
-        const userCredential = await createUserWithEmailAndPassword(auth, emailForAuth, tempPassword);
-        const authUser = userCredential.user;
-
-        console.log(`New player registered with temporary password: ${tempPassword}. They can use this to log in and change it.`);
-
-        // Now create their profile in Firestore
+        
+        // This will sign in the new user and sign out the current admin.
+        const newUserCredential = await createUserWithEmailAndPassword(auth, emailForAuth, tempPassword);
+        const newAuthUser = newUserCredential.user;
+        
+        console.log(`New player registered with temporary password: ${tempPassword}.`);
+        
         const profileData: Omit<UserProfile, 'id' | 'uid'> = {
             name: name,
             phoneNumber: phoneNumber,
             email: email,
-            gender: 'Other', // Default value
-            isPlaceholder: false, // It's a full user now
+            gender: 'Other', 
+            isPlaceholder: false, 
         };
         
         await setDoc(userDocRef, {
             ...profileData,
-            uid: authUser.uid, // Store the real auth UID
+            uid: newAuthUser.uid,
         });
 
         const newUserProfile: UserProfile = {
             id: phoneNumber,
-            uid: authUser.uid,
+            uid: newAuthUser.uid,
             ...profileData,
         };
+
+        // Re-authenticate the original admin user
+        const adminPassword = prompt("Please re-enter your password to continue.");
+        if (adminPassword) {
+            try {
+                await signInWithEmailAndPassword(auth, currentUserEmail, adminPassword);
+                console.log("Admin re-authenticated successfully.");
+            } catch (error) {
+                console.error("Admin re-authentication failed:", error);
+                router.push('/login'); // Force logout if re-auth fails
+                throw new Error("Session expired. Please log in again.");
+            }
+        } else {
+            await logout();
+            throw new Error("Password not provided. You have been logged out.");
+        }
 
         return newUserProfile;
     };
