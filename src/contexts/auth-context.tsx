@@ -8,6 +8,7 @@ import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addD
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useRouter } from 'next/navigation';
 import type { UserProfile, Team } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   user: User | null;
@@ -19,7 +20,7 @@ interface AuthContextType {
   signInWithPhoneAndPassword: (phoneNumber: string, password: string) => Promise<any>;
   sendPasswordReset: (emailOrPhone: string) => Promise<void>;
   createUserProfile: (uid: string, data: Omit<UserProfile, 'uid' | 'id'>) => Promise<void>;
-  registerNewPlayer: (name: string, phoneNumber: string, email?: string) => Promise<UserProfile>;
+  registerNewPlayer: (name: string, phoneNumber: string, email?: string) => Promise<UserProfile | null>;
   updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => Promise<void>;
   uploadProfilePicture: (uid: string, file: File) => Promise<string>;
   uploadTeamLogo: (teamId: string, file: File) => Promise<string>;
@@ -36,6 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -151,67 +153,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-    const registerNewPlayer = async (name: string, phoneNumber: string, email?: string): Promise<UserProfile> => {
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
+    const registerNewPlayer = async (name: string, phoneNumber: string, email?: string): Promise<UserProfile | null> => {
+        const adminUser = auth.currentUser;
+        if (!adminUser) {
             throw new Error("You must be logged in to register a new player.");
         }
-        const currentUserEmail = currentUser.email;
-        if (!currentUserEmail) {
-            throw new Error("Current user does not have a valid email to re-authenticate.");
-        }
-
+        
         const userDocRef = doc(db, 'users', phoneNumber);
         const docSnap = await getDoc(userDocRef);
 
         if (docSnap.exists()) {
             throw new Error("A player with this phone number is already registered.");
         }
-
-        const adminPassword = prompt("To continue, please re-enter your password to confirm your identity.");
-        if (!adminPassword) {
-            throw new Error("Password not provided. Player creation cancelled.");
-        }
-
+        
         const emailForAuth = email || `${phoneNumber}@cricmate.com`;
         const tempPassword = phoneNumber;
         
-        // This will sign in the new user and sign out the current admin.
-        const newUserCredential = await createUserWithEmailAndPassword(auth, emailForAuth, tempPassword);
-        const newAuthUser = newUserCredential.user;
-        
-        console.log(`New player registered with temporary password (their phone number).`);
-        
-        const profileData: Omit<UserProfile, 'id' | 'uid'> = {
-            name: name,
-            phoneNumber: phoneNumber,
-            email: email,
-            gender: 'Other', 
-            isPlaceholder: false, 
-        };
-        
-        await setDoc(userDocRef, {
-            ...profileData,
-            uid: newAuthUser.uid,
-        });
-
-        const newUserProfile: UserProfile = {
-            id: phoneNumber,
-            uid: newAuthUser.uid,
-            ...profileData,
-        };
-
-        // Re-authenticate the original admin user
         try {
-            await signInWithEmailAndPassword(auth, currentUserEmail, adminPassword);
-            console.log("Admin re-authenticated successfully.");
-        } catch (error) {
-            console.error("Admin re-authentication failed:", error);
-            router.push('/login'); // Force logout if re-auth fails
-            throw new Error("Re-authentication failed. Please log in again.");
-        }
+            // NOTE: This client-side approach has limitations and logs out the admin.
+            // A server-side Admin SDK is the robust solution for user management without session interference.
+            
+            const newUserCredential = await createUserWithEmailAndPassword(auth, emailForAuth, tempPassword);
+            const newAuthUser = newUserCredential.user;
 
-        return newUserProfile;
+            const profileData: Omit<UserProfile, 'id' | 'uid'> = {
+                name: name,
+                phoneNumber: phoneNumber,
+                email: email,
+                gender: 'Other', 
+                isPlaceholder: false, 
+            };
+            
+            await setDoc(userDocRef, {
+                ...profileData,
+                uid: newAuthUser.uid,
+            });
+
+            toast({
+                title: 'Player Created & Session Reset',
+                description: `${name} has been registered. You have been logged out and will be redirected to the login page.`,
+            });
+
+            // The onAuthStateChanged listener will handle the user state change.
+            // We'll sign out the new user, which will trigger the listener to clear state and then the admin can log back in.
+            await signOut(auth);
+            router.push('/login');
+
+
+            const newUserProfile: UserProfile = {
+                id: phoneNumber,
+                uid: newAuthUser.uid,
+                ...profileData,
+            };
+
+            return newUserProfile;
+
+        } catch (error: any) {
+            console.error("Error creating new player:", error);
+            // If the user creation fails, we should try to sign the admin back in if they were logged out.
+            // However, the current flow makes this complex. The best UX is to guide them to log back in.
+            if(auth.currentUser?.uid !== adminUser.uid) {
+               await signOut(auth);
+               router.push('/login');
+            }
+            throw new Error(error.message || "Failed to create new player.");
+        }
     };
   
   const updateUserProfile = async (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => {

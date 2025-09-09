@@ -32,22 +32,28 @@ type NewPlayerFormValues = z.infer<typeof newPlayerSchema>;
 
 function NewPlayerDialog({ onPlayerCreated }: { onPlayerCreated: (player: UserProfile) => void }) {
     const [open, setOpen] = useState(false);
-    const { registerNewPlayer, loading: authLoading } = useAuth();
+    const { registerNewPlayer } = useAuth();
+    const [loading, setLoading] = useState(false);
     const { toast } = useToast();
     const form = useForm<NewPlayerFormValues>({ resolver: zodResolver(newPlayerSchema) });
 
     const handleCreatePlayer = async (data: NewPlayerFormValues) => {
+        setLoading(true);
         try {
             const newUserProfile = await registerNewPlayer(data.name, data.phoneNumber, data.email);
-            toast({ 
-                title: "Player Created!", 
-                description: `${data.name} can now log in using their phone number as a temporary password.` 
-            });
-            onPlayerCreated(newUserProfile);
-            setOpen(false);
-            form.reset();
+            if (newUserProfile) {
+                toast({ 
+                    title: "Player Created!", 
+                    description: `${data.name} can now log in using their phone number as a temporary password.` 
+                });
+                onPlayerCreated(newUserProfile);
+                setOpen(false);
+                form.reset();
+            }
         } catch (error: any) {
             toast({ title: "Creation Failed", description: error.message, variant: "destructive" });
+        } finally {
+            setLoading(false);
         }
     };
     
@@ -82,8 +88,8 @@ function NewPlayerDialog({ onPlayerCreated }: { onPlayerCreated: (player: UserPr
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button type="submit" disabled={authLoading}>
-                            {authLoading ? 'Creating...' : 'Create Player'}
+                        <Button type="submit" disabled={loading}>
+                            {loading ? 'Creating...' : 'Create Player'}
                         </Button>
                     </DialogFooter>
                 </form>
