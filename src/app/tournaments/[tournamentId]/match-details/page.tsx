@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
@@ -161,11 +162,17 @@ function MatchDetailsContent() {
         if (!tournamentId) return;
         const unsub = onSnapshot(doc(db, "tournaments", tournamentId), (doc) => {
             if (doc.exists()) {
-                setTournament({ ...doc.data() as Tournament, id: doc.id });
+                const tournamentData = { ...doc.data() as Tournament, id: doc.id };
+                setTournament(tournamentData);
+                // Set default form values from tournament settings
+                form.setValue('overs', tournamentData.oversPerInnings || 20);
+                if (tournamentData.tournamentFormat) {
+                  form.setValue('matchType', tournamentData.tournamentFormat);
+                }
             }
         });
         return unsub;
-    }, [tournamentId]);
+    }, [tournamentId, form]);
     
     useEffect(() => {
         fetchTournament();
@@ -306,10 +313,10 @@ function MatchDetailsContent() {
             tournamentId,
             venue: venue,
             matchDate: matchDateStr ? decodeURIComponent(matchDateStr) : undefined,
-            ballsPerOver: 6,
+            ballsPerOver: tournament?.ballsPerOver || 6,
             powerPlay: data.powerPlay,
-            noBall: { enabled: true, reball: true, run: 1 },
-            wideBall: { enabled: true, reball: true, run: 1 },
+            noBall: tournament?.noBall || { enabled: true, reball: true, run: 1 },
+            wideBall: tournament?.wideBall || { enabled: true, reball: true, run: 1 },
             ...data
         };
         

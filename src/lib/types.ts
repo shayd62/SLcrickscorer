@@ -85,6 +85,9 @@ export interface Tournament {
   groups?: TournamentGroup[];
   matches?: TournamentMatch[];
   createdAt?: any;
+  ballsPerOver?: number;
+  noBall?: { enabled: boolean; reball: boolean; run: number };
+  wideBall?: { enabled: boolean; reball: boolean; run: number };
 }
 
 export interface TournamentPoints {
