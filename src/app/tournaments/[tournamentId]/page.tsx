@@ -627,6 +627,7 @@ function TournamentDetailsPage() {
     const tournamentId = params.tournamentId as string;
 
     const isOwnerOrAdmin = tournament?.userId === user?.uid || tournament?.adminUids?.includes(user?.uid || '');
+    const isScorer = tournament?.scorerUids?.includes(user?.uid || '');
 
     const liveMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Live'), [tournament?.matches]);
     const upcomingMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Upcoming'), [tournament?.matches]);
@@ -955,7 +956,7 @@ function TournamentDetailsPage() {
                                             <p className="font-bold">{match.team1} vs {match.team2}</p>
                                             <p className="text-sm text-muted-foreground">{new Date(match.date!).toLocaleString()} at {match.venue}</p>
                                         </div>
-                                        {isOwnerOrAdmin && (
+                                        {(isOwnerOrAdmin || isScorer) && (
                                             <div className="flex items-center gap-2">
                                                 <Link href={`/tournaments/${tournamentId}/match-details?team1Name=${encodeURIComponent(match.team1)}&team2Name=${encodeURIComponent(match.team2)}&date=${encodeURIComponent(match.date || '')}&venue=${encodeURIComponent(match.venue || '')}`}>
                                                 <Button>Start Match</Button>
@@ -1043,7 +1044,7 @@ function TournamentDetailsPage() {
                        )}
                     </TabsContent>
                 </Tabs>
-                {isOwnerOrAdmin && (
+                {(isOwnerOrAdmin || isScorer) && (
                     <Link href={`/tournaments/${tournamentId}/add-match`} passHref>
                         <Button className="fixed bottom-8 right-8 rounded-full h-16 w-16 shadow-lg">
                             <Plus className="h-8 w-8" />
@@ -1058,6 +1059,7 @@ function TournamentDetailsPage() {
 export default TournamentDetailsPage;
 
     
+
 
 
 
