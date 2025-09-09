@@ -90,6 +90,8 @@ export interface Tournament {
   wideBall?: { enabled: boolean; reball: boolean; run: number };
   admins?: Player[];
   scorers?: Player[];
+  adminUids?: string[];
+  scorerUids?: string[];
 }
 
 export interface TournamentPoints {

@@ -35,10 +35,32 @@ function TournamentsPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const q = query(collection(db, "tournaments"), where("userId", "==", user.uid));
-      const querySnapshot = await getDocs(q);
-      const tournamentData = querySnapshot.docs.map(doc => ({ ...doc.data() as Tournament, id: doc.id }));
-      setTournaments(tournamentData);
+      const tournamentsRef = collection(db, "tournaments");
+      
+      const ownerQuery = query(tournamentsRef, where("userId", "==", user.uid));
+      const adminQuery = query(tournamentsRef, where("adminUids", "array-contains", user.uid));
+      const scorerQuery = query(tournamentsRef, where("scorerUids", "array-contains", user.uid));
+
+      const [ownerSnapshot, adminSnapshot, scorerSnapshot] = await Promise.all([
+        getDocs(ownerQuery),
+        getDocs(adminQuery),
+        getDocs(scorerQuery),
+      ]);
+
+      const tournamentsMap = new Map<string, Tournament>();
+
+      ownerSnapshot.forEach(doc => {
+        tournamentsMap.set(doc.id, { ...doc.data() as Tournament, id: doc.id });
+      });
+      adminSnapshot.forEach(doc => {
+        tournamentsMap.set(doc.id, { ...doc.data() as Tournament, id: doc.id });
+      });
+      scorerSnapshot.forEach(doc => {
+        tournamentsMap.set(doc.id, { ...doc.data() as Tournament, id: doc.id });
+      });
+      
+      setTournaments(Array.from(tournamentsMap.values()));
+
     } catch (e) {
       console.error("Failed to load tournaments from Firestore", e);
       toast({ title: "Error", description: "Could not load tournaments.", variant: "destructive" });

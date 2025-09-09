@@ -52,6 +52,8 @@ const tournamentSchema = z.object({
   numberOfTeams: z.string({ required_error: "Please select the number of teams." }),
   admins: z.array(playerSchema).optional(),
   scorers: z.array(playerSchema).optional(),
+  adminUids: z.array(z.string()).optional(),
+  scorerUids: z.array(z.string()).optional(),
 });
 
 type TournamentFormValues = z.infer<typeof tournamentSchema>;
@@ -91,6 +93,8 @@ function EditTournamentPage() {
       coverPhotoUrl: '',
       admins: [],
       scorers: [],
+      adminUids: [],
+      scorerUids: [],
     },
     mode: 'onChange',
   });
@@ -129,6 +133,8 @@ function EditTournamentPage() {
                     numberOfTeams: tournamentData.numberOfTeams, // Ensure this is set
                     admins: tournamentData.admins || [],
                     scorers: tournamentData.scorers || [],
+                    adminUids: tournamentData.adminUids || [],
+                    scorerUids: tournamentData.scorerUids || [],
                 });
                 if(tournamentData.logoUrl) setLogoPreview(tournamentData.logoUrl);
                 if(tournamentData.coverPhotoUrl) setCoverPreview(tournamentData.coverPhotoUrl);
@@ -176,12 +182,21 @@ function EditTournamentPage() {
     
     const newPlayer: Player = { id: player.uid, name: player.name };
     form.setValue(editingRole, [...currentPlayers, newPlayer]);
+    
+    const uidField = editingRole === 'admins' ? 'adminUids' : 'scorerUids';
+    const currentUids = form.getValues(uidField) || [];
+    form.setValue(uidField, [...currentUids, player.uid]);
   };
   
   const handleRemoveRolePlayer = (role: 'admins' | 'scorers', playerId: string) => {
     const currentPlayers = form.getValues(role) || [];
     const updatedPlayers = currentPlayers.filter(p => p.id !== playerId);
     form.setValue(role, updatedPlayers);
+
+    const uidField = role === 'admins' ? 'adminUids' : 'scorerUids';
+    const currentUids = form.getValues(uidField) || [];
+    const updatedUids = currentUids.filter(uid => uid !== playerId);
+    form.setValue(uidField, updatedUids);
   };
 
 
