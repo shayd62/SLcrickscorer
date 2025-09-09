@@ -121,9 +121,12 @@ function EditTournamentPage() {
             const docSnap = await getDoc(tournamentDocRef);
             if (docSnap.exists()) {
                 const tournamentData = docSnap.data() as Tournament;
-                if (tournamentData.userId !== user.uid) {
-                    toast({ title: "Unauthorized", description: "You cannot edit this tournament.", variant: "destructive" });
-                    router.push('/tournaments');
+                const isOwner = tournamentData.userId === user.uid;
+                const isAdmin = tournamentData.adminUids?.includes(user.uid);
+
+                if (!isOwner && !isAdmin) {
+                    toast({ title: "Unauthorized", description: "You do not have permission to edit this tournament.", variant: "destructive" });
+                    router.push(`/tournaments/${tournamentId}`); // Redirect to view page instead
                     return;
                 }
                 form.reset({
