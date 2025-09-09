@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,7 +11,7 @@ import { ArrowLeft, CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Tournament, TournamentGroup, TournamentMatch } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -26,9 +26,12 @@ export default function AddMatchPage() {
     const [matchDate, setMatchDate] = useState<Date | undefined>();
     const [matchTime, setMatchTime] = useState<string>('');
     const [loading, setLoading] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
     
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { toast } = useToast();
     const tournamentId = params.tournamentId as string;
 
@@ -36,7 +39,28 @@ export default function AddMatchPage() {
         if (!tournamentId) return;
         const unsub = onSnapshot(doc(db, "tournaments", tournamentId), (doc) => {
             if (doc.exists()) {
-                setTournament({ ...doc.data() as Tournament, id: doc.id });
+                const tournamentData = { ...doc.data() as Tournament, id: doc.id };
+                setTournament(tournamentData);
+
+                const editMode = searchParams.get('edit') === 'true';
+                const matchId = searchParams.get('matchId');
+
+                if (editMode && matchId) {
+                    setIsEditing(true);
+                    setEditingMatchId(matchId);
+                    const matchToEdit = tournamentData.matches?.find(m => m.id === matchId);
+                    if (matchToEdit) {
+                        const group = tournamentData.groups?.find(g => g.name === matchToEdit.groupName) || null;
+                        setSelectedGroup(group);
+                        setSelectedTeams([matchToEdit.team1, matchToEdit.team2]);
+                        if (matchToEdit.date) {
+                            const date = new Date(matchToEdit.date);
+                            setMatchDate(date);
+                            setMatchTime(format(date, 'HH:mm'));
+                        }
+                    }
+                }
+
             } else {
                 toast({ title: "Error", description: "Tournament not found.", variant: "destructive" });
                 router.push('/tournaments');
@@ -44,7 +68,7 @@ export default function AddMatchPage() {
             setLoading(false);
         });
         return unsub;
-    }, [tournamentId, router, toast]);
+    }, [tournamentId, router, toast, searchParams]);
 
     useEffect(() => {
         const unsubscribe = fetchTournamentAndListen();
@@ -58,6 +82,10 @@ export default function AddMatchPage() {
     };
 
     const handleTeamSelect = (teamName: string) => {
+        if (isEditing) {
+            toast({ title: "Cannot change teams while editing."});
+            return;
+        }
         setSelectedTeams(prev => {
             if (prev.includes(teamName)) {
                 return prev.filter(t => t !== teamName);
@@ -92,26 +120,46 @@ export default function AddMatchPage() {
         const finalMatchDate = new Date(matchDate);
         finalMatchDate.setHours(hours, minutes);
 
-        const newMatch: TournamentMatch = {
-            id: `match-${selectedTeams[0].replace(/\s/g, '')}-vs-${selectedTeams[1].replace(/\s/g, '')}-${Date.now()}`,
-            groupName: selectedGroup!.name,
-            team1: selectedTeams[0],
-            team2: selectedTeams[1],
-            status: 'Upcoming',
-            date: finalMatchDate.toISOString(),
-            venue: tournament?.location || 'TBD',
-        };
-        
-        try {
-            const tournamentRef = doc(db, "tournaments", tournamentId);
-            await updateDoc(tournamentRef, {
-                matches: arrayUnion(newMatch)
+        if (isEditing && editingMatchId) {
+            // Update existing match
+            const updatedMatches = tournament?.matches?.map(m => {
+                if (m.id === editingMatchId) {
+                    return { ...m, date: finalMatchDate.toISOString() };
+                }
+                return m;
             });
-            toast({ title: "Match Scheduled!", description: "The new match has been added to the tournament." });
-            router.push(`/tournaments/${tournamentId}`);
-        } catch (e) {
-            console.error("Error scheduling match: ", e);
-            toast({ title: "Error", description: "Could not schedule the match.", variant: 'destructive' });
+            try {
+                const tournamentRef = doc(db, "tournaments", tournamentId);
+                await updateDoc(tournamentRef, { matches: updatedMatches });
+                toast({ title: "Match Rescheduled!", description: "The match date and time have been updated." });
+                router.push(`/tournaments/${tournamentId}`);
+            } catch (e) {
+                console.error("Error rescheduling match: ", e);
+                toast({ title: "Error", description: "Could not reschedule the match.", variant: 'destructive' });
+            }
+        } else {
+            // Add new match
+            const newMatch: TournamentMatch = {
+                id: `match-${selectedTeams[0].replace(/\s/g, '')}-vs-${selectedTeams[1].replace(/\s/g, '')}-${Date.now()}`,
+                groupName: selectedGroup!.name,
+                team1: selectedTeams[0],
+                team2: selectedTeams[1],
+                status: 'Upcoming',
+                date: finalMatchDate.toISOString(),
+                venue: tournament?.location || 'TBD',
+            };
+            
+            try {
+                const tournamentRef = doc(db, "tournaments", tournamentId);
+                await updateDoc(tournamentRef, {
+                    matches: arrayUnion(newMatch)
+                });
+                toast({ title: "Match Scheduled!", description: "The new match has been added to the tournament." });
+                router.push(`/tournaments/${tournamentId}`);
+            } catch (e) {
+                console.error("Error scheduling match: ", e);
+                toast({ title: "Error", description: "Could not schedule the match.", variant: 'destructive' });
+            }
         }
     }
 
@@ -124,7 +172,7 @@ export default function AddMatchPage() {
             <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
                 <Button variant="ghost" size="icon" onClick={() => router.back()}><ArrowLeft className="h-6 w-6" /></Button>
                 <div className='flex flex-col items-center text-center'>
-                    <h1 className="text-2xl font-bold">Add New Match</h1>
+                    <h1 className="text-2xl font-bold">{isEditing ? 'Reschedule Match' : 'Add New Match'}</h1>
                     <p className="text-sm text-muted-foreground">{tournament?.name}</p>
                 </div>
                 <div className="w-10"></div>
@@ -133,13 +181,13 @@ export default function AddMatchPage() {
             <main className="p-4 md:p-8 flex justify-center">
                 <Card className="w-full max-w-lg">
                     <CardHeader>
-                        <CardTitle>Schedule a New Match</CardTitle>
-                        <CardDescription>Choose a group, select two teams, and set the date and time.</CardDescription>
+                        <CardTitle>{isEditing ? 'Update Date and Time' : 'Schedule a New Match'}</CardTitle>
+                        <CardDescription>{isEditing ? 'Change the scheduled date and time for this match.' : 'Choose a group, select two teams, and set the date and time.'}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="space-y-2">
                             <Label>Select Group</Label>
-                            <Select onValueChange={handleGroupSelect} disabled={!tournament?.groups || tournament.groups.length === 0}>
+                            <Select onValueChange={handleGroupSelect} value={selectedGroup?.name} disabled={!tournament?.groups || tournament.groups.length === 0 || isEditing}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Choose a group" />
                                 </SelectTrigger>
@@ -164,6 +212,7 @@ export default function AddMatchPage() {
                                                 id={teamName}
                                                 checked={selectedTeams.includes(teamName)}
                                                 onCheckedChange={() => handleTeamSelect(teamName)}
+                                                disabled={isEditing}
                                             />
                                             <label htmlFor={teamName} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                                 {teamName}
@@ -194,7 +243,7 @@ export default function AddMatchPage() {
                         </div>
                         
                         <Button onClick={handleScheduleMatch} disabled={selectedTeams.length !== 2 || !matchDate || !matchTime} className="w-full">
-                            Schedule Match
+                           {isEditing ? 'Save Changes' : 'Schedule Match'}
                         </Button>
                     </CardContent>
                 </Card>
