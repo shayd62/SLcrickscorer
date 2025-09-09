@@ -16,7 +16,7 @@ import type { MatchConfig, MatchState, Innings, Player as PlayerType, Team, Tour
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
+import { doc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { PlayerSearchDialog } from './player-search-dialog';
@@ -157,12 +157,14 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
 
   useEffect(() => {
     const fetchTeams = async () => {
+        if (!user) return;
         try {
-            const querySnapshot = await getDocs(collection(db, "teams"));
+            const q = query(collection(db, "teams"), where("userId", "==", user.uid));
+            const querySnapshot = await getDocs(q);
             const teams = querySnapshot.docs.map(doc => ({...doc.data() as Omit<Team, 'id'>, id: doc.id}));
             setSavedTeams(teams);
         } catch (e) {
-            console.error("Failed to parse teams from firestore", e);
+            console.error("Failed to load teams from firestore", e);
         }
     };
     fetchTeams();
@@ -174,7 +176,7 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
         form.setValue('wideBall', settings.wideBall);
         form.setValue('ballsPerOver', settings.ballsPerOver);
     }
-  }, [form]);
+  }, [form, user]);
 
   const { fields: team1Players, append: appendT1, remove: removeT1 } = useFieldArray({ control: form.control, name: "team1.players" });
   const { fields: team2Players, append: appendT2, remove: removeT2 } = useFieldArray({ control: form.control, name: "team2.players" });
@@ -456,7 +458,7 @@ export default function MatchSetup({ onSetupComplete }: { onSetupComplete: (matc
                     {savedTeams.length > 0 && (
                       <Select onValueChange={(val) => handleTeamSelect(val, teamKey as 'team1' | 'team2')}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Or load a saved team" />
+                          <SelectValue placeholder="My Team" />
                         </SelectTrigger>
                         <SelectContent>
                           {savedTeams.map(team => <SelectItem key={team.name} value={team.name}>{team.name}</SelectItem>)}
