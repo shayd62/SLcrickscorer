@@ -11,7 +11,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, User, LogOut, Home as HomeIcon, Settings, Trophy, Users as UsersIcon, Trash2, Gamepad2, Radio, Calendar, Clock, ChevronRight } from "lucide-react";
+import { Plus, User, LogOut, Home as HomeIcon, Settings, Trophy, Users as UsersIcon, Trash2, Gamepad2, Radio, Calendar, Clock, ChevronRight, Search, Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -396,7 +396,10 @@ function HomePage() {
     return (
         <div className="min-h-screen bg-secondary/30 text-foreground flex flex-col items-center font-sans">
             <div className="w-full max-w-md mx-auto p-4 pb-24">
-                <header className="py-4 px-4 md:px-6 flex items-center justify-center text-center bg-[#2C3E50] text-white rounded-b-2xl">
+                <header className="py-4 px-4 md:px-6 flex items-center justify-between text-center bg-[#2C3E50] text-white rounded-b-2xl">
+                    <Button variant="ghost" size="icon">
+                        <Search className="h-6 w-6" />
+                    </Button>
                     <div className='flex flex-col items-center'>
                         <h1 className="text-2xl font-bold">
                         <span className="text-red-500">SL</span>
@@ -404,6 +407,9 @@ function HomePage() {
                         </h1>
                         <p className="text-sm text-gray-300">Professional Match Scoring</p>
                     </div>
+                     <Button variant="ghost" size="icon">
+                        <Bell className="h-6 w-6" />
+                    </Button>
                 </header>
                 
                 <main className="space-y-6 mt-4">
@@ -471,5 +477,6 @@ function HomePage() {
 export default withAuth(HomePage);
 
     
+
 
 
