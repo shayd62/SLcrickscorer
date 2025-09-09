@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -19,12 +18,13 @@ import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import type { Team, Tournament, Player } from '@/lib/types';
+import type { Team, Tournament, Player, UserProfile } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, getDoc, query, where, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, getDoc, query, where, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import Image from 'next/image';
+import { PlayerSearchDialog } from '@/components/player-search-dialog';
 
 const playerSchema = z.object({
   id: z.string(),
@@ -68,6 +68,8 @@ function EditTournamentPage() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [isPlayerSearchOpen, setPlayerSearchOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<'admins' | 'scorers' | null>(null);
 
   const form = useForm<TournamentFormValues>({
     resolver: zodResolver(tournamentSchema),
@@ -156,6 +158,27 @@ function EditTournamentPage() {
       }
   };
 
+  const handleOpenPlayerSearch = (role: 'admins' | 'scorers') => {
+    setEditingRole(role);
+    setPlayerSearchOpen(true);
+  };
+  
+  const handleAddRolePlayer = (player: UserProfile) => {
+    if (!editingRole) return;
+
+    const currentPlayers = form.getValues(editingRole) || [];
+    const isAlreadyAdded = currentPlayers.some(p => p.id === player.uid);
+
+    if(isAlreadyAdded) {
+      toast({ title: `Player already an ${editingRole.slice(0, -1)}`, variant: "destructive" });
+      return;
+    }
+    
+    const newPlayer: Player = { id: player.uid, name: player.name };
+    form.setValue(editingRole, [...currentPlayers, newPlayer]);
+  };
+
+
   const onSubmit = async (data: TournamentFormValues) => {
     if (!user) return;
 
@@ -205,6 +228,7 @@ function EditTournamentPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-foreground font-body">
+       <PlayerSearchDialog open={isPlayerSearchOpen} onOpenChange={setPlayerSearchOpen} onPlayerSelect={handleAddRolePlayer} />
       <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
         <Button variant="ghost" size="icon" onClick={() => router.push('/tournaments')}>
           <ArrowLeft className="h-6 w-6" />
@@ -372,7 +396,7 @@ function EditTournamentPage() {
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div
                     className="flex items-center justify-between px-4 py-3 rounded-lg border cursor-pointer hover:bg-secondary/50"
-                    onClick={() => { /* Open Admins Dialog */ }}
+                    onClick={() => handleOpenPlayerSearch('admins')}
                 >
                     <span className="font-medium text-base">Admins</span>
                     <div className="flex items-center gap-2 text-muted-foreground">
@@ -382,7 +406,7 @@ function EditTournamentPage() {
                 </div>
                 <div
                     className="flex items-center justify-between px-4 py-3 rounded-lg border cursor-pointer hover:bg-secondary/50"
-                    onClick={() => { /* Open Scorers Dialog */ }}
+                    onClick={() => handleOpenPlayerSearch('scorers')}
                 >
                     <span className="font-medium text-base">Scorers</span>
                     <div className="flex items-center gap-2 text-muted-foreground">
