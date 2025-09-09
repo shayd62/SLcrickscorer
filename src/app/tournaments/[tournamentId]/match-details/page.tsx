@@ -184,12 +184,11 @@ function MatchDetailsContent() {
     }, [tournament, team1Name, team2Name, form]);
 
     const fetchTeams = useCallback(async () => {
-        if (!user) return;
         try {
             const teamsRef = collection(db, 'teams');
             
             const fetchTeamData = async (name: string) => {
-                const q = query(teamsRef, where("name", "==", name), where("userId", "==", user.uid));
+                const q = query(teamsRef, where("name", "==", name));
                 const snapshot = await getDocs(q);
                 if (!snapshot.empty) {
                     return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Team;
@@ -213,7 +212,7 @@ function MatchDetailsContent() {
             console.error("Error fetching teams: ", error);
             toast({ title: "Error", description: "Could not load team data.", variant: "destructive" });
         }
-    }, [team1Name, team2Name, user, toast]);
+    }, [team1Name, team2Name, toast]);
 
     useEffect(() => {
         fetchTeams();
