@@ -168,6 +168,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error("A player with this phone number is already registered.");
         }
 
+        const adminPassword = prompt("To continue, please re-enter your password to confirm your identity.");
+        if (!adminPassword) {
+            throw new Error("Password not provided. Player creation cancelled.");
+        }
+
         const emailForAuth = email || `${phoneNumber}@cricmate.com`;
         const tempPassword = phoneNumber;
         
@@ -197,19 +202,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         // Re-authenticate the original admin user
-        const adminPassword = prompt("Please re-enter your password to continue.");
-        if (adminPassword) {
-            try {
-                await signInWithEmailAndPassword(auth, currentUserEmail, adminPassword);
-                console.log("Admin re-authenticated successfully.");
-            } catch (error) {
-                console.error("Admin re-authentication failed:", error);
-                router.push('/login'); // Force logout if re-auth fails
-                throw new Error("Session expired. Please log in again.");
-            }
-        } else {
-            await logout();
-            throw new Error("Password not provided. You have been logged out.");
+        try {
+            await signInWithEmailAndPassword(auth, currentUserEmail, adminPassword);
+            console.log("Admin re-authenticated successfully.");
+        } catch (error) {
+            console.error("Admin re-authentication failed:", error);
+            router.push('/login'); // Force logout if re-auth fails
+            throw new Error("Re-authentication failed. Please log in again.");
         }
 
         return newUserProfile;
