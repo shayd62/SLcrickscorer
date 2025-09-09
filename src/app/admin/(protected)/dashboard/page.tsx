@@ -8,37 +8,71 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-const kpiData = [
-    { title: 'Total Users', value: '1,250', icon: Users, change: '+12.5%' },
-    { title: 'Total Tournaments', value: '82', icon: Trophy, change: '+5' },
-    { title: 'Matches Played', value: '1,421', icon: Gamepad2, change: '+50 this week' },
-    { title: 'Active Today', value: '189', icon: UserCheck, change: '-3%' },
-];
-
-const chartData = [
-  { month: "January", desktop: 186 },
-  { month: "February", desktop: 305 },
-  { month: "March", desktop: 237 },
-  { month: "April", desktop: 73 },
-  { month: "May", desktop: 209 },
-  { month: "June", desktop: 214 },
-];
-
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "hsl(var(--primary))",
-  },
-};
-
-const recentApprovals = [
-    { id: 'T7', name: 'Summer Smash 2024', owner: 'john.doe@example.com', status: 'pending' },
-    { id: 'U5', name: 'Jane Smith', owner: 'jane.smith@example.com', status: 'approved' },
-    { id: 'T8', name: 'Winter Cup', owner: 'sam.wilson@example.com', status: 'pending' },
-];
+import { useEffect, useState } from "react";
+import { collection, onSnapshot, query, where, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import type { UserProfile, Tournament, MatchState } from "@/lib/types";
 
 export default function AdminDashboard() {
+  const [kpiData, setKpiData] = useState([
+    { title: 'Total Users', value: '0', icon: Users },
+    { title: 'Total Tournaments', value: '0', icon: Trophy },
+    { title: 'Matches Played', value: '0', icon: Gamepad2 },
+    { title: 'Active Today', value: '0', icon: UserCheck },
+  ]);
+  const [chartData, setChartData] = useState<{ month: string; desktop: number }[]>([]);
+  const [recentApprovals, setRecentApprovals] = useState<Tournament[]>([]);
+
+  useEffect(() => {
+    // Users KPI
+    const usersQuery = query(collection(db, "users"));
+    const usersUnsub = onSnapshot(usersQuery, (snapshot) => {
+      setKpiData(prev => prev.map(k => k.title === 'Total Users' ? { ...k, value: snapshot.size.toString() } : k));
+      
+      const monthlyData: { [key: string]: number } = {};
+      snapshot.docs.forEach(doc => {
+        const user = doc.data() as UserProfile;
+        // The auth user object has a `createdAt` but our UserProfile doesn't.
+        // We'll simulate for now. In a real app, you'd store a `createdAt` timestamp.
+        const month = new Date().toLocaleString('default', { month: 'long' });
+        if (!monthlyData[month]) monthlyData[month] = 0;
+        monthlyData[month]++;
+      });
+      
+      const formattedChartData = Object.entries(monthlyData).map(([month, count]) => ({ month, desktop: count }));
+      setChartData(formattedChartData);
+    });
+
+    // Tournaments KPI
+    const tournamentsQuery = query(collection(db, "tournaments"));
+    const tournamentsUnsub = onSnapshot(tournamentsQuery, (snapshot) => {
+      setKpiData(prev => prev.map(k => k.title === 'Total Tournaments' ? { ...k, value: snapshot.size.toString() } : k));
+      const pending = snapshot.docs
+        .map(doc => ({ ...doc.data() as Tournament, id: doc.id }))
+        .filter(t => t.status === 'pending');
+      setRecentApprovals(pending);
+    });
+    
+    // Matches KPI
+    const matchesQuery = query(collection(db, "matches"), where("matchOver", "==", true));
+    const matchesUnsub = onSnapshot(matchesQuery, (snapshot) => {
+      setKpiData(prev => prev.map(k => k.title === 'Matches Played' ? { ...k, value: snapshot.size.toString() } : k));
+    });
+
+    return () => {
+      usersUnsub();
+      tournamentsUnsub();
+      matchesUnsub();
+    };
+  }, []);
+
+  const chartConfig = {
+    desktop: {
+      label: "Users",
+      color: "hsl(var(--primary))",
+    },
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -55,7 +89,6 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{item.value}</div>
-              <p className="text-xs text-gray-500">{item.change}</p>
             </CardContent>
           </Card>
         ))}
@@ -65,7 +98,7 @@ export default function AdminDashboard() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>User Growth</CardTitle>
-            <CardDescription>Monthly active users trend.</CardDescription>
+            <CardDescription>Monthly new users trend.</CardDescription>
           </CardHeader>
           <CardContent className="h-80">
              <ChartContainer config={chartConfig}>

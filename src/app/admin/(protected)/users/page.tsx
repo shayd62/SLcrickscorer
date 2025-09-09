@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -16,21 +16,50 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-const users = [
-  { id: 'u1', name: 'John Doe', email: 'john.doe@example.com', roles: ['scorer', 'viewer'], status: 'active', lastLogin: '2 hours ago' },
-  { id: 'u2', name: 'Jane Smith', email: 'jane.smith@example.com', roles: ['org_admin'], status: 'active', lastLogin: '1 day ago' },
-  { id: 'u3', name: 'Sam Wilson', email: 'sam.wilson@example.com', roles: ['viewer'], status: 'suspended', lastLogin: '1 week ago' },
-  { id: 'u4', name: 'Alice Johnson', email: 'alice.j@example.com', roles: ['scorer'], status: 'active', lastLogin: '5 minutes ago' },
-];
+import { collection, onSnapshot, query } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { UserProfile } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const q = query(collection(db, "users"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const usersData = snapshot.docs.map(doc => ({ ...doc.data() as UserProfile, id: doc.id }));
+        setUsers(usersData);
+        setLoading(false);
+    }, (error) => {
+        console.error("Error fetching users: ", error);
+        toast({ title: "Error", description: "Failed to fetch users.", variant: "destructive" });
+        setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [toast]);
 
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>User Management</CardTitle>
+          <CardDescription>View, manage, and assign roles to users.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p>Loading users...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -59,30 +88,26 @@ export default function AdminUsersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>User</TableHead>
-              <TableHead>Roles</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Last Login</TableHead>
+              <TableHead>Phone Number</TableHead>
+              <TableHead>Role</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredUsers.map((user) => (
-              <TableRow key={user.id}>
+              <TableRow key={user.uid}>
                 <TableCell>
                   <div className="font-medium">{user.name}</div>
-                  <div className="text-sm text-gray-500">{user.email}</div>
+                  <div className="text-sm text-gray-500">{user.email || 'No email'}</div>
                 </TableCell>
                 <TableCell>
-                  <div className="flex gap-1">
-                    {user.roles.map(role => <Badge key={role} variant="secondary">{role}</Badge>)}
-                  </div>
+                  <div className="text-sm text-gray-500">{user.phoneNumber}</div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={user.status === 'active' ? 'default' : 'destructive'}>
-                    {user.status}
+                  <Badge variant={user.role === 'admin' ? 'destructive' : 'secondary'}>
+                    {user.role || 'user'}
                   </Badge>
                 </TableCell>
-                <TableCell>{user.lastLogin}</TableCell>
                 <TableCell className="text-right">
                    <DropdownMenu>
                       <DropdownMenuTrigger asChild>
