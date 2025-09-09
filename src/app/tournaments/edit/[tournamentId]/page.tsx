@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -41,7 +40,7 @@ const tournamentSchema = z.object({
   venue: z.string().optional(),
   ballType: z.string().optional(),
   pitchType: z.string().optional(),
-  tournamentFormat: z.enum(['Round Robin', 'Knockout', 'League']).optional(),
+  tournamentFormat: z.enum(['ODI', 'T20', 'Test', '100 Ball', 'Sixes a Side', 'Limited Overs', 'Custom']).optional(),
   logoUrl: z.string().url().optional().or(z.literal('')),
   coverPhotoUrl: z.string().url().optional().or(z.literal('')),
   numberOfTeams: z.string({ required_error: "Please select the number of teams." }),
@@ -307,30 +306,32 @@ function EditTournamentPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Controller
+                      control={form.control}
+                      name="tournamentFormat"
+                      render={({ field }) => (
+                          <div className="space-y-2">
+                          <Label>Tournament Match Format</Label>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                              <SelectTrigger><SelectValue placeholder="Select format" /></SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="ODI">ODI</SelectItem>
+                                  <SelectItem value="T20">T20</SelectItem>
+                                  <SelectItem value="Test">Test</SelectItem>
+                                  <SelectItem value="100 Ball">100 Ball</SelectItem>
+                                  <SelectItem value="Sixes a Side">Sixes a Side</SelectItem>
+                                  <SelectItem value="Limited Overs">Limited Overs</SelectItem>
+                                  <SelectItem value="Custom">Custom</SelectItem>
+                              </SelectContent>
+                          </Select>
+                          </div>
+                      )}
+                  />
                  <div className="space-y-2">
                     <Label htmlFor="overs">Overs per Innings</Label>
                     <Input id="overs" type="number" {...form.register('oversPerInnings', { valueAsNumber: true })} />
                     {form.formState.errors.oversPerInnings && <p className="text-destructive text-sm">{form.formState.errors.oversPerInnings.message}</p>}
                 </div>
-                 <Controller
-                    control={form.control}
-                    name="tournamentFormat"
-                    render={({ field }) => (
-                        <div className="space-y-2">
-                        <Label>Tournament Format</Label>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger>
-                            <SelectValue placeholder="Select format" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            <SelectItem value="League">League</SelectItem>
-                            <SelectItem value="Knockout">Knockout</SelectItem>
-                            <SelectItem value="Round Robin">Round Robin</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        </div>
-                    )}
-                />
               </div>
 
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

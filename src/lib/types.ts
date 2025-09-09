@@ -80,7 +80,7 @@ export interface Tournament {
   venue?: string;
   ballType?: string;
   pitchType?: string;
-  tournamentFormat?: 'Round Robin' | 'Knockout' | 'League';
+  tournamentFormat?: 'ODI' | 'T20' | 'Test' | '100 Ball' | 'Sixes a Side' | 'Limited Overs' | 'Custom';
   userId?: string;
   groups?: TournamentGroup[];
   matches?: TournamentMatch[];
