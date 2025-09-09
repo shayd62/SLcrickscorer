@@ -1,5 +1,4 @@
 
-
 'use client';
 import withAuth from "@/components/with-auth";
 import { useAuth } from "@/contexts/auth-context";
@@ -29,6 +28,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { SettingsSheet } from "@/components/settings-sheet";
+import { GlobalSearchDialog } from "@/components/global-search-dialog";
+
 
 const formatOvers = (balls: number, ballsPerOver: number = 6) => {
     if (balls === 0) return "0.0";
@@ -313,6 +314,7 @@ function HomePage() {
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const { toast } = useToast();
+    const [isSearchOpen, setSearchOpen] = useState(false);
 
     useEffect(() => {
         setLoading(true);
@@ -395,9 +397,10 @@ function HomePage() {
   
     return (
         <div className="min-h-screen bg-secondary/30 text-foreground flex flex-col items-center font-sans">
+            <GlobalSearchDialog open={isSearchOpen} onOpenChange={setSearchOpen} />
             <div className="w-full max-w-md mx-auto p-4 pb-24">
                 <header className="py-4 px-4 md:px-6 flex items-center justify-between text-center bg-[#2C3E50] text-white rounded-b-2xl">
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)}>
                         <Search className="h-6 w-6" />
                     </Button>
                     <div className='flex flex-col items-center'>
@@ -477,6 +480,7 @@ function HomePage() {
 export default withAuth(HomePage);
 
     
+
 
 
 

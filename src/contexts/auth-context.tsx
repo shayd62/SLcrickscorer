@@ -4,10 +4,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential, sendPasswordResetEmail, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { auth, db, storage, app as mainApp } from '@/lib/firebase';
-import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, deleteDoc, writeBatch, or } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useRouter } from 'next/navigation';
-import type { UserProfile, Team } from '@/lib/types';
+import type { UserProfile, Team, MatchState, Tournament } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { initializeApp, getApp, deleteApp } from 'firebase/app';
 import { getAuth as getAuthInstance } from 'firebase/auth';
@@ -30,6 +30,7 @@ interface AuthContextType {
   uploadTournamentImage: (tournamentId: string, file: File, type: 'logo' | 'cover') => Promise<string>;
   searchUsers: (searchTerm: string) => Promise<UserProfile[]>;
   searchTeams: (searchTerm: string) => Promise<Team[]>;
+  globalSearch: (searchTerm: string) => Promise<{ players: UserProfile[], matches: MatchState[], tournaments: Tournament[] }>;
   resetDatabase: () => Promise<void>;
 }
 
@@ -313,6 +314,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const globalSearch = async (searchTerm: string): Promise<{ players: UserProfile[], matches: MatchState[], tournaments: Tournament[] }> => {
+    const st = searchTerm.toLowerCase();
+    
+    // Players
+    const players = await searchUsers(searchTerm);
+
+    // Matches - very basic search on team names
+    const matchesRef = collection(db, "matches");
+    const matchQuery = query(matchesRef, or(
+        where('config.team1.name', '>=', st), where('config.team1.name', '<=', st + '\uf8ff'),
+        where('config.team2.name', '>=', st), where('config.team2.name', '<=', st + '\uf8ff')
+    ));
+    const matchSnap = await getDocs(matchesRef); // A more efficient way would be Algolia/Elasticsearch
+    const matches = matchSnap.docs
+        .map(doc => ({id: doc.id, ...doc.data()}) as MatchState)
+        .filter(m => m.config.team1.name.toLowerCase().includes(st) || m.config.team2.name.toLowerCase().includes(st));
+
+
+    // Tournaments
+    const tourneyRef = collection(db, "tournaments");
+    const tourneyQuery = query(tourneyRef, where('name', '>=', searchTerm), where('name', '<=', searchTerm + '\uf8ff'));
+    const tourneySnap = await getDocs(tourneyQuery);
+    const tournaments = tourneySnap.docs.map(doc => ({id: doc.id, ...doc.data()}) as Tournament);
+
+    return { players, matches, tournaments };
+  };
+
   const value = {
     user,
     userProfile,
@@ -330,6 +358,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     uploadTournamentImage,
     searchUsers,
     searchTeams,
+    globalSearch,
     resetDatabase,
   };
 
