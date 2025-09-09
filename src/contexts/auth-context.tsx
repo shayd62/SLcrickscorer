@@ -3,12 +3,15 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential, sendPasswordResetEmail, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
-import { auth, db, storage } from '@/lib/firebase';
+import { auth, db, storage, app as mainApp } from '@/lib/firebase';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useRouter } from 'next/navigation';
 import type { UserProfile, Team } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { initializeApp, getApp, deleteApp } from 'firebase/app';
+import { getAuth as getAuthInstance } from 'firebase/auth';
+
 
 interface AuthContextType {
   user: User | null;
@@ -153,62 +156,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const registerNewPlayer = async (name: string, phoneNumber: string, email?: string): Promise<UserProfile | null> => {
-      const adminUser = auth.currentUser;
-      if (!adminUser) {
-          throw new Error("You must be logged in to register a new player.");
-      }
+    const registerNewPlayer = async (name: string, phoneNumber: string, email?: string): Promise<UserProfile | null> => {
+    if (!user) {
+      throw new Error("You must be logged in to register a new player.");
+    }
 
-      const userDocRef = doc(db, 'users', phoneNumber);
-      const docSnap = await getDoc(userDocRef);
+    const userDocRef = doc(db, 'users', phoneNumber);
+    const docSnap = await getDoc(userDocRef);
+    if (docSnap.exists()) {
+      throw new Error("A player with this phone number is already registered.");
+    }
 
-      if (docSnap.exists()) {
-          throw new Error("A player with this phone number is already registered.");
-      }
+    // Initialize a temporary, secondary Firebase app for user creation
+    const tempAppName = `temp-user-creation-${Date.now()}`;
+    const tempApp = initializeApp(mainApp.options, tempAppName);
+    const tempAuth = getAuthInstance(tempApp);
 
+    try {
       const emailForAuth = email || `${phoneNumber}@cricmate.com`;
       const tempPassword = phoneNumber;
 
-      try {
-          const newUserCredential = await createUserWithEmailAndPassword(auth, emailForAuth, tempPassword);
-          const newAuthUser = newUserCredential.user;
+      const newUserCredential = await createUserWithEmailAndPassword(tempAuth, emailForAuth, tempPassword);
+      const newAuthUser = newUserCredential.user;
 
-          const profileData: Omit<UserProfile, 'id' | 'uid'> = {
-              name: name,
-              phoneNumber: phoneNumber,
-              email: email,
-              gender: 'Other',
-              isPlaceholder: false,
-          };
+      // Save the new user profile with their actual UID
+      const profileData: Omit<UserProfile, 'id'> = {
+        uid: newAuthUser.uid,
+        name: name,
+        phoneNumber: phoneNumber,
+        email: email,
+        gender: 'Other',
+        isPlaceholder: false,
+      };
+      await setDoc(userDocRef, profileData);
 
-          await setDoc(userDocRef, {
-              ...profileData,
-              uid: newAuthUser.uid,
-          });
+      // Sign out the new user from the temporary app instance to clean up
+      await signOut(tempAuth);
 
-          toast({
-              title: 'Player Created & Session Reset',
-              description: `${name} has been registered. You have been logged out and will be redirected to the login page.`,
-          });
+      toast({
+        title: 'Player Created!',
+        description: `${name} has been registered and can now log in with their phone number as password.`,
+      });
+      
+      return { id: phoneNumber, ...profileData };
 
-          await signOut(auth);
-          router.push('/login');
-
-          const newUserProfile: UserProfile = {
-              id: phoneNumber,
-              uid: newAuthUser.uid,
-              ...profileData,
-          };
-
-          return newUserProfile;
-      } catch (error: any) {
-          console.error("Error creating new player:", error);
-          if (auth.currentUser?.uid !== adminUser.uid) {
-              await signOut(auth);
-              router.push('/login');
-          }
-          throw new Error(error.message || "Failed to create new player.");
-      }
+    } catch (error: any) {
+      console.error("Error creating new player:", error);
+      throw new Error(error.message || "Failed to create new player.");
+    } finally {
+      // Clean up the temporary Firebase app instance
+      await deleteApp(tempApp);
+    }
   };
   
   const updateUserProfile = async (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => {
