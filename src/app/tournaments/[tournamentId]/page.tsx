@@ -103,7 +103,7 @@ function PastMatchCard({ match }: { match: TournamentMatch }) {
     );
 }
 
-function GroupManagement({ tournament, onUpdate }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void> }) {
+function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void>, isOwner: boolean }) {
   const [newGroupName, setNewGroupName] = useState('');
   const { toast } = useToast();
 
@@ -139,7 +139,8 @@ function GroupManagement({ tournament, onUpdate }: { tournament: Tournament, onU
   
   return (
     <div className="space-y-6">
-       <Card>
+       {isOwner && (
+        <Card>
           <CardHeader>
             <CardTitle>Create & Manage Groups</CardTitle>
           </CardHeader>
@@ -148,32 +149,35 @@ function GroupManagement({ tournament, onUpdate }: { tournament: Tournament, onU
             <Button onClick={handleAddGroup}><Plus className="mr-2 h-4 w-4" /> Add Group</Button>
           </CardContent>
         </Card>
+       )}
       <div className="grid md:grid-cols-2 gap-8">
         {(tournament.groups || []).length > 0 ? (tournament.groups || []).map(group => (
           <Card key={group.name}>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>{group.name}</CardTitle>
-              <AlertDialog>
-                  <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-5 w-5 text-destructive" /></Button></AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will delete Group {group.name} and all its fixtures. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveGroup(group.name)}>Delete</AlertDialogAction></AlertDialogFooter>
-                  </AlertDialogContent>
-              </AlertDialog>
+              {isOwner && (
+                <AlertDialog>
+                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-5 w-5 text-destructive" /></Button></AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will delete Group {group.name} and all its fixtures. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                      <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveGroup(group.name)}>Delete</AlertDialogAction></AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+              )}
             </CardHeader>
             <CardContent>
               <h4 className="font-semibold mb-2">Assign Teams</h4>
               <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                 {tournament.participatingTeams.map(teamName => (
                   <div key={teamName} className="flex items-center space-x-2">
-                    <Checkbox id={`${group.name}-${teamName}`} checked={group.teams.includes(teamName)} onCheckedChange={(checked) => handleTeamSelection(group.name, teamName, !!checked)} disabled={!group.teams.includes(teamName) && assignedTeams.includes(teamName)} />
+                    <Checkbox id={`${group.name}-${teamName}`} checked={group.teams.includes(teamName)} onCheckedChange={(checked) => isOwner && handleTeamSelection(group.name, teamName, !!checked)} disabled={!group.teams.includes(teamName) && assignedTeams.includes(teamName)} />
                     <label htmlFor={`${group.name}-${teamName}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{teamName}</label>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
-        )) : <p className="text-muted-foreground text-center md:col-span-2">No groups created yet. Add a group to start assigning teams.</p>}
+        )) : <p className="text-muted-foreground text-center md:col-span-2">No groups created yet. {isOwner && "Add a group to start assigning teams."}</p>}
       </div>
        {unassignedTeams.length > 0 && (
           <Card className="mt-8">
@@ -235,7 +239,7 @@ function PointsTable({ teams, title = "Points Table" }: { teams: TournamentPoint
     );
 }
 
-function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void> }) {
+function ParticipatingTeamsCard({ tournament, onUpdate, isOwner }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void>, isOwner: boolean }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState<Team[]>([]);
     const { toast } = useToast();
@@ -343,27 +347,29 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="space-y-2">
-                    <div className="flex gap-2">
-                        <Input 
-                            placeholder="Search to add a team..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-                        />
-                        <Button onClick={handleSearch}><Search className="h-4 w-4" /></Button>
-                    </div>
-                    {searchResults.length > 0 && (
-                        <div className="border rounded-md max-h-40 overflow-y-auto">
-                            {searchResults.map(team => (
-                                <div key={team.id} className="p-2 flex justify-between items-center hover:bg-secondary">
-                                    <span>{team.name}</span>
-                                    <Button size="sm" onClick={() => handleAddTeam(team)}>Add</Button>
-                                </div>
-                            ))}
+                {isOwner && (
+                    <div className="space-y-2">
+                        <div className="flex gap-2">
+                            <Input 
+                                placeholder="Search to add a team..." 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                            />
+                            <Button onClick={handleSearch}><Search className="h-4 w-4" /></Button>
                         </div>
-                    )}
-                </div>
+                        {searchResults.length > 0 && (
+                            <div className="border rounded-md max-h-40 overflow-y-auto">
+                                {searchResults.map(team => (
+                                    <div key={team.id} className="p-2 flex justify-between items-center hover:bg-secondary">
+                                        <span>{team.name}</span>
+                                        <Button size="sm" onClick={() => handleAddTeam(team)}>Add</Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="mt-4 border-t pt-4">
                     {participatingTeams.length > 0 ? (
@@ -374,28 +380,32 @@ function ParticipatingTeamsCard({ tournament, onUpdate }: { tournament: Tourname
                                         <AccordionTrigger className="flex-grow">
                                             {team.name}
                                         </AccordionTrigger>
-                                        <AlertDialog onOpenChange={(e) => e.stopPropagation()}>
-                                            <AlertDialogTrigger asChild>
-                                                <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                                <AlertDialogHeader><AlertDialogTitle>Remove Team?</AlertDialogTitle><AlertDialogDescription>This will remove "{team.name}" from the tournament. Are you sure?</AlertDialogDescription></AlertDialogHeader>
-                                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveTeam(team.name)}>Remove</AlertDialogAction></AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
+                                        {isOwner && (
+                                            <AlertDialog onOpenChange={(e) => e.stopPropagation()}>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader><AlertDialogTitle>Remove Team?</AlertDialogTitle><AlertDialogDescription>This will remove "{team.name}" from the tournament. Are you sure?</AlertDialogDescription></AlertDialogHeader>
+                                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveTeam(team.name)}>Remove</AlertDialogAction></AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        )}
                                     </div>
                                     <AccordionContent>
                                         <ul className="space-y-1 text-sm pl-4">
                                             {team.players.map(player => (
                                                 <li key={player.id} className="flex justify-between items-center">
                                                     <span>{player.name}</span>
-                                                    <Button variant="ghost" size="icon" onClick={() => handleRemovePlayerFromTeam(team, player.id)}><Trash2 className="h-3 w-3 text-destructive/70" /></Button>
+                                                    {isOwner && <Button variant="ghost" size="icon" onClick={() => handleRemovePlayerFromTeam(team, player.id)}><Trash2 className="h-3 w-3 text-destructive/70" /></Button>}
                                                 </li>
                                             ))}
                                         </ul>
-                                        <Button variant="outline" size="sm" className="mt-2 w-full" onClick={() => handleOpenPlayerSearch(team)}>
-                                            <UserPlus className="mr-2 h-4 w-4" /> Add Player
-                                        </Button>
+                                        {isOwner && (
+                                            <Button variant="outline" size="sm" className="mt-2 w-full" onClick={() => handleOpenPlayerSearch(team)}>
+                                                <UserPlus className="mr-2 h-4 w-4" /> Add Player
+                                            </Button>
+                                        )}
                                     </AccordionContent>
                                 </AccordionItem>
                             ))}
@@ -613,7 +623,10 @@ function TournamentDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const { toast } = useToast();
+    const { user } = useAuth();
     const tournamentId = params.tournamentId as string;
+
+    const isOwner = tournament?.userId === user?.uid;
 
     const liveMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Live'), [tournament?.matches]);
     const upcomingMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Upcoming'), [tournament?.matches]);
@@ -865,23 +878,25 @@ function TournamentDetailsPage() {
             <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
                 <Button variant="ghost" size="icon" onClick={() => router.push('/tournaments')}><ArrowLeft className="h-6 w-6" /></Button>
                 <div className='flex flex-col items-center text-center'><h1 className="text-2xl font-bold truncate max-w-sm">{tournament.name}</h1><p className="text-sm text-muted-foreground">Tournament Dashboard</p></div>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                            <Settings className="h-6 w-6" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => router.push(`/tournaments/edit/${tournament.id}`)}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            <span>Edit Tournament</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => router.push(`/tournaments/${tournament.id}/advanced-settings`)}>
-                            <Settings className="mr-2 h-4 w-4" />
-                            <span>Advanced Settings</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                {isOwner ? (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                                <Settings className="h-6 w-6" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => router.push(`/tournaments/edit/${tournament.id}`)}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                <span>Edit Tournament</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/tournaments/${tournament.id}/advanced-settings`)}>
+                                <Settings className="mr-2 h-4 w-4" />
+                                <span>Advanced Settings</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                ) : <div className="w-10"></div>}
             </header>
 
             <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 relative">
@@ -917,8 +932,8 @@ function TournamentDetailsPage() {
                     
                     <TabsContent value="teams" className="mt-6">
                       <div className="grid md:grid-cols-2 gap-8">
-                          <ParticipatingTeamsCard tournament={tournament} onUpdate={handleUpdateTournament} />
-                          <GroupManagement tournament={tournament} onUpdate={handleUpdateTournament} />
+                          <ParticipatingTeamsCard tournament={tournament} onUpdate={handleUpdateTournament} isOwner={isOwner} />
+                          <GroupManagement tournament={tournament} onUpdate={handleUpdateTournament} isOwner={isOwner} />
                       </div>
                     </TabsContent>
                     
@@ -940,41 +955,43 @@ function TournamentDetailsPage() {
                                             <p className="font-bold">{match.team1} vs {match.team2}</p>
                                             <p className="text-sm text-muted-foreground">{new Date(match.date!).toLocaleString()} at {match.venue}</p>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <Link href={`/tournaments/${tournamentId}/match-details?team1Name=${encodeURIComponent(match.team1)}&team2Name=${encodeURIComponent(match.team2)}&date=${encodeURIComponent(match.date || '')}&venue=${encodeURIComponent(match.venue || '')}`}>
-                                              <Button>Start Match</Button>
-                                            </Link>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="outline" size="icon"><Pencil className="h-4 w-4"/></Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent>
-                                                    <DropdownMenuItem onSelect={() => router.push(`/tournaments/${tournamentId}/add-match?group=${match.groupName}&team1=${match.team1}&team2=${match.team2}&edit=true&matchId=${match.id}`)}>
-                                                        Rescheduling Match
-                                                    </DropdownMenuItem>
-                                                     <DropdownMenuItem onSelect={() => router.push(`/tournaments/${tournamentId}/add-match?group=${match.groupName}&team1=${match.team1}&team2=${match.team2}&edit=true&matchId=${match.id}`)}>
-                                                        Edit Match Details
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4"/></Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Delete Match?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                          This will permanently delete the match between {match.team1} and {match.team2}. This action cannot be undone.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteMatch(match.id)}>Delete</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </div>
+                                        {isOwner && (
+                                            <div className="flex items-center gap-2">
+                                                <Link href={`/tournaments/${tournamentId}/match-details?team1Name=${encodeURIComponent(match.team1)}&team2Name=${encodeURIComponent(match.team2)}&date=${encodeURIComponent(match.date || '')}&venue=${encodeURIComponent(match.venue || '')}`}>
+                                                <Button>Start Match</Button>
+                                                </Link>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="outline" size="icon"><Pencil className="h-4 w-4"/></Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent>
+                                                        <DropdownMenuItem onSelect={() => router.push(`/tournaments/${tournamentId}/add-match?group=${match.groupName}&team1=${match.team1}&team2=${match.team2}&edit=true&matchId=${match.id}`)}>
+                                                            Rescheduling Match
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onSelect={() => router.push(`/tournaments/${tournamentId}/add-match?group=${match.groupName}&team1=${match.team1}&team2=${match.team2}&edit=true&matchId=${match.id}`)}>
+                                                            Edit Match Details
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4"/></Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Delete Match?</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                            This will permanently delete the match between {match.team1} and {match.team2}. This action cannot be undone.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handleDeleteMatch(match.id)}>Delete</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </div>
+                                        )}
                                     </CardContent>
                                 </Card>
                             )) : <p className="text-muted-foreground text-center py-8">No upcoming matches scheduled.</p>}
@@ -1026,11 +1043,13 @@ function TournamentDetailsPage() {
                        )}
                     </TabsContent>
                 </Tabs>
-                <Link href={`/tournaments/${tournamentId}/add-match`} passHref>
-                    <Button className="fixed bottom-8 right-8 rounded-full h-16 w-16 shadow-lg">
-                        <Plus className="h-8 w-8" />
-                    </Button>
-                </Link>
+                {isOwner && (
+                    <Link href={`/tournaments/${tournamentId}/add-match`} passHref>
+                        <Button className="fixed bottom-8 right-8 rounded-full h-16 w-16 shadow-lg">
+                            <Plus className="h-8 w-8" />
+                        </Button>
+                    </Link>
+                )}
             </main>
         </div>
     );
@@ -1039,6 +1058,7 @@ function TournamentDetailsPage() {
 export default TournamentDetailsPage;
 
     
+
 
 
 
