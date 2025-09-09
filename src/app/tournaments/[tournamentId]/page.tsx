@@ -944,9 +944,19 @@ function TournamentDetailsPage() {
                                             <Link href={`/tournaments/${tournamentId}/match-details?team1Name=${encodeURIComponent(match.team1)}&team2Name=${encodeURIComponent(match.team2)}&date=${encodeURIComponent(match.date || '')}&venue=${encodeURIComponent(match.venue || '')}`}>
                                               <Button>Start Match</Button>
                                             </Link>
-                                            <Link href={`/tournaments/${tournamentId}/add-match?group=${match.groupName}&team1=${match.team1}&team2=${match.team2}&edit=true&matchId=${match.id}`}>
-                                                <Button variant="outline" size="icon"><Pencil className="h-4 w-4"/></Button>
-                                            </Link>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="outline" size="icon"><Pencil className="h-4 w-4"/></Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    <DropdownMenuItem onSelect={() => router.push(`/tournaments/${tournamentId}/add-match?group=${match.groupName}&team1=${match.team1}&team2=${match.team2}&edit=true&matchId=${match.id}`)}>
+                                                        Rescheduling Match
+                                                    </DropdownMenuItem>
+                                                     <DropdownMenuItem onSelect={() => router.push(`/tournaments/${tournamentId}/add-match?group=${match.groupName}&team1=${match.team1}&team2=${match.team2}&edit=true&matchId=${match.id}`)}>
+                                                        Edit Match Details
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
                                                     <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4"/></Button>
@@ -1029,5 +1039,6 @@ function TournamentDetailsPage() {
 export default TournamentDetailsPage;
 
     
+
 
 
