@@ -166,7 +166,7 @@ export interface MatchConfig {
     bowlerId: string;
   };
   matchType?: string;
-  matchFormat?: string;
+  matchFormat?: 'Limited Overs' | 'Test Match' | 'The Hundred' | 'T20' | 'ODI'
   tournamentId?: string;
   tournamentStage?: string;
   venue?: string;
