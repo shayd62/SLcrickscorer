@@ -314,7 +314,7 @@ function ParticipatingTeamsCard({ tournament, onUpdate, isOwner }: { tournament:
         const newPlayer: Player = { id: player.uid, name: player.name };
         try {
             const teamRef = doc(db, 'teams', editingTeam.id);
-            await updateDoc(teamRef, { players: arrayUnion(newPlayer) });
+            await updateDoc(teamRef, { players: arrayUnion({id: newPlayer.id, name: newPlayer.name}) });
             toast({ title: "Player Added!", description: `${newPlayer.name} has been added to ${editingTeam.name}.` });
             // Refresh team data locally
             setParticipatingTeams(prev => prev.map(t => t.id === editingTeam.id ? { ...t, players: [...t.players, newPlayer] } : t));
@@ -626,7 +626,7 @@ function TournamentDetailsPage() {
     const { user } = useAuth();
     const tournamentId = params.tournamentId as string;
 
-    const isOwner = tournament?.userId === user?.uid;
+    const isOwnerOrAdmin = tournament?.userId === user?.uid || tournament?.adminUids?.includes(user?.uid || '');
 
     const liveMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Live'), [tournament?.matches]);
     const upcomingMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Upcoming'), [tournament?.matches]);
@@ -878,7 +878,7 @@ function TournamentDetailsPage() {
             <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
                 <Button variant="ghost" size="icon" onClick={() => router.push('/tournaments')}><ArrowLeft className="h-6 w-6" /></Button>
                 <div className='flex flex-col items-center text-center'><h1 className="text-2xl font-bold truncate max-w-sm">{tournament.name}</h1><p className="text-sm text-muted-foreground">Tournament Dashboard</p></div>
-                {isOwner ? (
+                {isOwnerOrAdmin ? (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">
@@ -932,8 +932,8 @@ function TournamentDetailsPage() {
                     
                     <TabsContent value="teams" className="mt-6">
                       <div className="grid md:grid-cols-2 gap-8">
-                          <ParticipatingTeamsCard tournament={tournament} onUpdate={handleUpdateTournament} isOwner={isOwner} />
-                          <GroupManagement tournament={tournament} onUpdate={handleUpdateTournament} isOwner={isOwner} />
+                          <ParticipatingTeamsCard tournament={tournament} onUpdate={handleUpdateTournament} isOwner={isOwnerOrAdmin} />
+                          <GroupManagement tournament={tournament} onUpdate={handleUpdateTournament} isOwner={isOwnerOrAdmin} />
                       </div>
                     </TabsContent>
                     
@@ -955,7 +955,7 @@ function TournamentDetailsPage() {
                                             <p className="font-bold">{match.team1} vs {match.team2}</p>
                                             <p className="text-sm text-muted-foreground">{new Date(match.date!).toLocaleString()} at {match.venue}</p>
                                         </div>
-                                        {isOwner && (
+                                        {isOwnerOrAdmin && (
                                             <div className="flex items-center gap-2">
                                                 <Link href={`/tournaments/${tournamentId}/match-details?team1Name=${encodeURIComponent(match.team1)}&team2Name=${encodeURIComponent(match.team2)}&date=${encodeURIComponent(match.date || '')}&venue=${encodeURIComponent(match.venue || '')}`}>
                                                 <Button>Start Match</Button>
@@ -1043,7 +1043,7 @@ function TournamentDetailsPage() {
                        )}
                     </TabsContent>
                 </Tabs>
-                {isOwner && (
+                {isOwnerOrAdmin && (
                     <Link href={`/tournaments/${tournamentId}/add-match`} passHref>
                         <Button className="fixed bottom-8 right-8 rounded-full h-16 w-16 shadow-lg">
                             <Plus className="h-8 w-8" />
@@ -1058,6 +1058,7 @@ function TournamentDetailsPage() {
 export default TournamentDetailsPage;
 
     
+
 
 
 
