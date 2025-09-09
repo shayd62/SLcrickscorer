@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import type { Team } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Trash2, Users, ArrowLeft, Plus, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,7 @@ import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, deleteDoc, doc, query, where } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
+import Image from 'next/image';
 
 function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -101,12 +102,16 @@ function TeamsPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {teams.map((team) => (
               <Card key={team.id} className="flex flex-col">
-                <CardHeader>
-                  <CardTitle className="flex justify-between items-center">
-                    <Link href={`/teams/edit/${team.id}`}>
-                      <span className="hover:underline">{team.name}</span>
-                    </Link>
-                    <div className="flex items-center gap-1">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start">
+                     <Link href={`/teams/edit/${team.id}`} className="flex items-center gap-3">
+                        <Image src={team.logoUrl || '/placeholder-team.png'} alt={team.name} width={48} height={48} className="rounded-full border" />
+                        <div>
+                          <p className="font-semibold hover:underline">{team.name}</p>
+                          <p className="text-xs text-muted-foreground">{team.players.length} Players</p>
+                        </div>
+                     </Link>
+                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="icon" onClick={() => handleEditTeam(team.id)}>
                         <Pencil className="h-5 w-5 text-muted-foreground" />
                       </Button>
@@ -130,8 +135,8 @@ function TeamsPage() {
                         </AlertDialogContent>
                       </AlertDialog>
                     </div>
-                  </CardTitle>
-                </CardHeader>
+                  </div>
+                </CardContent>
               </Card>
             ))}
           </div>
