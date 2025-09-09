@@ -4,7 +4,7 @@
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, User, Mail, Phone, MapPin, Edit, Shield, GanttChartSquare, Trash2, BarChart } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, MapPin, Edit, Shield, GanttChartSquare, Trash2, BarChart2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import withAuth from '@/components/with-auth';
 import Image from 'next/image';
