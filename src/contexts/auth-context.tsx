@@ -242,28 +242,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const searchUsers = async (searchTerm: string): Promise<UserProfile[]> => {
+      const lowercasedTerm = searchTerm.toLowerCase();
       const usersRef = collection(db, 'users');
-      const nameQuery = query(usersRef, where('name', '>=', searchTerm), where('name', '<=', searchTerm + '\uf8ff'));
-      const phoneQuery = query(usersRef, where('phoneNumber', '>=', searchTerm), where('phoneNumber', '<=', searchTerm + '\uf8ff'));
+      const snapshot = await getDocs(usersRef);
+      const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
 
-      const [nameSnapshot, phoneSnapshot] = await Promise.all([
-          getDocs(nameQuery),
-          getDocs(phoneQuery),
-      ]);
-      
-      const usersMap = new Map<string, UserProfile>();
-      
-      nameSnapshot.forEach(doc => {
-          const userData = { id: doc.id, ...doc.data()} as UserProfile;
-          if (userData.uid) usersMap.set(userData.uid, userData);
-      });
-      
-      phoneSnapshot.forEach(doc => {
-          const userData = { id: doc.id, ...doc.data() } as UserProfile;
-          if (userData.uid) usersMap.set(userData.uid, userData);
-      });
-
-      return Array.from(usersMap.values());
+      return allUsers.filter(user => 
+          user.name.toLowerCase().includes(lowercasedTerm) ||
+          user.phoneNumber.includes(searchTerm)
+      );
   };
 
   const searchTeams = async (searchTerm: string): Promise<Team[]> => {
@@ -292,13 +279,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Otherwise, search by name
     const lowercasedSearchTerm = searchTerm.toLowerCase();
-    const nameQuery = query(teamsRef, where('name', '>=', searchTerm), where('name', '<=', searchTerm + '\uf8ff'));
-    const nameSnapshot = await getDocs(nameQuery);
-    const teams: Team[] = [];
-    nameSnapshot.forEach(doc => {
-        teams.push({ id: doc.id, ...doc.data() } as Team);
-    });
-    return teams;
+    return allTeams.filter(team => team.name.toLowerCase().includes(lowercasedSearchTerm));
   };
   
    const resetDatabase = async () => {
@@ -320,23 +301,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Players
     const players = await searchUsers(searchTerm);
 
-    // Matches - very basic search on team names
+    // Matches
     const matchesRef = collection(db, "matches");
-    const matchQuery = query(matchesRef, or(
-        where('config.team1.name', '>=', st), where('config.team1.name', '<=', st + '\uf8ff'),
-        where('config.team2.name', '>=', st), where('config.team2.name', '<=', st + '\uf8ff')
-    ));
-    const matchSnap = await getDocs(matchesRef); // A more efficient way would be Algolia/Elasticsearch
+    const matchSnap = await getDocs(matchesRef);
     const matches = matchSnap.docs
         .map(doc => ({id: doc.id, ...doc.data()}) as MatchState)
-        .filter(m => m.config.team1.name.toLowerCase().includes(st) || m.config.team2.name.toLowerCase().includes(st));
+        .filter(m => 
+            m.config.team1.name.toLowerCase().includes(st) || 
+            m.config.team2.name.toLowerCase().includes(st) ||
+            m.config.tournamentId?.toLowerCase().includes(st)
+        );
 
 
     // Tournaments
     const tourneyRef = collection(db, "tournaments");
-    const tourneyQuery = query(tourneyRef, where('name', '>=', searchTerm), where('name', '<=', searchTerm + '\uf8ff'));
-    const tourneySnap = await getDocs(tourneyQuery);
-    const tournaments = tourneySnap.docs.map(doc => ({id: doc.id, ...doc.data()}) as Tournament);
+    const tourneySnap = await getDocs(tourneyRef);
+    const tournaments = tourneySnap.docs
+        .map(doc => ({id: doc.id, ...doc.data()}) as Tournament)
+        .filter(t => t.name.toLowerCase().includes(st));
 
     return { players, matches, tournaments };
   };
