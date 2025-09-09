@@ -39,7 +39,7 @@ const matchDetailsSchema = z.object({
   group: z.string().min(1, 'Group is required'),
   overs: z.number().min(1),
   pitchType: z.enum(['Turf', 'Mat', 'Cement', 'Astroturf']),
-  ballType: z.enum(['Leather', 'Soft Tennis', 'Tape', 'Rubber']),
+  ballType: z.enum(['Leather Ball', 'Tennis Ball', 'Tape Tennis Ball', 'Rubber Ball', 'Synthetic Ball', 'Other']),
   pointsTable: z.boolean(),
   powerPlay: z.array(powerPlaySchema).optional(),
 });
@@ -143,7 +143,7 @@ function MatchDetailsContent() {
             matchRound: 'League',
             overs: 20,
             pitchType: 'Turf',
-            ballType: 'Leather',
+            ballType: 'Leather Ball',
             pointsTable: true,
             powerPlay: [{ type: 'P1', startOver: 1, endOver: 6 }]
         }
@@ -439,11 +439,13 @@ function MatchDetailsContent() {
                     </div>
                      <div className="space-y-2">
                         <Label className="font-semibold">Ball Type</Label>
-                        <div className="flex gap-2">
-                            <ChipButton label="Leather" isSelected={form.watch('ballType') === 'Leather'} onClick={() => form.setValue('ballType', 'Leather')} />
-                           <ChipButton label="Soft Tennis" isSelected={form.watch('ballType') === 'Soft Tennis'} onClick={() => form.setValue('ballType', 'Soft Tennis')} />
-                           <ChipButton label="Tape" isSelected={form.watch('ballType') === 'Tape'} onClick={() => form.setValue('ballType', 'Tape')} />
-                           <ChipButton label="Rubber" isSelected={form.watch('ballType') === 'Rubber'} onClick={() => form.setValue('ballType', 'Rubber')} />
+                        <div className="flex flex-wrap gap-2">
+                            <ChipButton label="Leather Ball" isSelected={form.watch('ballType') === 'Leather Ball'} onClick={() => form.setValue('ballType', 'Leather Ball')} />
+                            <ChipButton label="Tennis Ball" isSelected={form.watch('ballType') === 'Tennis Ball'} onClick={() => form.setValue('ballType', 'Tennis Ball')} />
+                            <ChipButton label="Tape Tennis Ball" isSelected={form.watch('ballType') === 'Tape Tennis Ball'} onClick={() => form.setValue('ballType', 'Tape Tennis Ball')} />
+                            <ChipButton label="Rubber Ball" isSelected={form.watch('ballType') === 'Rubber Ball'} onClick={() => form.setValue('ballType', 'Rubber Ball')} />
+                            <ChipButton label="Synthetic Ball" isSelected={form.watch('ballType') === 'Synthetic Ball'} onClick={() => form.setValue('ballType', 'Synthetic Ball')} />
+                            <ChipButton label="Other" isSelected={form.watch('ballType') === 'Other'} onClick={() => form.setValue('ballType', 'Other')} />
                         </div>
                     </div>
 

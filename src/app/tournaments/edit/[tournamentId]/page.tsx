@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -381,11 +382,12 @@ function EditTournamentPage() {
                                 <SelectValue placeholder="Select ball type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                <SelectItem value="Leather">Leather</SelectItem>
-                                <SelectItem value="Tennis">Tennis</SelectItem>
-                                <SelectItem value="Tape Ball">Tape Ball</SelectItem>
-                                <SelectItem value="Synthetic">Synthetic</SelectItem>
-                                <SelectItem value="Other">Other</SelectItem>
+                                  <SelectItem value="Leather Ball">Leather Ball</SelectItem>
+                                  <SelectItem value="Tennis Ball">Tennis Ball</SelectItem>
+                                  <SelectItem value="Tape Tennis Ball">Tape Tennis Ball</SelectItem>
+                                  <SelectItem value="Rubber Ball">Rubber Ball</SelectItem>
+                                  <SelectItem value="Synthetic Ball">Synthetic Ball</SelectItem>
+                                  <SelectItem value="Other">Other</SelectItem>
                                 </SelectContent>
                             </Select>
                             </div>
