@@ -33,7 +33,7 @@ const powerPlaySchema = z.object({
 });
 
 const matchDetailsSchema = z.object({
-  matchType: z.enum(['Limited Overs', 'Test Match', 'The Hundred', 'T20', 'ODI']),
+  matchType: z.enum(['Limited Overs', 'Test Match', 'The Hundred', 'T20', 'ODI', 'Sixes a Side']),
   matchRound: z.enum(['League', 'Quarter Final', 'Semi Final', 'Final']),
   matchNumber: z.number().min(1),
   group: z.string().min(1, 'Group is required'),
@@ -380,6 +380,7 @@ function MatchDetailsContent() {
                             <ChipButton label="ODI" isSelected={form.watch('matchType') === 'ODI'} onClick={() => form.setValue('matchType', 'ODI')} />
                             <ChipButton label="Test Match" isSelected={form.watch('matchType') === 'Test Match'} onClick={() => form.setValue('matchType', 'Test Match')} />
                             <ChipButton label="The Hundred" isSelected={form.watch('matchType') === 'The Hundred'} onClick={() => form.setValue('matchType', 'The Hundred')} />
+                            <ChipButton label="Sixes a Side" isSelected={form.watch('matchType') === 'Sixes a Side'} onClick={() => form.setValue('matchType', 'Sixes a Side')} />
                         </div>
                     </div>
                      <div className="space-y-2">
@@ -538,5 +539,3 @@ export default function MatchDetailsPage() {
         </Suspense>
     )
 }
-
-    
