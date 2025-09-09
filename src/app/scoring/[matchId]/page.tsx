@@ -127,10 +127,10 @@ function ScoringPage() {
             <ArrowLeft className="h-6 w-6" />
           </Button>
           <div className="flex-grow text-center overflow-hidden px-2">
-            <h1 className="text-xl font-bold flex items-center justify-center gap-2 text-primary whitespace-nowrap">
-              <span className="truncate max-w-[calc(50%-2rem)]">{config.team1.name}</span>
+            <h1 className="text-xl font-bold flex flex-wrap items-center justify-center gap-x-2 text-primary">
+              <span className="truncate">{config.team1.name}</span>
               <span className="text-muted-foreground text-base font-normal">vs</span>
-              <span className="truncate max-w-[calc(50%-2rem)]">{config.team2.name}</span>
+              <span className="truncate">{config.team2.name}</span>
             </h1>
             <p className="text-xs text-muted-foreground truncate">
               {tossWinner} won the toss and chose to {tossDecision}
@@ -175,3 +175,4 @@ export default ScoringPage;
     
 
     
+

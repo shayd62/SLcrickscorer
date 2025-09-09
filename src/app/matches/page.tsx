@@ -209,14 +209,14 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <Image src="https://picsum.photos/seed/t1-flag/24/16" width={24} height={16} alt={`${firstInningsTeamInfo.name} flag`} className="rounded-sm" data-ai-hint="cricket team" />
-                            <span className={cn("text-lg", firstInningsIsWinner && "font-bold")}>{firstInningsTeamInfo.name}</span>
+                            <span className={cn("text-lg truncate", firstInningsIsWinner && "font-bold")}>{firstInningsTeamInfo.name}</span>
                         </div>
                         <div className="font-bold text-lg">{firstInningsScore.score}/{firstInningsScore.wickets}</div>
                     </div>
                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                              <Image src="https://picsum.photos/seed/t2-flag/24/16" width={24} height={16} alt={`${secondInningsTeamInfo.name} flag`} className="rounded-sm" data-ai-hint="cricket team" />
-                            <span className={cn("text-lg", secondInningsIsWinner && "font-bold")}>{secondInningsTeamInfo.name}</span>
+                            <span className={cn("text-lg truncate", secondInningsIsWinner && "font-bold")}>{secondInningsTeamInfo.name}</span>
                         </div>
                         <div className="flex items-center gap-2">
                              {innings2 && <span className="font-normal text-muted-foreground text-sm">({secondInningsScore.overs}/{config.oversPerInnings} ov, T:{target})</span>}
@@ -471,4 +471,5 @@ function HomePage() {
 export default withAuth(HomePage);
 
     
+
 
