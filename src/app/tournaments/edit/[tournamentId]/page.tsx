@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Shield, ArrowLeft, CalendarIcon, Plus, Upload, ChevronRight } from 'lucide-react';
+import { Shield, ArrowLeft, CalendarIcon, Plus, Upload, ChevronRight, UserPlus, Trash2 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -177,6 +177,12 @@ function EditTournamentPage() {
     const newPlayer: Player = { id: player.uid, name: player.name };
     form.setValue(editingRole, [...currentPlayers, newPlayer]);
   };
+  
+  const handleRemoveRolePlayer = (role: 'admins' | 'scorers', playerId: string) => {
+    const currentPlayers = form.getValues(role) || [];
+    const updatedPlayers = currentPlayers.filter(p => p.id !== playerId);
+    form.setValue(role, updatedPlayers);
+  };
 
 
   const onSubmit = async (data: TournamentFormValues) => {
@@ -223,6 +229,9 @@ function EditTournamentPage() {
       toast({ title: "Error", description: "Could not update the tournament.", variant: "destructive" });
     }
   };
+  
+  const admins = form.watch('admins') || [];
+  const scorers = form.watch('scorers') || [];
 
   const tournamentName = form.watch('name');
 
@@ -394,26 +403,38 @@ function EditTournamentPage() {
               </div>
 
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div
-                    className="flex items-center justify-between px-4 py-3 rounded-lg border cursor-pointer hover:bg-secondary/50"
-                    onClick={() => handleOpenPlayerSearch('admins')}
-                >
-                    <span className="font-medium text-base">Admins</span>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                        <span>{form.watch('admins')?.length || 0} Selected</span>
-                        <ChevronRight className="h-5 w-5" />
-                    </div>
-                </div>
-                <div
-                    className="flex items-center justify-between px-4 py-3 rounded-lg border cursor-pointer hover:bg-secondary/50"
-                    onClick={() => handleOpenPlayerSearch('scorers')}
-                >
-                    <span className="font-medium text-base">Scorers</span>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                        <span>{form.watch('scorers')?.length || 0} Selected</span>
-                        <ChevronRight className="h-5 w-5" />
-                    </div>
-                </div>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Admins</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                       {admins.length > 0 ? (
+                            admins.map(admin => (
+                                <div key={admin.id} className="flex items-center justify-between text-sm p-2 bg-secondary rounded-md">
+                                    <span>{admin.name}</span>
+                                    <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveRolePlayer('admins', admin.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                </div>
+                            ))
+                        ) : <p className="text-sm text-muted-foreground">No admins assigned.</p>}
+                        <Button type="button" variant="outline" className="w-full" onClick={() => handleOpenPlayerSearch('admins')}><UserPlus className="mr-2 h-4 w-4" /> Add Admin</Button>
+                    </CardContent>
+                  </Card>
+                   <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Scorers</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                        {scorers.length > 0 ? (
+                            scorers.map(scorer => (
+                                <div key={scorer.id} className="flex items-center justify-between text-sm p-2 bg-secondary rounded-md">
+                                    <span>{scorer.name}</span>
+                                     <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveRolePlayer('scorers', scorer.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                </div>
+                            ))
+                        ) : <p className="text-sm text-muted-foreground">No scorers assigned.</p>}
+                        <Button type="button" variant="outline" className="w-full" onClick={() => handleOpenPlayerSearch('scorers')}><UserPlus className="mr-2 h-4 w-4" /> Add Scorer</Button>
+                    </CardContent>
+                  </Card>
               </div>
               
               <div className="space-y-4">
