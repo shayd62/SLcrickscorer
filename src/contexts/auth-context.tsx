@@ -103,9 +103,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // If the user has a real email, use that. Otherwise, use the dummy one.
         const emailForAuth = userDoc.email || `${userDoc.phoneNumber}@cricmate.com`;
         
-        console.log(`Simulating sending password reset email via custom SMTP to ${emailForAuth}`);
-        console.log(`Host: ${process.env.MAIL_HOST}, User: ${process.env.MAIL_USER}`);
-        
         await sendPasswordResetEmail(auth, emailForAuth);
     } catch (error: any) {
         // We can swallow this error to avoid leaking information about which emails are registered.
@@ -154,34 +151,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const registerNewPlayer = async (name: string, phoneNumber: string, email?: string): Promise<UserProfile> => {
-    // This function creates a "placeholder" profile that can be claimed later.
-    const userDocRef = doc(db, 'users', phoneNumber);
-    const docSnap = await getDoc(userDocRef);
+    const registerNewPlayer = async (name: string, phoneNumber: string, email?: string): Promise<UserProfile> => {
+        const userDocRef = doc(db, 'users', phoneNumber);
+        const docSnap = await getDoc(userDocRef);
 
-    if (docSnap.exists()) {
-        throw new Error("A player with this phone number is already registered.");
-    }
+        if (docSnap.exists()) {
+            throw new Error("A player with this phone number is already registered.");
+        }
 
-    const profileData: Omit<UserProfile, 'id'|'uid'> & { isPlaceholder: boolean } = {
-        name: name,
-        phoneNumber: phoneNumber,
-        email: email,
-        gender: 'Other', // Default value
-        isPlaceholder: true, // Mark as a placeholder
+        // Use the real email for auth if provided, otherwise create a dummy one.
+        const emailForAuth = email || `${phoneNumber}@cricmate.com`;
+        // Use the phone number as a default temporary password.
+        const tempPassword = phoneNumber;
+
+        // Create the user in Firebase Authentication
+        const userCredential = await createUserWithEmailAndPassword(auth, emailForAuth, tempPassword);
+        const authUser = userCredential.user;
+
+        console.log(`New player registered with temporary password: ${tempPassword}. They can use this to log in and change it.`);
+
+        // Now create their profile in Firestore
+        const profileData: Omit<UserProfile, 'id' | 'uid'> = {
+            name: name,
+            phoneNumber: phoneNumber,
+            email: email,
+            gender: 'Other', // Default value
+            isPlaceholder: false, // It's a full user now
+        };
+        
+        await setDoc(userDocRef, {
+            ...profileData,
+            uid: authUser.uid, // Store the real auth UID
+        });
+
+        const newUserProfile: UserProfile = {
+            id: phoneNumber,
+            uid: authUser.uid,
+            ...profileData,
+        };
+
+        return newUserProfile;
     };
-    
-    await setDoc(userDocRef, profileData as any);
-
-    const newUserProfile: UserProfile = {
-        id: phoneNumber,
-        uid: `placeholder-${Date.now()}`, // Temporary UID
-        isPlaceholder: true,
-        ...profileData
-    };
-
-    return newUserProfile;
-};
   
   const updateUserProfile = async (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => {
     if (!userProfile?.id) {

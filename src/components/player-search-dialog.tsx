@@ -39,7 +39,10 @@ function NewPlayerDialog({ onPlayerCreated }: { onPlayerCreated: (player: UserPr
     const handleCreatePlayer = async (data: NewPlayerFormValues) => {
         try {
             const newUserProfile = await registerNewPlayer(data.name, data.phoneNumber, data.email);
-            toast({ title: "Player Created!", description: `${data.name} has been registered.` });
+            toast({ 
+                title: "Player Created!", 
+                description: `${data.name} has been registered with a temporary password (their phone number).` 
+            });
             onPlayerCreated(newUserProfile);
             setOpen(false);
             form.reset();
@@ -59,7 +62,7 @@ function NewPlayerDialog({ onPlayerCreated }: { onPlayerCreated: (player: UserPr
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Register New Player</DialogTitle>
-                    <DialogDescription>Quickly add a new player by providing their name and phone number.</DialogDescription>
+                    <DialogDescription>Quickly add a new player. Their phone number will be their temporary password.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={form.handleSubmit(handleCreatePlayer)} className="space-y-4">
                      <div className="space-y-2">
