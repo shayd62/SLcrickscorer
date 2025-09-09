@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -16,21 +16,62 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-const tournaments = [
-  { id: 't1', name: 'Summer Championship 2024', owner: 'john.doe@example.com', status: 'approved', plan: 'pro', matches: 56 },
-  { id: 't2', name: 'Winter League', owner: 'jane.smith@example.com', status: 'pending', plan: 'free', matches: 0 },
-  { id: 't3', name: 'City Cup', owner: 'org1@example.com', status: 'blocked', plan: 'enterprise', matches: 120 },
-  { id: 't4', name: 'Amateur Trophy', owner: 'amateur.league@example.com', status: 'approved', plan: 'free', matches: 12 },
-];
+import { collection, onSnapshot, query, updateDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { Tournament } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminTournamentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const q = query(collection(db, "tournaments"));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const tournamentsData = querySnapshot.docs.map(doc => ({ ...doc.data() as Tournament, id: doc.id }));
+      setTournaments(tournamentsData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching tournaments: ", error);
+      toast({ title: "Error", description: "Failed to fetch tournaments.", variant: "destructive" });
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [toast]);
+  
+  const handleStatusChange = async (id: string, status: 'approved' | 'pending' | 'blocked') => {
+    try {
+      const tournamentRef = doc(db, 'tournaments', id);
+      await updateDoc(tournamentRef, { status });
+      toast({ title: "Status Updated", description: `Tournament status changed to ${status}.` });
+    } catch (error) {
+      console.error("Error updating status: ", error);
+      toast({ title: "Error", description: "Failed to update tournament status.", variant: "destructive" });
+    }
+  };
+
 
   const filteredTournaments = tournaments.filter(t =>
     t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.owner.toLowerCase().includes(searchTerm.toLowerCase())
+    t.userId?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Tournament Management</CardTitle>
+          <CardDescription>Oversee all tournaments on the platform.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p>Loading tournaments...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -53,7 +94,7 @@ export default function AdminTournamentsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Tournament</TableHead>
-              <TableHead>Owner</TableHead>
+              <TableHead>Owner ID</TableHead>
               <TableHead>Plan</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -64,15 +105,15 @@ export default function AdminTournamentsPage() {
               <TableRow key={t.id}>
                 <TableCell>
                   <div className="font-medium">{t.name}</div>
-                  <div className="text-sm text-gray-500">{t.matches} matches</div>
+                  <div className="text-sm text-gray-500">{t.matches?.length || 0} matches</div>
                 </TableCell>
-                <TableCell>{t.owner}</TableCell>
-                <TableCell><Badge variant="outline">{t.plan}</Badge></TableCell>
+                <TableCell className="text-sm text-gray-500">{t.userId || 'N/A'}</TableCell>
+                <TableCell><Badge variant="outline">{t.plan || 'free'}</Badge></TableCell>
                 <TableCell>
                   <Badge
                     variant={t.status === 'approved' ? 'default' : t.status === 'pending' ? 'secondary' : 'destructive'}
                   >
-                    {t.status}
+                    {t.status || 'pending'}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
@@ -84,11 +125,11 @@ export default function AdminTournamentsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
-                        <DropdownMenuItem>Approve</DropdownMenuItem>
-                        <DropdownMenuItem>Block</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push(`/tournaments/${t.id}`)}>View Details</DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">Hard Delete</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleStatusChange(t.id, 'approved')}>Approve</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleStatusChange(t.id, 'pending')}>Set to Pending</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleStatusChange(t.id, 'blocked')} className="text-destructive">Block</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                 </TableCell>
