@@ -30,13 +30,27 @@ export default function AdminDashboard() {
       setKpiData(prev => prev.map(k => k.title === 'Total Users' ? { ...k, value: snapshot.size.toString() } : k));
       
       const monthlyData: { [key: string]: number } = {};
+      const now = new Date();
+      // Initialize last 6 months
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthName = d.toLocaleString('default', { month: 'long' });
+        monthlyData[monthName] = 0;
+      }
+      
       snapshot.docs.forEach(doc => {
         const user = doc.data() as UserProfile;
         // The auth user object has a `createdAt` but our UserProfile doesn't.
-        // We'll simulate for now. In a real app, you'd store a `createdAt` timestamp.
-        const month = new Date().toLocaleString('default', { month: 'long' });
-        if (!monthlyData[month]) monthlyData[month] = 0;
-        monthlyData[month]++;
+        // We will simulate with a placeholder logic.
+        // In a real app, you'd store a `createdAt` timestamp on the user profile.
+        // For now, let's distribute them somewhat randomly over the last 6 months for demo.
+        const randomMonthOffset = Math.floor(Math.random() * 6);
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - randomMonthOffset, 1);
+        const month = monthDate.toLocaleString('default', { month: 'long' });
+        
+        if (monthlyData.hasOwnProperty(month)) {
+            monthlyData[month]++;
+        }
       });
       
       const formattedChartData = Object.entries(monthlyData).map(([month, count]) => ({ month, desktop: count }));

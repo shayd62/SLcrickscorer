@@ -20,12 +20,14 @@ import { collection, onSnapshot, query, updateDoc, doc } from 'firebase/firestor
 import { db } from '@/lib/firebase';
 import type { Tournament } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 export default function AdminTournamentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     const q = query(collection(db, "tournaments"));
@@ -55,8 +57,8 @@ export default function AdminTournamentsPage() {
 
 
   const filteredTournaments = tournaments.filter(t =>
-    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.userId?.toLowerCase().includes(searchTerm.toLowerCase())
+    (t.name && t.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (t.userId && t.userId.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   if (loading) {

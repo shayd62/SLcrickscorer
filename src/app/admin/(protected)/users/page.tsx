@@ -43,7 +43,7 @@ export default function AdminUsersPage() {
   }, [toast]);
 
   const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
@@ -95,7 +95,7 @@ export default function AdminUsersPage() {
           </TableHeader>
           <TableBody>
             {filteredUsers.map((user) => (
-              <TableRow key={user.uid}>
+              <TableRow key={user.id}>
                 <TableCell>
                   <div className="font-medium">{user.name}</div>
                   <div className="text-sm text-gray-500">{user.email || 'No email'}</div>
