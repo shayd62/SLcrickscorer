@@ -180,7 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const newUserCredential = await createUserWithEmailAndPassword(auth, emailForAuth, tempPassword);
         const newAuthUser = newUserCredential.user;
         
-        console.log(`New player registered with temporary password: ${tempPassword}.`);
+        console.log(`New player registered with temporary password (their phone number).`);
         
         const profileData: Omit<UserProfile, 'id' | 'uid'> = {
             name: name,

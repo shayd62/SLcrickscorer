@@ -41,7 +41,7 @@ function NewPlayerDialog({ onPlayerCreated }: { onPlayerCreated: (player: UserPr
             const newUserProfile = await registerNewPlayer(data.name, data.phoneNumber, data.email);
             toast({ 
                 title: "Player Created!", 
-                description: `${data.name} has been registered with a temporary password (their phone number).` 
+                description: `${data.name} can now log in using their phone number as a temporary password.` 
             });
             onPlayerCreated(newUserProfile);
             setOpen(false);
