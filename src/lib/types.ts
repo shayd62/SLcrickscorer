@@ -88,6 +88,8 @@ export interface Tournament {
   ballsPerOver?: number;
   noBall?: { enabled: boolean; reball: boolean; run: number };
   wideBall?: { enabled: boolean; reball: boolean; run: number };
+  admins?: Player[];
+  scorers?: Player[];
 }
 
 export interface TournamentPoints {

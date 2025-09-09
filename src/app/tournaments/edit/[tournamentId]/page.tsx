@@ -14,17 +14,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Shield, ArrowLeft, CalendarIcon, Plus, Upload } from 'lucide-react';
+import { Shield, ArrowLeft, CalendarIcon, Plus, Upload, ChevronRight } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import type { Team, Tournament } from '@/lib/types';
+import type { Team, Tournament, Player } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, getDoc, query, where, updateDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import Image from 'next/image';
+
+const playerSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
 
 const tournamentSchema = z.object({
   name: z.string().min(1, 'Tournament name is required.'),
@@ -45,6 +50,8 @@ const tournamentSchema = z.object({
   logoUrl: z.string().url().optional().or(z.literal('')),
   coverPhotoUrl: z.string().url().optional().or(z.literal('')),
   numberOfTeams: z.string({ required_error: "Please select the number of teams." }),
+  admins: z.array(playerSchema).optional(),
+  scorers: z.array(playerSchema).optional(),
 });
 
 type TournamentFormValues = z.infer<typeof tournamentSchema>;
@@ -80,6 +87,8 @@ function EditTournamentPage() {
       tournamentFormat: undefined,
       logoUrl: '',
       coverPhotoUrl: '',
+      admins: [],
+      scorers: [],
     },
     mode: 'onChange',
   });
@@ -116,6 +125,8 @@ function EditTournamentPage() {
                     startDate: new Date(tournamentData.startDate),
                     endDate: new Date(tournamentData.endDate),
                     numberOfTeams: tournamentData.numberOfTeams, // Ensure this is set
+                    admins: tournamentData.admins || [],
+                    scorers: tournamentData.scorers || [],
                 });
                 if(tournamentData.logoUrl) setLogoPreview(tournamentData.logoUrl);
                 if(tournamentData.coverPhotoUrl) setCoverPreview(tournamentData.coverPhotoUrl);
@@ -356,6 +367,29 @@ function EditTournamentPage() {
                     />
                     {form.formState.errors.numberOfTeams && <p className="text-destructive text-sm">{form.formState.errors.numberOfTeams.message}</p>}
                   </div>
+              </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div
+                    className="flex items-center justify-between px-4 py-3 rounded-lg border cursor-pointer hover:bg-secondary/50"
+                    onClick={() => { /* Open Admins Dialog */ }}
+                >
+                    <span className="font-medium text-base">Admins</span>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                        <span>{form.watch('admins')?.length || 0} Selected</span>
+                        <ChevronRight className="h-5 w-5" />
+                    </div>
+                </div>
+                <div
+                    className="flex items-center justify-between px-4 py-3 rounded-lg border cursor-pointer hover:bg-secondary/50"
+                    onClick={() => { /* Open Scorers Dialog */ }}
+                >
+                    <span className="font-medium text-base">Scorers</span>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                        <span>{form.watch('scorers')?.length || 0} Selected</span>
+                        <ChevronRight className="h-5 w-5" />
+                    </div>
+                </div>
               </div>
               
               <div className="space-y-4">
