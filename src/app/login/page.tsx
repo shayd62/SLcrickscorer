@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { Eye, EyeOff } from 'lucide-react';
 
 const emailSchema = z.object({
   email: z.string().email('Invalid email address.'),
@@ -32,6 +33,7 @@ function LoginPage() {
   const { signInWithEmail, signInWithPhoneAndPassword } = useAuth();
   const { toast } = useToast();
   const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email');
+  const [showPassword, setShowPassword] = useState(false);
 
   const emailForm = useForm<EmailFormValues>({ resolver: zodResolver(emailSchema) });
   const phoneForm = useForm<PhoneFormValues>({ resolver: zodResolver(phoneSchema) });
@@ -76,14 +78,23 @@ function LoginPage() {
                 <Input id="email" type="email" {...emailForm.register('email')} />
                 {emailForm.formState.errors.email && <p className="text-destructive text-sm">{emailForm.formState.errors.email.message}</p>}
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <div className="flex justify-between items-center">
                     <Label htmlFor="password">Password</Label>
                     <Link href="/forgot-password" passHref>
                       <span className="text-sm underline cursor-pointer">Forgot Password?</span>
                     </Link>
                 </div>
-                <Input id="password" type="password" {...emailForm.register('password')} />
+                <Input id="password" type={showPassword ? 'text' : 'password'} {...emailForm.register('password')} />
+                 <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-7 h-7 w-7 text-muted-foreground"
+                    onClick={() => setShowPassword(prev => !prev)}
+                >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
                 {emailForm.formState.errors.password && <p className="text-destructive text-sm">{emailForm.formState.errors.password.message}</p>}
               </div>
               <Button type="submit" className="w-full">Log In</Button>
@@ -95,14 +106,23 @@ function LoginPage() {
                 <Input id="phoneNumber" type="tel" {...phoneForm.register('phoneNumber')} placeholder="+1 123 456 7890" />
                 {phoneForm.formState.errors.phoneNumber && <p className="text-destructive text-sm">{phoneForm.formState.errors.phoneNumber.message}</p>}
               </div>
-               <div className="space-y-2">
+               <div className="space-y-2 relative">
                  <div className="flex justify-between items-center">
                     <Label htmlFor="phone-password">Password</Label>
                      <Link href="/forgot-password" passHref>
                       <span className="text-sm underline cursor-pointer">Forgot Password?</span>
                     </Link>
                 </div>
-                <Input id="phone-password" type="password" {...phoneForm.register('password')} />
+                <Input id="phone-password" type={showPassword ? 'text' : 'password'} {...phoneForm.register('password')} />
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-7 h-7 w-7 text-muted-foreground"
+                    onClick={() => setShowPassword(prev => !prev)}
+                >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
                 {phoneForm.formState.errors.password && <p className="text-destructive text-sm">{phoneForm.formState.errors.password.message}</p>}
               </div>
               <Button type="submit" className="w-full">Log In</Button>

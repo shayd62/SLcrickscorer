@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { Shield } from 'lucide-react';
+import { Shield, Eye, EyeOff } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address.'),
@@ -25,6 +25,7 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const { signInWithEmail, userProfile } = useAuth();
   const { toast } = useToast();
+  const [showPassword, setShowPassword] = useState(false);
   
   const form = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) });
 
@@ -55,9 +56,18 @@ export default function AdminLoginPage() {
               <Input id="email" type="email" {...form.register('email')} placeholder="admin@example.com" />
               {form.formState.errors.email && <p className="text-destructive text-sm">{form.formState.errors.email.message}</p>}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" {...form.register('password')} placeholder="••••••••" />
+              <Input id="password" type={showPassword ? 'text' : 'password'} {...form.register('password')} placeholder="••••••••" />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-7 h-7 w-7 text-muted-foreground"
+                onClick={() => setShowPassword(prev => !prev)}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
               {form.formState.errors.password && <p className="text-destructive text-sm">{form.formState.errors.password.message}</p>}
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-lg py-6">
