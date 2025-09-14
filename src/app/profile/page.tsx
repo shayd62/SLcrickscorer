@@ -4,7 +4,7 @@
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, User, Mail, Phone, MapPin, Edit, Shield, GanttChartSquare, Trash2, BarChart2 } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, MapPin, Edit, Shield, GanttChartSquare, Trash2, BarChart2, Key } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import withAuth from '@/components/with-auth';
 import Image from 'next/image';
@@ -42,7 +42,7 @@ function ProfilePage() {
                     </Button>
                 </Link>
             </header>
-            <main className="p-4 md:p-8 flex justify-center">
+            <main className="p-4 md:p-8 flex flex-col items-center gap-4">
                 <Card className="w-full max-w-md shadow-lg">
                     <CardHeader className="items-center text-center">
                         <Image 
@@ -95,6 +95,18 @@ function ProfilePage() {
                             </CardContent>
                         </Card>
                     </CardContent>
+                </Card>
+                <Card className="w-full max-w-md shadow-lg">
+                  <CardHeader>
+                      <CardTitle>Security</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                      <Link href="/profile/change-password">
+                          <Button variant="outline" className="w-full">
+                              <Key className="mr-2 h-4 w-4" /> Change Password
+                          </Button>
+                      </Link>
+                  </CardContent>
                 </Card>
             </main>
         </div>

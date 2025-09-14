@@ -2,7 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential, sendPasswordResetEmail, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { onAuthStateChanged, User, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthCredential, sendPasswordResetEmail, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
 import { auth, db, storage, app as mainApp } from '@/lib/firebase';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, deleteDoc, writeBatch, or } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -22,6 +22,7 @@ interface AuthContextType {
   signInWithEmail: (email: string, password: string) => Promise<any>;
   signInWithPhoneAndPassword: (phoneNumber: string, password: string) => Promise<any>;
   sendPasswordReset: (emailOrPhone: string) => Promise<void>;
+  changeUserPassword: (currentPassword: string, newPassword: string) => Promise<void>;
   createUserProfile: (uid: string, data: Omit<UserProfile, 'uid' | 'id'>) => Promise<void>;
   registerNewPlayer: (name: string, phoneNumber: string, email?: string) => Promise<UserProfile | null>;
   updateUserProfile: (uid: string, data: Partial<Omit<UserProfile, 'uid' | 'id'>>) => Promise<void>;
@@ -115,6 +116,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error("Firebase sendPasswordResetEmail error:", error.message);
     }
   };
+
+    const changeUserPassword = async (currentPassword: string, newPassword: string) => {
+        if (!user || !user.email) {
+            throw new Error("No authenticated user found.");
+        }
+
+        try {
+            const credential = EmailAuthProvider.credential(user.email, currentPassword);
+            await reauthenticateWithCredential(user, credential);
+            await updatePassword(user, newPassword);
+        } catch (error: any) {
+            console.error("Password change error:", error);
+            if (error.code === 'auth/wrong-password') {
+                throw new Error("The current password you entered is incorrect.");
+            }
+            throw new Error("Failed to change password. Please try again later.");
+        }
+    };
 
   const signInWithPhoneAndPassword = async (phoneNumber: string, password: string) => {
     const usersRef = collection(db, "users");
@@ -332,6 +351,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithEmail,
     signInWithPhoneAndPassword,
     sendPasswordReset,
+    changeUserPassword,
     createUserProfile,
     registerNewPlayer,
     updateUserProfile,
