@@ -619,6 +619,7 @@ function TournamentDetailsPage() {
     const [bowlerStats, setBowlerStats] = useState<BowlerLeaderboardStat[]>([]);
     const [fielderStats, setFielderStats] = useState<FielderLeaderboardStat[]>([]);
     const [allRounderStats, setAllRounderStats] = useState<AllRounderLeaderboardStat[]>([]);
+    const [pointsTables, setPointsTables] = useState<Record<string, TournamentPoints[]>>({});
 
     const params = useParams();
     const router = useRouter();
@@ -626,7 +627,9 @@ function TournamentDetailsPage() {
     const { user } = useAuth();
     const tournamentId = params.tournamentId as string;
 
-    const isOwnerOrAdmin = tournament?.userId === user?.uid || tournament?.adminUids?.includes(user?.uid || '');
+    const isOwner = tournament?.userId === user?.uid;
+    const isAdmin = tournament?.adminUids?.includes(user?.uid || '');
+    const isOwnerOrAdmin = isOwner || isAdmin;
     const isScorer = tournament?.scorerUids?.includes(user?.uid || '');
 
     const liveMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Live'), [tournament?.matches]);
@@ -786,6 +789,71 @@ function TournamentDetailsPage() {
 
     }, []);
 
+    const calculatePointsForAllGroups = useCallback(async (currentTournament: Tournament) => {
+        if (!currentTournament.groups || !currentTournament.matches || !currentTournament.pointsPolicy) return;
+    
+        const newPointsTables: Record<string, TournamentPoints[]> = {};
+    
+        for (const group of currentTournament.groups) {
+            const pointsData: { [teamName: string]: TournamentPoints & { totalRunsScored: number, totalOversFaced: number, totalRunsConceded: number, totalOversBowled: number } } = {};
+    
+            group.teams.forEach(teamName => {
+                pointsData[teamName] = { teamName, matchesPlayed: 0, wins: 0, losses: 0, draws: 0, points: 0, netRunRate: 0.00, totalRunsScored: 0, totalOversFaced: 0, totalRunsConceded: 0, totalOversBowled: 0 };
+            });
+    
+            const groupMatches = currentTournament.matches.filter(m => m.groupName === group.name && m.status === 'Completed' && m.result && m.matchId);
+    
+            for (const match of groupMatches) {
+                const matchDoc = await getDoc(doc(db, 'matches', match.matchId!));
+                if (!matchDoc.exists()) continue;
+                const matchData = matchDoc.data() as MatchState;
+    
+                const { winner, loser, method } = match.result!;
+    
+                if (pointsData[match.team1]) pointsData[match.team1].matchesPlayed++;
+                if (pointsData[match.team2]) pointsData[match.team2].matchesPlayed++;
+    
+                if (method.toLowerCase().includes('draw') || method.toLowerCase().includes('tie')) {
+                    if (pointsData[match.team1]) { pointsData[match.team1].draws++; pointsData[match.team1].points += currentTournament.pointsPolicy.draw; }
+                    if (pointsData[match.team2]) { pointsData[match.team2].draws++; pointsData[match.team2].points += currentTournament.pointsPolicy.draw; }
+                } else {
+                    if (winner && pointsData[winner]) { pointsData[winner].wins++; pointsData[winner].points += currentTournament.pointsPolicy.win; }
+                    if (loser && pointsData[loser]) { pointsData[loser].losses++; pointsData[loser].points += currentTournament.pointsPolicy.loss; }
+                }
+    
+                // NRR Calculation
+                const team1Name = matchData.config.team1.name;
+                const team2Name = matchData.config.team2.name;
+    
+                const innings1 = matchData.innings1;
+                const innings2 = matchData.innings2;
+    
+                if (pointsData[team1Name]) {
+                    pointsData[team1Name].totalRunsScored += innings1.battingTeam === 'team1' ? innings1.score : (innings2?.score || 0);
+                    pointsData[team1Name].totalOversFaced += innings1.battingTeam === 'team1' ? (innings1.balls / currentTournament.ballsPerOver) : ((innings2?.balls || 0) / currentTournament.ballsPerOver);
+                    pointsData[team1Name].totalRunsConceded += innings1.battingTeam === 'team2' ? innings1.score : (innings2?.score || 0);
+                    pointsData[team1Name].totalOversBowled += innings1.battingTeam === 'team2' ? (innings1.balls / currentTournament.ballsPerOver) : ((innings2?.balls || 0) / currentTournament.ballsPerOver);
+                }
+    
+                if (pointsData[team2Name]) {
+                    pointsData[team2Name].totalRunsScored += innings1.battingTeam === 'team2' ? innings1.score : (innings2?.score || 0);
+                    pointsData[team2Name].totalOversFaced += innings1.battingTeam === 'team2' ? (innings1.balls / currentTournament.ballsPerOver) : ((innings2?.balls || 0) / currentTournament.ballsPerOver);
+                    pointsData[team2Name].totalRunsConceded += innings1.battingTeam === 'team1' ? innings1.score : (innings2?.score || 0);
+                    pointsData[team2Name].totalOversBowled += innings1.battingTeam === 'team1' ? (innings1.balls / currentTournament.ballsPerOver) : ((innings2?.balls || 0) / currentTournament.ballsPerOver);
+                }
+            }
+    
+            Object.values(pointsData).forEach(team => {
+                const scoringRate = team.totalOversFaced > 0 ? team.totalRunsScored / team.totalOversFaced : 0;
+                const concedingRate = team.totalOversBowled > 0 ? team.totalRunsConceded / team.totalOversBowled : 0;
+                team.netRunRate = scoringRate - concedingRate;
+            });
+    
+            newPointsTables[group.name] = Object.values(pointsData);
+        }
+        setPointsTables(newPointsTables);
+    }, []);
+
     const fetchTournamentAndListen = useCallback(() => {
         if (!tournamentId) return;
         const unsub = onSnapshot(doc(db, "tournaments", tournamentId), (doc) => {
@@ -795,6 +863,7 @@ function TournamentDetailsPage() {
                 const completed = (tournamentData.matches || []).filter(m => m.status === 'Completed');
                 if (completed.length > 0) {
                     calculateLeaderboards(completed, tournamentData);
+                    calculatePointsForAllGroups(tournamentData);
                 }
             } else {
                 toast({ title: "Error", description: "Tournament not found.", variant: "destructive" });
@@ -803,7 +872,7 @@ function TournamentDetailsPage() {
             setLoading(false);
         });
         return unsub;
-    }, [tournamentId, router, toast, calculateLeaderboards]);
+    }, [tournamentId, router, toast, calculateLeaderboards, calculatePointsForAllGroups]);
 
     useEffect(() => {
         const unsubscribe = fetchTournamentAndListen();
@@ -837,38 +906,6 @@ function TournamentDetailsPage() {
         }
     };
     
-    const calculatePointsForGroup = useCallback((groupName: string): TournamentPoints[] => {
-      if (!tournament || !tournament.groups || !tournament.matches || !tournament.pointsPolicy) return [];
-      
-      const group = tournament.groups.find(g => g.name === groupName);
-      if (!group) return [];
-
-      const pointsData: { [teamName: string]: TournamentPoints } = {};
-      
-      group.teams.forEach(teamName => {
-        pointsData[teamName] = { teamName, matchesPlayed: 0, wins: 0, losses: 0, draws: 0, points: 0, netRunRate: 0.00 };
-      });
-
-      tournament.matches.filter(m => m.groupName === groupName).forEach(match => {
-        if (match.status === 'Completed' && match.result) {
-          const { winner, loser, method } = match.result;
-
-          if (pointsData[match.team1]) pointsData[match.team1].matchesPlayed++;
-          if (pointsData[match.team2]) pointsData[match.team2].matchesPlayed++;
-          
-          if (method.toLowerCase().includes('draw') || method.toLowerCase().includes('tie')) {
-            if (pointsData[match.team1]) { pointsData[match.team1].draws++; pointsData[match.team1].points += tournament.pointsPolicy?.draw || 1; }
-            if (pointsData[match.team2]) { pointsData[match.team2].draws++; pointsData[match.team2].points += tournament.pointsPolicy?.draw || 1; }
-          } else {
-            if (winner && pointsData[winner]) { pointsData[winner].wins++; pointsData[winner].points += tournament.pointsPolicy.win; }
-            if (loser && pointsData[loser]) { pointsData[loser].losses++; pointsData[loser].points += tournament.pointsPolicy.loss; }
-          }
-        }
-      });
-
-      return Object.values(pointsData);
-    }, [tournament]);
-
     if (loading) return <div className="flex items-center justify-center min-h-screen">Loading tournament...</div>;
     if (!tournament) return <div className="flex items-center justify-center min-h-screen">Tournament not found.</div>;
 
@@ -1037,7 +1074,7 @@ function TournamentDetailsPage() {
                     <TabsContent value="points" className="mt-6 space-y-6">
                        {tournament.groups && tournament.groups.length > 0 ? (
                          tournament.groups.map(group => (
-                           <PointsTable key={group.name} teams={calculatePointsForGroup(group.name)} title={`Points Table - ${group.name}`} />
+                           <PointsTable key={group.name} teams={pointsTables[group.name] || []} title={`Points Table - ${group.name}`} />
                          ))
                        ) : (
                          <Card><CardHeader><CardTitle>Points Table</CardTitle></CardHeader><CardContent><p className="text-muted-foreground text-center py-4">No groups available. Create groups and play matches to see the points table.</p></CardContent></Card>
@@ -1057,11 +1094,3 @@ function TournamentDetailsPage() {
 }
 
 export default TournamentDetailsPage;
-
-    
-
-
-
-
-
-
