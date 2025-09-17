@@ -827,19 +827,47 @@ function TournamentDetailsPage() {
     
                 const innings1 = matchData.innings1;
                 const innings2 = matchData.innings2;
+
+                const ballsPerOver = matchData.config.ballsPerOver || 6;
     
+                // Team 1 NRR data
                 if (pointsData[team1Name]) {
-                    pointsData[team1Name].totalRunsScored += innings1.battingTeam === 'team1' ? innings1.score : (innings2?.score || 0);
-                    pointsData[team1Name].totalOversFaced += innings1.battingTeam === 'team1' ? (innings1.balls / currentTournament.ballsPerOver) : ((innings2?.balls || 0) / currentTournament.ballsPerOver);
-                    pointsData[team1Name].totalRunsConceded += innings1.battingTeam === 'team2' ? innings1.score : (innings2?.score || 0);
-                    pointsData[team1Name].totalOversBowled += innings1.battingTeam === 'team2' ? (innings1.balls / currentTournament.ballsPerOver) : ((innings2?.balls || 0) / currentTournament.ballsPerOver);
+                    if (innings1.battingTeam === 'team1') {
+                        pointsData[team1Name].totalRunsScored += innings1.score;
+                        pointsData[team1Name].totalOversFaced += innings1.balls / ballsPerOver;
+                    }
+                    if (innings2 && innings2.battingTeam === 'team1') {
+                        pointsData[team1Name].totalRunsScored += innings2.score;
+                        pointsData[team1Name].totalOversFaced += innings2.balls / ballsPerOver;
+                    }
+                    if (innings1.bowlingTeam === 'team1') {
+                        pointsData[team1Name].totalRunsConceded += innings1.score;
+                        pointsData[team1Name].totalOversBowled += innings1.balls / ballsPerOver;
+                    }
+                    if (innings2 && innings2.bowlingTeam === 'team1') {
+                        pointsData[team1Name].totalRunsConceded += innings2.score;
+                        pointsData[team1Name].totalOversBowled += innings2.balls / ballsPerOver;
+                    }
                 }
     
+                // Team 2 NRR data
                 if (pointsData[team2Name]) {
-                    pointsData[team2Name].totalRunsScored += innings1.battingTeam === 'team2' ? innings1.score : (innings2?.score || 0);
-                    pointsData[team2Name].totalOversFaced += innings1.battingTeam === 'team2' ? (innings1.balls / currentTournament.ballsPerOver) : ((innings2?.balls || 0) / currentTournament.ballsPerOver);
-                    pointsData[team2Name].totalRunsConceded += innings1.battingTeam === 'team1' ? innings1.score : (innings2?.score || 0);
-                    pointsData[team2Name].totalOversBowled += innings1.battingTeam === 'team1' ? (innings1.balls / currentTournament.ballsPerOver) : ((innings2?.balls || 0) / currentTournament.ballsPerOver);
+                    if (innings1.battingTeam === 'team2') {
+                        pointsData[team2Name].totalRunsScored += innings1.score;
+                        pointsData[team2Name].totalOversFaced += innings1.balls / ballsPerOver;
+                    }
+                    if (innings2 && innings2.battingTeam === 'team2') {
+                        pointsData[team2Name].totalRunsScored += innings2.score;
+                        pointsData[team2Name].totalOversFaced += innings2.balls / ballsPerOver;
+                    }
+                    if (innings1.bowlingTeam === 'team2') {
+                        pointsData[team2Name].totalRunsConceded += innings1.score;
+                        pointsData[team2Name].totalOversBowled += innings1.balls / ballsPerOver;
+                    }
+                    if (innings2 && innings2.bowlingTeam === 'team2') {
+                        pointsData[team2Name].totalRunsConceded += innings2.score;
+                        pointsData[team2Name].totalOversBowled += innings2.balls / ballsPerOver;
+                    }
                 }
             }
     
