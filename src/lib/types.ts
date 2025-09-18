@@ -58,6 +58,7 @@ export interface TournamentMatch {
     venue?: string;
     overs?: number;
     matchType?: string;
+    matchRound?: 'League' | 'Quarter Final' | 'Semi Final' | 'Final';
 }
 
 export interface Tournament {
@@ -172,6 +173,7 @@ export interface MatchConfig {
   };
   matchType?: string;
   matchFormat?: 'Limited Overs' | 'Test Match' | 'The Hundred' | 'T20' | 'ODI'
+  matchRound?: 'League' | 'Quarter Final' | 'Semi Final' | 'Final';
   tournamentId?: string;
   tournamentStage?: string;
   venue?: string;

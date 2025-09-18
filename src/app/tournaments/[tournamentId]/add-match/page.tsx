@@ -17,6 +17,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Checkbox } from '@/components/ui/checkbox';
 
 function ChipButton({ label, isSelected, onClick }: { label: string; isSelected: boolean; onClick: () => void }) {
     return (
@@ -82,7 +84,7 @@ export default function AddMatchPage() {
     const [team1, setTeam1] = useState<Team | null>(null);
     const [team2, setTeam2] = useState<Team | null>(null);
     
-    const [matchRound, setMatchRound] = useState('League');
+    const [matchRound, setMatchRound] = useState<'League' | 'Quarter Final' | 'Semi Final' | 'Final'>('League');
     const [matchDate, setMatchDate] = useState<Date | undefined>(new Date());
     const [matchTime, setMatchTime] = useState<string>(format(new Date(), 'HH:mm'));
 
@@ -111,9 +113,18 @@ export default function AddMatchPage() {
                     : tourneyData.participatingTeams;
 
                 if (teamsToFetch && teamsToFetch.length > 0) {
-                    const teamsQuery = query(collection(db, "teams"), where("name", "in", teamsToFetch));
-                    getDocs(teamsQuery).then(snapshot => {
-                        const teamsData = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Team));
+                     const chunks = [];
+                    for (let i = 0; i < teamsToFetch.length; i += 30) {
+                        chunks.push(teamsToFetch.slice(i, i + 30));
+                    }
+                    
+                    const teamPromises = chunks.map(chunk => getDocs(query(collection(db, "teams"), where("name", "in", chunk))));
+                    
+                    Promise.all(teamPromises).then(teamSnapshots => {
+                        const teamsData: Team[] = [];
+                        teamSnapshots.forEach(snapshot => {
+                            snapshot.forEach(d => teamsData.push({ ...d.data(), id: d.id } as Team));
+                        });
                         setAllTeams(teamsData);
                     });
                 }
@@ -156,6 +167,7 @@ export default function AddMatchPage() {
             status: 'Upcoming',
             date: finalMatchDate.toISOString(),
             venue: tournament?.location || 'TBD',
+            matchRound: matchRound,
         };
 
         try {
@@ -179,6 +191,17 @@ export default function AddMatchPage() {
       ? allTeams.filter(team => tournament?.groups?.find(g => g.name === groupName)?.teams.includes(team.name))
       : allTeams;
 
+    const handleTeamCheck = (team: Team, teamSlot: 'team1' | 'team2') => {
+        if (teamSlot === 'team1') {
+            if (team1?.id === team.id) setTeam1(null);
+            else if (team2?.id !== team.id) setTeam1(team);
+        } else {
+            if (team2?.id === team.id) setTeam2(null);
+            else if (team1?.id !== team.id) setTeam2(team);
+        }
+    }
+
+
     return (
         <div className="min-h-screen bg-gray-900 text-white font-body">
             <header className="py-4 px-4 md:px-6">
@@ -193,18 +216,57 @@ export default function AddMatchPage() {
                 {/* Team Selection */}
                 <div className="w-full max-w-2xl grid grid-cols-[1fr,auto,1fr] items-start gap-4">
                     <div className="flex flex-col items-center gap-3">
-                        <Image src={team1?.logoUrl || `https://picsum.photos/seed/team1/80/80`} alt={team1?.name || "Team 1"} width={80} height={80} className="rounded-full bg-gray-700 cursor-pointer" onClick={() => setTeam1DialogOpen(true)} />
+                        <Image src={team1?.logoUrl || `https://picsum.photos/seed/team1/80/80`} alt={team1?.name || "Team 1"} width={80} height={80} className="rounded-full bg-gray-700" />
                         <span className="font-semibold text-center">{team1?.name || "Team 1"}</span>
                     </div>
                     <span className="text-2xl font-bold self-center pt-8">VS</span>
                     <div className="flex flex-col items-center gap-3">
-                        <Image src={team2?.logoUrl || `https://picsum.photos/seed/team2/80/80`} alt={team2?.name || "Team 2"} width={80} height={80} className="rounded-full bg-gray-700 cursor-pointer" onClick={() => setTeam2DialogOpen(true)} />
+                        <Image src={team2?.logoUrl || `https://picsum.photos/seed/team2/80/80`} alt={team2?.name || "Team 2"} width={80} height={80} className="rounded-full bg-gray-700" />
                         <span className="font-semibold text-center">{team2?.name || "Team 2"}</span>
                     </div>
                 </div>
 
-                {/* Match Details */}
+                {/* Team & Match Details */}
                 <div className="w-full max-w-md space-y-6">
+                    <div className="space-y-2">
+                        <Label className="font-semibold">Select Team</Label>
+                        <Accordion type="multiple" className="w-full bg-gray-800 rounded-lg p-2">
+                             {(tournament?.groups || []).filter(g => !groupName || g.name === groupName).map(group => (
+                                <AccordionItem value={group.name} key={group.name}>
+                                    <AccordionTrigger>{group.name}</AccordionTrigger>
+                                    <AccordionContent>
+                                        <div className="space-y-2">
+                                            {allTeams.filter(t => group.teams.includes(t.name)).map(team => (
+                                                <div key={team.id} className="flex items-center space-x-2 p-2 rounded hover:bg-gray-700">
+                                                    <Checkbox
+                                                        id={`team-${team.id}`}
+                                                        checked={team1?.id === team.id || team2?.id === team.id}
+                                                        onCheckedChange={(checked) => {
+                                                            if (checked) {
+                                                                if (!team1) handleTeamCheck(team, 'team1');
+                                                                else if (!team2) handleTeamCheck(team, 'team2');
+                                                            } else {
+                                                                if (team1?.id === team.id) setTeam1(null);
+                                                                if (team2?.id === team.id) setTeam2(null);
+                                                            }
+                                                        }}
+                                                        disabled={(team1 && team2) ? !(team1.id === team.id || team2.id === team.id) : false}
+                                                    />
+                                                    <label
+                                                        htmlFor={`team-${team.id}`}
+                                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                    >
+                                                        {team.name}
+                                                    </label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    </div>
+
                     <div className="space-y-2">
                         <Label className="font-semibold">Match Round</Label>
                         <div className="flex flex-wrap gap-2">
@@ -243,21 +305,6 @@ export default function AddMatchPage() {
                      </Button>
                 </div>
             </main>
-
-            <TeamSelectionDialog
-                open={isTeam1DialogOpen}
-                onOpenChange={setTeam1DialogOpen}
-                teams={displayedTeams}
-                onTeamSelect={setTeam1}
-                excludeTeamName={team2?.name}
-            />
-            <TeamSelectionDialog
-                open={isTeam2DialogOpen}
-                onOpenChange={setTeam2DialogOpen}
-                teams={displayedTeams}
-                onTeamSelect={setTeam2}
-                excludeTeamName={team1?.name}
-            />
         </div>
     );
 }

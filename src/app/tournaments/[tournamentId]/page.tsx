@@ -178,7 +178,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
             <CardContent>
               <h4 className="font-semibold mb-2">Assign Teams</h4>
               <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                {availableTeamsForAssignment.map(teamName => (
+                {(availableTeamsForAssignment || []).map(teamName => (
                   <div key={teamName} className="flex items-center space-x-2">
                     <Checkbox id={`${group.name}-${teamName}`} checked={group.teams.includes(teamName)} onCheckedChange={(checked) => isOwner && handleTeamSelection(group.name, teamName, !!checked)} disabled={!group.teams.includes(teamName) && assignedTeams.includes(teamName)} />
                     <label htmlFor={`${group.name}-${teamName}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{teamName}</label>
@@ -1070,8 +1070,8 @@ function TournamentDetailsPage() {
                                         </div>
                                         {(isOwnerOrAdmin || isScorer) && (
                                             <div className="flex items-center gap-2">
-                                                <Link href={`/tournaments/${tournamentId}/match-details?team1Name=${encodeURIComponent(match.team1)}&team2Name=${encodeURIComponent(match.team2)}&date=${encodeURIComponent(match.date || '')}&venue=${encodeURIComponent(match.venue || '')}`}>
-                                                <Button>Start Match</Button>
+                                                <Link href={`/tournaments/${tournamentId}/match-details?team1Name=${encodeURIComponent(match.team1)}&team2Name=${encodeURIComponent(match.team2)}&date=${encodeURIComponent(match.date || '')}&venue=${encodeURIComponent(match.venue || '')}&matchRound=${encodeURIComponent(match.matchRound || '')}`}>
+                                                    <Button>Start Match</Button>
                                                 </Link>
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>

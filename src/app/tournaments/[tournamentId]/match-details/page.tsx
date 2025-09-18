@@ -36,7 +36,7 @@ const matchDetailsSchema = z.object({
   matchType: z.enum(['Limited Overs', 'Test Match', 'The Hundred', 'T20', 'ODI', 'Sixes a Side']),
   matchRound: z.enum(['League', 'Quarter Final', 'Semi Final', 'Final']),
   matchNumber: z.number().min(1),
-  group: z.string().min(1, 'Group is required'),
+  group: z.string().optional(),
   overs: z.number().min(1),
   pitchType: z.enum(['Turf', 'Mat', 'Cement', 'Astroturf']),
   ballType: z.enum(['Leather Ball', 'Tennis Ball', 'Tape Tennis Ball', 'Rubber Ball', 'Synthetic Ball', 'Other']),
@@ -126,6 +126,8 @@ function MatchDetailsContent() {
     const matchDateStr = searchParams.get('date');
     const venue = searchParams.get('venue') || 'TBD';
     const tournamentId = params.tournamentId as string;
+    const matchRoundParam = searchParams.get('matchRound') as 'League' | 'Quarter Final' | 'Semi Final' | 'Final' | null;
+
     
     const [formattedDate, setFormattedDate] = useState<string | null>(null);
 
@@ -133,7 +135,7 @@ function MatchDetailsContent() {
         resolver: zodResolver(matchDetailsSchema),
         defaultValues: {
             matchType: 'Limited Overs',
-            matchRound: 'League',
+            matchRound: matchRoundParam || 'League',
             overs: 20,
             pitchType: 'Turf',
             ballType: 'Leather Ball',
@@ -153,6 +155,12 @@ function MatchDetailsContent() {
             setFormattedDate('Date not set');
         }
     }, [matchDateStr]);
+
+    useEffect(() => {
+        if (matchRoundParam) {
+            form.setValue('matchRound', matchRoundParam);
+        }
+    }, [matchRoundParam, form]);
 
     const fetchTournament = useCallback(async () => {
         if (!tournamentId) return;
@@ -226,7 +234,7 @@ function MatchDetailsContent() {
             team1: team1,
             team2: team2,
             oversPerInnings: data.overs,
-            playersPerSide: team1.players.length, // Use full player list length
+            playersPerSide: Math.min(team1.players.length, team2.players.length), // Use the smaller team size
             toss: { // Dummy toss, will be decided on next page
                 winner: 'team1',
                 decision: 'bat',
@@ -275,12 +283,12 @@ function MatchDetailsContent() {
                     </div>
                     <div className="mt-4 flex justify-around items-center">
                         <div className="flex flex-col items-center gap-2">
-                            <Image src="https://picsum.photos/100/100" alt="Team 1 Logo" width={60} height={60} className="rounded-full" data-ai-hint="cricket team" />
+                            <Image src={team1?.logoUrl || "https://picsum.photos/seed/t1-logo/100/100"} alt="Team 1 Logo" width={60} height={60} className="rounded-full" data-ai-hint="cricket team" />
                             <span className="font-semibold text-sm">{team1Name}</span>
                         </div>
                         <span className="text-2xl font-bold text-gray-400">VS</span>
                          <div className="flex flex-col items-center gap-2">
-                            <Image src="https://picsum.photos/100/100" alt="Team 2 Logo" width={60} height={60} className="rounded-full" data-ai-hint="cricket team" />
+                            <Image src={team2?.logoUrl || "https://picsum.photos/seed/t2-logo/100/100"} alt="Team 2 Logo" width={60} height={60} className="rounded-full" data-ai-hint="cricket team" />
                             <span className="font-semibold text-sm">{team2Name}</span>
                         </div>
                     </div>
@@ -413,4 +421,5 @@ export default function MatchDetailsPage() {
         </Suspense>
     )
 }
+
 
