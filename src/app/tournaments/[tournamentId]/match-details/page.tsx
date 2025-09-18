@@ -118,15 +118,8 @@ function MatchDetailsContent() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [team1, setTeam1] = useState<Team | null>(null);
     const [team2, setTeam2] = useState<Team | null>(null);
-    const [squad1, setSquad1] = useState<Player[]>([]);
-    const [squad2, setSquad2] = useState<Player[]>([]);
     
-    const [dialogOpen, setDialogOpen] = useState(false);
     const [powerPlayDialogOpen, setPowerPlayDialogOpen] = useState(false);
-    const [editingTeam, setEditingTeam] = useState<'team1' | 'team2' | null>(null);
-    const [squadSearchTerm, setSquadSearchTerm] = useState('');
-    const [isPlayerSearchOpen, setPlayerSearchOpen] = useState(false);
-
     
     const team1Name = searchParams.get('team1Name') || 'Team A';
     const team2Name = searchParams.get('team2Name') || 'Team B';
@@ -207,16 +200,10 @@ function MatchDetailsContent() {
             }
 
             const team1Data = await fetchTeamData(team1Name);
-            if (team1Data) {
-                setTeam1(team1Data);
-                setSquad1(team1Data.players);
-            }
+            if (team1Data) setTeam1(team1Data);
 
             const team2Data = await fetchTeamData(team2Name);
-             if (team2Data) {
-                setTeam2(team2Data);
-                setSquad2(team2Data.players);
-            }
+            if (team2Data) setTeam2(team2Data);
 
         } catch (error) {
             console.error("Error fetching teams: ", error);
@@ -229,81 +216,17 @@ function MatchDetailsContent() {
     }, [fetchTeams]);
 
 
-    const handleSquadSelect = (teamKey: 'team1' | 'team2') => {
-        setEditingTeam(teamKey);
-        setSquadSearchTerm(''); // Reset search on open
-        setDialogOpen(true);
-    };
-
-    const handlePlayerSelection = (playerId: string, isSelected: boolean) => {
-        const setSquad = editingTeam === 'team1' ? setSquad1 : setSquad2;
-        const originalTeam = editingTeam === 'team1' ? team1 : team2;
-        if (!originalTeam) return;
-
-        setSquad(currentSquad => {
-            const playerInSquad = currentSquad.some(p => p.id === playerId);
-
-            if (isSelected && !playerInSquad) {
-                const playerToAdd = originalTeam.players.find(p => p.id === playerId);
-                if (playerToAdd) {
-                    return [...currentSquad, playerToAdd];
-                }
-            } else if (!isSelected && playerInSquad) {
-                return currentSquad.filter(p => p.id !== playerId);
-            }
-            return currentSquad;
-        });
-    };
-    
-    const handleAddNewPlayerToTeam = async (player: UserProfile) => {
-        const teamToUpdate = editingTeam === 'team1' ? team1 : team2;
-        const setTeamState = editingTeam === 'team1' ? setTeam1 : setTeam2;
-        const setSquadState = editingTeam === 'team1' ? setSquad1 : setSquad2;
-        
-        if (!teamToUpdate) return;
-        
-        const isAlreadyAdded = teamToUpdate.players.some(p => p.id === player.uid);
-        if (isAlreadyAdded) {
-            toast({ title: "Player already in team", variant: "destructive" });
-            return;
-        }
-
-        const newPlayer: Player = {
-            id: player.uid,
-            name: player.name,
-        };
-
-        const updatedPlayers = [...teamToUpdate.players, newPlayer];
-        const updatedTeamData = { ...teamToUpdate, players: updatedPlayers };
-
-        try {
-            const teamRef = doc(db, 'teams', teamToUpdate.id);
-            await updateDoc(teamRef, { players: arrayUnion({id: newPlayer.id, name: newPlayer.name}) });
-            
-            setTeamState(updatedTeamData);
-            setSquadState(squad => [...squad, newPlayer]);
-            
-            toast({ title: "Player Added!", description: `${newPlayer.name} has been added to ${teamToUpdate.name}.` });
-        } catch (error) {
-            console.error("Error adding new player: ", error);
-            toast({ title: "Error", description: "Could not add player.", variant: "destructive" });
-        }
-    };
-
     const handleProceedToToss = (data: MatchDetailsFormValues) => {
-        if (!team1 || !team2 || squad1.length < 2 || squad2.length < 2) {
-            toast({ title: "Squad Error", description: "Both teams must have at least 2 players selected.", variant: 'destructive' });
+        if (!team1 || !team2) {
+            toast({ title: "Team Error", description: "One or both teams could not be loaded.", variant: 'destructive' });
             return;
         }
-
-        const team1WithSquad = { ...team1, players: squad1 };
-        const team2WithSquad = { ...team2, players: squad2 };
 
         const config: MatchConfig = {
-            team1: team1WithSquad,
-            team2: team2WithSquad,
+            team1: team1,
+            team2: team2,
             oversPerInnings: data.overs,
-            playersPerSide: squad1.length,
+            playersPerSide: team1.players.length, // Use full player list length
             toss: { // Dummy toss, will be decided on next page
                 winner: 'team1',
                 decision: 'bat',
@@ -329,18 +252,9 @@ function MatchDetailsContent() {
 
         router.push(`/tournaments/${tournamentId}/toss?${params.toString()}`);
     };
-
-    const editingTeamData = editingTeam === 'team1' ? team1 : team2;
-    const editingSquadData = editingTeam === 'team1' ? squad1 : squad2;
-    const opponentSquadData = editingTeam === 'team1' ? squad2 : squad1;
     
-    const filteredPlayers = (editingTeamData?.players || []).filter(player =>
-        player.name.toLowerCase().includes(squadSearchTerm.toLowerCase())
-    );
-
     return (
         <div className="min-h-screen bg-background text-foreground font-body">
-            <PlayerSearchDialog open={isPlayerSearchOpen} onOpenChange={setPlayerSearchOpen} onPlayerSelect={handleAddNewPlayerToTeam} />
             <PowerPlayDialog open={powerPlayDialogOpen} onOpenChange={setPowerPlayDialogOpen} control={form.control} overs={form.watch('overs')} />
             <form onSubmit={form.handleSubmit(handleProceedToToss)}>
                 <header className="p-4 bg-gray-800 text-white">
@@ -363,13 +277,11 @@ function MatchDetailsContent() {
                         <div className="flex flex-col items-center gap-2">
                             <Image src="https://picsum.photos/100/100" alt="Team 1 Logo" width={60} height={60} className="rounded-full" data-ai-hint="cricket team" />
                             <span className="font-semibold text-sm">{team1Name}</span>
-                            <Button type="button" variant="outline" size="sm" onClick={() => handleSquadSelect('team1')} disabled={!team1} className="text-black">Select Squad</Button>
                         </div>
                         <span className="text-2xl font-bold text-gray-400">VS</span>
                          <div className="flex flex-col items-center gap-2">
                             <Image src="https://picsum.photos/100/100" alt="Team 2 Logo" width={60} height={60} className="rounded-full" data-ai-hint="cricket team" />
                             <span className="font-semibold text-sm">{team2Name}</span>
-                            <Button type="button" variant="outline" size="sm" onClick={() => handleSquadSelect('team2')} disabled={!team2} className="text-black">Select Squad</Button>
                         </div>
                     </div>
                 </header>
@@ -489,49 +401,6 @@ function MatchDetailsContent() {
                     <Button type="submit" size="lg" className="w-full">Save & Proceed to Toss</Button>
                 </footer>
             </form>
-            
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Select Squad for {editingTeamData?.name}</DialogTitle>
-                        <DialogDescription>{editingSquadData.length}/{editingTeamData?.players?.length || 0} players selected.</DialogDescription>
-                    </DialogHeader>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search players..."
-                            value={squadSearchTerm}
-                            onChange={(e) => setSquadSearchTerm(e.target.value)}
-                            className="pl-10"
-                        />
-                    </div>
-                    <div className="max-h-80 overflow-y-auto space-y-2 p-1">
-                        {filteredPlayers.map(player => {
-                            const isSelectedInOpponentSquad = opponentSquadData.some(p => p.id === player.id);
-                            return (
-                                <div key={player.id} className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id={player.id}
-                                        checked={editingSquadData.some(p => p.id === player.id)}
-                                        onCheckedChange={(checked) => handlePlayerSelection(player.id, !!checked)}
-                                        disabled={isSelectedInOpponentSquad}
-                                    />
-                                    <Label htmlFor={player.id} className={cn(isSelectedInOpponentSquad && "text-muted-foreground line-through")}>
-                                        {player.name}
-                                        {isSelectedInOpponentSquad && " (in other team)"}
-                                    </Label>
-                                </div>
-                            )
-                        })}
-                    </div>
-                    <DialogFooter className="sm:justify-between items-center mt-4">
-                         <Button type="button" variant="outline" onClick={() => setPlayerSearchOpen(true)}>
-                            <Plus className="mr-2 h-4 w-4" /> Add Player
-                        </Button>
-                        <DialogClose asChild><Button type="button" onClick={() => setDialogOpen(false)}>Done</Button></DialogClose>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     )
 }
