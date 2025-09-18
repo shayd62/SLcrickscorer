@@ -149,6 +149,9 @@ function MatchDetailsContent() {
         }
     });
 
+    const matchRound = form.watch('matchRound');
+    const isKnockoutStage = ['Quarter Final', 'Semi Final', 'Final'].includes(matchRound);
+
     useEffect(() => {
         if (matchDateStr) {
             const date = new Date(decodeURIComponent(matchDateStr));
@@ -399,12 +402,12 @@ function MatchDetailsContent() {
                             <Input id="match-number" type="number" {...form.register('matchNumber', { valueAsNumber: true })} className="w-20" />
                         </div>
                         <div className="flex items-center justify-between p-3 border rounded-lg">
-                            <Label htmlFor="group-select" className="font-semibold">Group</Label>
+                            <Label htmlFor="group-select" className={cn("font-semibold", isKnockoutStage && "text-muted-foreground")}>Group</Label>
                              <Controller
                                 control={form.control}
                                 name="group"
                                 render={({ field }) => (
-                                    <Select onValueChange={field.onChange} value={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value} disabled={isKnockoutStage}>
                                         <SelectTrigger className="w-24 border-0 shadow-none">
                                             <SelectValue placeholder="Select"/>
                                         </SelectTrigger>
@@ -541,3 +544,4 @@ export default function MatchDetailsPage() {
         </Suspense>
     )
 }
+
