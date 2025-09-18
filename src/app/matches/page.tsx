@@ -175,7 +175,7 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
     
     // Determine which team batted first
     const firstInningsTeamKey = innings1.battingTeam;
-    const secondInningsTeamKey = firstInningsTeamKey === 'team1' ? 'team2' : 'team1';
+    const secondInningsTeamKey = innings2 ? innings2.battingTeam : (firstInningsTeamKey === 'team1' ? 'team2' : 'team1');
 
     const firstInningsTeamInfo = config[firstInningsTeamKey];
     const secondInningsTeamInfo = config[secondInningsTeamKey];
@@ -186,6 +186,7 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
     const firstInningsScore = {
         score: innings1.score,
         wickets: innings1.wickets,
+        overs: formatOvers(innings1.balls, config.ballsPerOver)
     };
     
     const secondInningsScore = innings2 ? {
@@ -212,7 +213,7 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
                             <Image src="https://picsum.photos/seed/t1-flag/24/16" width={24} height={16} alt={`${firstInningsTeamInfo.name} flag`} className="rounded-sm" data-ai-hint="cricket team" />
                             <span className={cn("text-lg truncate", firstInningsIsWinner && "font-bold")}>{firstInningsTeamInfo.name}</span>
                         </div>
-                        <div className="font-bold text-lg">{firstInningsScore.score}/{firstInningsScore.wickets}</div>
+                        <div className="font-bold text-lg">{firstInningsScore.score}/{firstInningsScore.wickets} <span className="font-normal text-sm text-muted-foreground">({firstInningsScore.overs})</span></div>
                     </div>
                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -484,3 +485,6 @@ export default withAuth(HomePage);
 
 
 
+
+
+    
