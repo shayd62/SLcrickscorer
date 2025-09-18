@@ -134,18 +134,22 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
     onUpdate({ groups: updatedGroups });
   };
   
+  const isNextRound = tournament.qualifiedTeams && tournament.qualifiedTeams.length > 0;
+  const availableTeamsForAssignment = isNextRound ? tournament.qualifiedTeams : tournament.participatingTeams;
+  
   const assignedTeams = useMemo(() => (tournament.groups || []).flatMap(g => g.teams), [tournament.groups]);
-  const unassignedTeams = useMemo(() => (tournament.participatingTeams || []).filter(t => !assignedTeams.includes(t)), [tournament.participatingTeams, assignedTeams]);
+  const unassignedTeams = useMemo(() => (availableTeamsForAssignment || []).filter(t => !assignedTeams.includes(t)), [availableTeamsForAssignment, assignedTeams]);
   
   return (
     <div className="space-y-6">
        {isOwner && (
         <Card>
           <CardHeader>
-            <CardTitle>Create & Manage Groups</CardTitle>
+            <CardTitle>{isNextRound ? 'Next Round Setup' : 'Create & Manage Groups'}</CardTitle>
+            <CardDescription>{isNextRound ? 'Create new groups for the qualified teams.' : 'Add groups and assign teams to them.'}</CardDescription>
           </CardHeader>
            <CardContent className="flex gap-2">
-            <Input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="e.g., Group A" />
+            <Input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder={isNextRound ? "e.g., Super 8 - Group 1" : "e.g., Group A"} />
             <Button onClick={handleAddGroup}><Plus className="mr-2 h-4 w-4" /> Add Group</Button>
           </CardContent>
         </Card>
@@ -168,7 +172,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
             <CardContent>
               <h4 className="font-semibold mb-2">Assign Teams</h4>
               <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                {tournament.participatingTeams.map(teamName => (
+                {availableTeamsForAssignment.map(teamName => (
                   <div key={teamName} className="flex items-center space-x-2">
                     <Checkbox id={`${group.name}-${teamName}`} checked={group.teams.includes(teamName)} onCheckedChange={(checked) => isOwner && handleTeamSelection(group.name, teamName, !!checked)} disabled={!group.teams.includes(teamName) && assignedTeams.includes(teamName)} />
                     <label htmlFor={`${group.name}-${teamName}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{teamName}</label>
@@ -193,7 +197,11 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
 
 
 function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifiedTeams }: { teams: TournamentPoints[], title?: string, onUpdate?: (data: Partial<Tournament>) => Promise<void>, isOwner?: boolean, qualifiedTeams?: string[] }) {
-    const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+    const [selectedTeams, setSelectedTeams] = useState<string[]>(qualifiedTeams || []);
+
+    useEffect(() => {
+        setSelectedTeams(qualifiedTeams || []);
+    }, [qualifiedTeams]);
 
     const sortedTeams = [...teams].sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
