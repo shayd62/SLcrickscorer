@@ -164,6 +164,8 @@ export default function AddMatchPage() {
     const router = useRouter();
     const { toast } = useToast();
     const tournamentId = params.tournamentId as string;
+    const searchParams = useSearchParams();
+    const groupName = searchParams.get('group');
 
     const fetchTournamentAndTeams = useCallback(async () => {
         if (!tournamentId) return;
@@ -172,9 +174,13 @@ export default function AddMatchPage() {
             if (doc.exists()) {
                 const tourneyData = { ...doc.data() as Tournament, id: doc.id };
                 setTournament(tourneyData);
+                
+                const teamsToFetch = (tourneyData.qualifiedTeams && tourneyData.qualifiedTeams.length > 0) 
+                    ? tourneyData.qualifiedTeams 
+                    : tourneyData.participatingTeams;
 
-                if (tourneyData.participatingTeams && tourneyData.participatingTeams.length > 0) {
-                    const teamsQuery = query(collection(db, "teams"), where("name", "in", tourneyData.participatingTeams));
+                if (teamsToFetch && teamsToFetch.length > 0) {
+                    const teamsQuery = query(collection(db, "teams"), where("name", "in", teamsToFetch));
                     getDocs(teamsQuery).then(snapshot => {
                         const teamsData = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Team));
                         setAllTeams(teamsData);
@@ -217,7 +223,7 @@ export default function AddMatchPage() {
 
         const newMatch: TournamentMatch = {
             id: `match-${team1.id}-vs-${team2.id}-${Date.now()}`,
-            groupName: '', // This can be determined based on groups if needed
+            groupName: groupName || '',
             team1: team1.name,
             team2: team2.name,
             status: 'Upcoming',
@@ -241,6 +247,10 @@ export default function AddMatchPage() {
     if (loading) {
         return <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">Loading...</div>;
     }
+    
+    const displayedTeams = groupName 
+      ? allTeams.filter(team => tournament?.groups?.find(g => g.name === groupName)?.teams.includes(team.name))
+      : allTeams;
 
     return (
         <div className="min-h-screen bg-gray-900 text-white font-body">
@@ -248,7 +258,7 @@ export default function AddMatchPage() {
                 <div className="relative text-center">
                     <Button variant="ghost" size="icon" onClick={() => router.back()} className="absolute left-0 top-1/2 -translate-y-1/2 hover:bg-gray-800"><ArrowLeft className="h-6 w-6" /></Button>
                     <h1 className="text-2xl font-bold">Schedule a New Match</h1>
-                    <p className="text-sm text-muted-foreground">Choose a group, select two teams, and set the date and time.</p>
+                    <p className="text-sm text-muted-foreground">{groupName ? `Group: ${groupName}` : "Choose teams and set the date and time."}</p>
                 </div>
             </header>
 
@@ -312,14 +322,14 @@ export default function AddMatchPage() {
             <TeamSelectionDialog
                 open={isTeam1DialogOpen}
                 onOpenChange={setTeam1DialogOpen}
-                teams={allTeams}
+                teams={displayedTeams}
                 onTeamSelect={setTeam1}
                 excludeTeamName={team2?.name}
             />
             <TeamSelectionDialog
                 open={isTeam2DialogOpen}
                 onOpenChange={setTeam2DialogOpen}
-                teams={allTeams}
+                teams={displayedTeams}
                 onTeamSelect={setTeam2}
                 excludeTeamName={team1?.name}
             />
