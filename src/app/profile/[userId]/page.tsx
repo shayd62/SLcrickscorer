@@ -6,12 +6,14 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, User, BarChart2, Shield } from 'lucide-react';
+import { ArrowLeft, User, BarChart2, Shield, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import type { UserProfile, MatchState, Batsman, Bowler } from '@/lib/types';
 import { CricketBatIcon, CricketBallIcon } from '@/components/icons';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 const formatOvers = (balls: number, ballsPerOver: number = 6) => `${Math.floor(balls / ballsPerOver)}.${balls % ballsPerOver}`;
 
@@ -36,6 +38,59 @@ interface CareerStats {
     economy: number;
 }
 
+function MatchHistory({ matches }: { matches: MatchState[] }) {
+    const router = useRouter();
+
+    if (matches.length === 0) {
+        return (
+            <Card className="w-full max-w-2xl">
+                <CardHeader>
+                    <CardTitle>Match History</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground text-center py-4">No match history found.</p>
+                </CardContent>
+            </Card>
+        );
+    }
+    
+    // Sort matches by date, most recent first
+    const sortedMatches = [...matches].sort((a, b) => {
+        const dateA = a.config.matchDate ? new Date(a.config.matchDate).getTime() : 0;
+        const dateB = b.config.matchDate ? new Date(b.config.matchDate).getTime() : 0;
+        return dateB - dateA;
+    });
+
+    return (
+        <Card className="w-full max-w-2xl">
+            <CardHeader>
+                <CardTitle>Match History</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+                {sortedMatches.map(match => (
+                    <Card 
+                        key={match.id} 
+                        className="cursor-pointer hover:bg-secondary/50" 
+                        onClick={() => router.push(`/scorecard/${match.id}`)}
+                    >
+                        <CardContent className="p-4">
+                            <div className="flex justify-between items-center">
+                                <div className="space-y-1">
+                                    <p className="font-semibold">{match.config.team1.name} vs {match.config.team2.name}</p>
+                                    <p className="text-sm text-green-600">{match.resultText}</p>
+                                    <p className="text-xs text-muted-foreground">{match.config.matchDate ? new Date(match.config.matchDate).toLocaleDateString() : 'Date not set'}</p>
+                                </div>
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </CardContent>
+        </Card>
+    );
+}
+
+
 function CareerStatsPage() {
     const params = useParams();
     const router = useRouter();
@@ -43,6 +98,7 @@ function CareerStatsPage() {
 
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [stats, setStats] = useState<CareerStats | null>(null);
+    const [playerMatches, setPlayerMatches] = useState<MatchState[]>([]);
     const [loading, setLoading] = useState(true);
 
     const calculateStats = useCallback((matches: MatchState[], playerId: string): CareerStats => {
@@ -126,7 +182,6 @@ function CareerStatsPage() {
                 if (userSnap.exists()) {
                     setProfile(userSnap.data() as UserProfile);
                 } else {
-                    // Fallback to query by UID if ID is not the phone number for some reason
                     const q = query(collection(db, 'users'), where('uid', '==', userId));
                     const querySnapshot = await getDocs(q);
                     if (!querySnapshot.empty) {
@@ -137,15 +192,17 @@ function CareerStatsPage() {
                 // Fetch all matches and filter client-side
                 const matchesRef = collection(db, "matches");
                 const matchesSnap = await getDocs(matchesRef);
-                const allMatches = matchesSnap.docs.map(doc => doc.data() as MatchState);
+                const allMatches = matchesSnap.docs.map(doc => ({...doc.data(), id: doc.id}) as MatchState);
                 
-                const playerMatches = allMatches.filter(match => {
+                const matchesForPlayer = allMatches.filter(match => {
                     const playerInTeam1 = match.config.team1.players.some(p => p.id === userId);
                     const playerInTeam2 = match.config.team2.players.some(p => p.id === userId);
                     return playerInTeam1 || playerInTeam2;
                 });
 
-                const careerStats = calculateStats(playerMatches, userId);
+                setPlayerMatches(matchesForPlayer);
+
+                const careerStats = calculateStats(matchesForPlayer, userId);
                 setStats(careerStats);
 
             } catch (error) {
@@ -231,11 +288,10 @@ function CareerStatsPage() {
                         </Table>
                     </CardContent>
                 </Card>
+                <MatchHistory matches={playerMatches} />
             </main>
         </div>
     );
 }
 
 export default CareerStatsPage;
-
-    
