@@ -101,7 +101,7 @@ function CareerStatsPage() {
     const [playerMatches, setPlayerMatches] = useState<MatchState[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const calculateStats = useCallback((matches: MatchState[], playerId: string): CareerStats => {
+    const calculateStats = useCallback((matches: MatchState[], playerProfile: UserProfile): CareerStats => {
         const career: CareerStats = {
             matches: matches.length,
             runs: 0,
@@ -127,8 +127,16 @@ function CareerStatsPage() {
             const processInnings = (innings: Innings) => {
                 if (!innings) return;
 
+                // Find the player's ID in this specific match's config by matching name
+                const playerInTeam1 = match.config.team1.players.find(p => p.name === playerProfile.name);
+                const playerInTeam2 = match.config.team2.players.find(p => p.name === playerProfile.name);
+                
+                const matchPlayerId = playerInTeam1?.id || playerInTeam2?.id;
+
+                if (!matchPlayerId) return;
+
                 // Batting stats
-                const batsman = innings.batsmen?.[playerId];
+                const batsman = innings.batsmen?.[matchPlayerId];
                 if (batsman && (batsman.balls > 0 || batsman.isOut)) {
                     career.runs += batsman.runs;
                     career.ballsFaced += batsman.balls;
@@ -145,7 +153,7 @@ function CareerStatsPage() {
                 }
 
                 // Bowling stats
-                const bowler = innings.bowlers?.[playerId];
+                const bowler = innings.bowlers?.[matchPlayerId];
                 if (bowler && bowler.balls > 0) {
                     career.wickets += bowler.wickets;
                     career.runsConceded += bowler.runsConceded;
@@ -179,41 +187,44 @@ function CareerStatsPage() {
                 const userDocRef = doc(db, 'users', userId);
                 const userSnap = await getDoc(userDocRef);
                 
+                let fetchedProfile: UserProfile | null = null;
                 if (userSnap.exists()) {
-                    setProfile(userSnap.data() as UserProfile);
+                    fetchedProfile = userSnap.data() as UserProfile;
                 } else {
-                    // Fallback for older UID-based IDs, might be needed if not fully migrated.
                     const q = query(collection(db, 'users'), where('uid', '==', userId));
                     const querySnapshot = await getDocs(q);
                     if (!querySnapshot.empty) {
-                        setProfile(querySnapshot.docs[0].data() as UserProfile);
+                        fetchedProfile = querySnapshot.docs[0].data() as UserProfile;
                     }
                 }
+                setProfile(fetchedProfile);
 
-                // Fetch all matches and filter client-side
-                const matchesRef = collection(db, "matches");
-                const matchesSnap = await getDocs(matchesRef);
-                const allMatches = matchesSnap.docs.map(doc => ({...doc.data(), id: doc.id}) as MatchState);
-                
-                const matchesForPlayer = allMatches.filter(match => {
-                    const playerInTeam1 = match.config.team1.players.some(p => p.id === userId);
-                    const playerInTeam2 = match.config.team2.players.some(p => p.id === userId);
-                    return playerInTeam1 || playerInTeam2;
-                });
+                if (fetchedProfile) {
+                  // Fetch all matches and filter client-side
+                  const matchesRef = collection(db, "matches");
+                  const matchesSnap = await getDocs(matchesRef);
+                  const allMatches = matchesSnap.docs.map(doc => ({...doc.data(), id: doc.id}) as MatchState);
+                  
+                  const matchesForPlayer = allMatches.filter(match => {
+                      const playerInTeam1 = match.config.team1.players.some(p => p.name === fetchedProfile!.name);
+                      const playerInTeam2 = match.config.team2.players.some(p => p.name === fetchedProfile!.name);
+                      return playerInTeam1 || playerInTeam2;
+                  });
 
-                setPlayerMatches(matchesForPlayer);
+                  setPlayerMatches(matchesForPlayer);
 
-                if (matchesForPlayer.length > 0) {
-                    const careerStats = calculateStats(matchesForPlayer, userId);
-                    setStats(careerStats);
-                } else {
-                    // Set zero stats if no matches are found
-                    setStats({
-                        matches: 0, runs: 0, ballsFaced: 0, notOuts: 0, fifties: 0, hundreds: 0,
-                        bestScore: { runs: 0, balls: 0, isOut: true }, strikeRate: 0, battingAverage: 0,
-                        wickets: 0, runsConceded: 0, ballsBowled: 0, fiveWicketHauls: 0,
-                        bestBowling: { wickets: 0, runs: 0 }, bowlingAverage: 0, economy: 0,
-                    });
+                  if (matchesForPlayer.length > 0) {
+                      const careerStats = calculateStats(matchesForPlayer, fetchedProfile);
+                      setStats(careerStats);
+                  } else {
+                      // Set zero stats if no matches are found
+                      setStats({
+                          matches: 0, runs: 0, ballsFaced: 0, notOuts: 0, fifties: 0, hundreds: 0,
+                          bestScore: { runs: 0, balls: 0, isOut: true }, strikeRate: 0, battingAverage: 0,
+                          wickets: 0, runsConceded: 0, ballsBowled: 0, fiveWicketHauls: 0,
+                          bestBowling: { wickets: 0, runs: 0 }, bowlingAverage: 0, economy: 0,
+                      });
+                  }
                 }
 
             } catch (error) {
@@ -306,3 +317,4 @@ function CareerStatsPage() {
 }
 
 export default CareerStatsPage;
+
