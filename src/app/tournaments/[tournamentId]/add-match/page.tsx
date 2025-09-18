@@ -3,124 +3,211 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowLeft, CalendarIcon } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Tournament, TournamentGroup, TournamentMatch } from '@/lib/types';
+import type { Tournament, Team, Player, TournamentMatch } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+
+function ChipButton({ label, isSelected, onClick }: { label: string; isSelected: boolean; onClick: () => void }) {
+    return (
+        <Button
+            type="button"
+            variant={isSelected ? 'default' : 'outline'}
+            className={cn(
+                "rounded-full border-gray-600 hover:bg-gray-700",
+                isSelected && "bg-green-500 hover:bg-green-600 border-green-500"
+            )}
+            onClick={onClick}
+        >
+            {label}
+        </Button>
+    )
+}
+
+function TeamSelectionDialog({
+    open,
+    onOpenChange,
+    teams,
+    onTeamSelect,
+    excludeTeamName,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    teams: Team[];
+    onTeamSelect: (team: Team) => void;
+    excludeTeamName?: string;
+}) {
+    const availableTeams = teams.filter(t => t.name !== excludeTeamName);
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="bg-gray-800 text-white border-gray-700">
+                <DialogHeader>
+                    <DialogTitle>Select a Team</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {availableTeams.map(team => (
+                        <div
+                            key={team.id}
+                            className="flex items-center gap-4 p-2 rounded-md hover:bg-gray-700 cursor-pointer"
+                            onClick={() => {
+                                onTeamSelect(team);
+                                onOpenChange(false);
+                            }}
+                        >
+                            <Image src={team.logoUrl || `https://picsum.photos/seed/${team.id}/40/40`} alt={team.name} width={40} height={40} className="rounded-full" />
+                            <span className="font-semibold">{team.name}</span>
+                        </div>
+                    ))}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function SquadSelectionDialog({
+    open,
+    onOpenChange,
+    team,
+    selectedPlayers,
+    onSquadConfirm,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    team: Team | null;
+    selectedPlayers: Player[];
+    onSquadConfirm: (squad: Player[]) => void;
+}) {
+    const [squad, setSquad] = useState<Player[]>(selectedPlayers);
+
+    useEffect(() => {
+        setSquad(selectedPlayers);
+    }, [selectedPlayers, open]);
+
+    const handlePlayerToggle = (player: Player) => {
+        setSquad(currentSquad =>
+            currentSquad.some(p => p.id === player.id)
+                ? currentSquad.filter(p => p.id !== player.id)
+                : [...currentSquad, player]
+        );
+    };
+    
+    const handleConfirm = () => {
+        onSquadConfirm(squad);
+        onOpenChange(false);
+    }
+
+    if (!team) return null;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="bg-gray-800 text-white border-gray-700">
+                <DialogHeader>
+                    <DialogTitle>Select Squad for {team.name}</DialogTitle>
+                    <DialogDescription>{squad.length} players selected.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {team.players.map(player => (
+                        <div key={player.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-700">
+                            <Checkbox
+                                id={`squad-${player.id}`}
+                                checked={squad.some(p => p.id === player.id)}
+                                onCheckedChange={() => handlePlayerToggle(player)}
+                                className="border-gray-500 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                            />
+                            <Label htmlFor={`squad-${player.id}`} className="cursor-pointer">{player.name}</Label>
+                        </div>
+                    ))}
+                </div>
+                <DialogClose asChild>
+                    <Button onClick={handleConfirm} className="w-full mt-4 bg-primary hover:bg-primary/90">
+                        Confirm Squad
+                    </Button>
+                </DialogClose>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 export default function AddMatchPage() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
-    const [selectedGroup, setSelectedGroup] = useState<TournamentGroup | null>(null);
-    const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
-    const [matchDate, setMatchDate] = useState<Date | undefined>();
-    const [matchTime, setMatchTime] = useState<string>('');
+    const [allTeams, setAllTeams] = useState<Team[]>([]);
+    const [team1, setTeam1] = useState<Team | null>(null);
+    const [team2, setTeam2] = useState<Team | null>(null);
+    const [squad1, setSquad1] = useState<Player[]>([]);
+    const [squad2, setSquad2] = useState<Player[]>([]);
+    
+    const [matchRound, setMatchRound] = useState('League');
+    const [matchDate, setMatchDate] = useState<Date | undefined>(new Date());
+    const [matchTime, setMatchTime] = useState<string>(format(new Date(), 'HH:mm'));
+
+    const [isTeam1DialogOpen, setTeam1DialogOpen] = useState(false);
+    const [isTeam2DialogOpen, setTeam2DialogOpen] = useState(false);
+    const [isSquad1DialogOpen, setSquad1DialogOpen] = useState(false);
+    const [isSquad2DialogOpen, setSquad2DialogOpen] = useState(false);
+
     const [loading, setLoading] = useState(true);
-    const [isEditing, setIsEditing] = useState(false);
-    const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
     
     const params = useParams();
     const router = useRouter();
-    const searchParams = useSearchParams();
     const { toast } = useToast();
     const tournamentId = params.tournamentId as string;
 
-    const fetchTournamentAndListen = useCallback(() => {
+    const fetchTournamentAndTeams = useCallback(async () => {
         if (!tournamentId) return;
-        const unsub = onSnapshot(doc(db, "tournaments", tournamentId), (doc) => {
+
+        const unsubTournament = onSnapshot(doc(db, "tournaments", tournamentId), (doc) => {
             if (doc.exists()) {
-                const tournamentData = { ...doc.data() as Tournament, id: doc.id };
-                setTournament(tournamentData);
+                const tourneyData = { ...doc.data() as Tournament, id: doc.id };
+                setTournament(tourneyData);
 
-                const groupNameFromParams = searchParams.get('group');
-                if (groupNameFromParams) {
-                    const group = tournamentData.groups?.find(g => g.name === groupNameFromParams);
-                    if (group) {
-                        setSelectedGroup(group);
-                    }
+                if (tourneyData.participatingTeams && tourneyData.participatingTeams.length > 0) {
+                    const teamsQuery = query(collection(db, "teams"), where("name", "in", tourneyData.participatingTeams));
+                    getDocs(teamsQuery).then(snapshot => {
+                        const teamsData = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Team));
+                        setAllTeams(teamsData);
+                    });
                 }
-
-                const editMode = searchParams.get('edit') === 'true';
-                const matchId = searchParams.get('matchId');
-
-                if (editMode && matchId) {
-                    setIsEditing(true);
-                    setEditingMatchId(matchId);
-                    const matchToEdit = tournamentData.matches?.find(m => m.id === matchId);
-                    if (matchToEdit) {
-                        const group = tournamentData.groups?.find(g => g.name === matchToEdit.groupName) || null;
-                        setSelectedGroup(group);
-                        setSelectedTeams([matchToEdit.team1, matchToEdit.team2]);
-                        if (matchToEdit.date) {
-                            const date = new Date(matchToEdit.date);
-                            setMatchDate(date);
-                            setMatchTime(format(date, 'HH:mm'));
-                        }
-                    }
-                }
-
             } else {
                 toast({ title: "Error", description: "Tournament not found.", variant: "destructive" });
                 router.push('/tournaments');
             }
             setLoading(false);
         });
-        return unsub;
-    }, [tournamentId, router, toast, searchParams]);
+
+        return unsubTournament;
+    }, [tournamentId, router, toast]);
 
     useEffect(() => {
-        const unsubscribe = fetchTournamentAndListen();
-        return () => unsubscribe && unsubscribe();
-    }, [fetchTournamentAndListen]);
-
-    const handleGroupSelect = (groupName: string) => {
-        const group = tournament?.groups?.find(g => g.name === groupName) || null;
-        setSelectedGroup(group);
-        setSelectedTeams([]);
-    };
-
-    const handleTeamSelect = (teamName: string) => {
-        if (isEditing) {
-            toast({ title: "Cannot change teams while editing."});
-            return;
+        const unsubscribe = fetchTournamentAndTeams();
+        return () => {
+            unsubscribe.then(unsub => unsub && unsub());
         }
-        setSelectedTeams(prev => {
-            if (prev.includes(teamName)) {
-                return prev.filter(t => t !== teamName);
-            }
-            if (prev.length < 2) {
-                return [...prev, teamName];
-            }
-            toast({
-                title: "Limit Reached",
-                description: "You can only select two teams for a match.",
-                variant: "destructive"
-            });
-            return prev;
-        });
-    };
-    
+    }, [fetchTournamentAndTeams]);
+
     const handleScheduleMatch = async () => {
-        if (selectedTeams.length !== 2) {
-             toast({ title: "Selection Error", description: "Please select exactly two teams.", variant: "destructive" });
+        if (!team1 || !team2) {
+            toast({ title: "Selection Error", description: "Please select both teams.", variant: "destructive" });
             return;
         }
-        if (!matchDate) {
-            toast({ title: "Date Missing", description: "Please select a date for the match.", variant: "destructive" });
+        if (squad1.length === 0 || squad2.length === 0) {
+            toast({ title: "Squad Error", description: "Please select squads for both teams.", variant: "destructive" });
             return;
         }
-        if (!matchTime) {
-            toast({ title: "Time Missing", description: "Please enter a time for the match.", variant: "destructive" });
+        if (!matchDate || !matchTime) {
+            toast({ title: "Date/Time Error", description: "Please set a date and time for the match.", variant: "destructive" });
             return;
         }
 
@@ -128,134 +215,128 @@ export default function AddMatchPage() {
         const finalMatchDate = new Date(matchDate);
         finalMatchDate.setHours(hours, minutes);
 
-        if (isEditing && editingMatchId) {
-            // Update existing match
-            const updatedMatches = tournament?.matches?.map(m => {
-                if (m.id === editingMatchId) {
-                    return { ...m, date: finalMatchDate.toISOString() };
-                }
-                return m;
-            });
-            try {
-                const tournamentRef = doc(db, "tournaments", tournamentId);
-                await updateDoc(tournamentRef, { matches: updatedMatches });
-                toast({ title: "Match Rescheduled!", description: "The match date and time have been updated." });
-                router.push(`/tournaments/${tournamentId}`);
-            } catch (e) {
-                console.error("Error rescheduling match: ", e);
-                toast({ title: "Error", description: "Could not reschedule the match.", variant: 'destructive' });
-            }
-        } else {
-            // Add new match
-            const newMatch: TournamentMatch = {
-                id: `match-${selectedTeams[0].replace(/\s/g, '')}-vs-${selectedTeams[1].replace(/\s/g, '')}-${Date.now()}`,
-                groupName: selectedGroup!.name,
-                team1: selectedTeams[0],
-                team2: selectedTeams[1],
-                status: 'Upcoming',
-                date: finalMatchDate.toISOString(),
-                venue: tournament?.location || 'TBD',
-            };
-            
-            try {
-                const tournamentRef = doc(db, "tournaments", tournamentId);
-                await updateDoc(tournamentRef, {
-                    matches: arrayUnion(newMatch)
-                });
-                toast({ title: "Match Scheduled!", description: "The new match has been added to the tournament." });
-                router.push(`/tournaments/${tournamentId}`);
-            } catch (e) {
-                console.error("Error scheduling match: ", e);
-                toast({ title: "Error", description: "Could not schedule the match.", variant: 'destructive' });
-            }
-        }
-    }
+        const newMatch: TournamentMatch = {
+            id: `match-${team1.id}-vs-${team2.id}-${Date.now()}`,
+            groupName: '', // This can be determined based on groups if needed
+            team1: team1.name,
+            team2: team2.name,
+            status: 'Upcoming',
+            date: finalMatchDate.toISOString(),
+            venue: tournament?.location || 'TBD',
+        };
 
+        try {
+            const tournamentRef = doc(db, "tournaments", tournamentId);
+            await updateDoc(tournamentRef, {
+                matches: arrayUnion(newMatch)
+            });
+            toast({ title: "Match Scheduled!", description: `${team1.name} vs ${team2.name} has been added.` });
+            router.push(`/tournaments/${tournamentId}`);
+        } catch (e) {
+            console.error("Error scheduling match: ", e);
+            toast({ title: "Error", description: "Could not schedule the match.", variant: 'destructive' });
+        }
+    };
+    
     if (loading) {
-        return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+        return <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">Loading...</div>;
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 text-foreground font-body">
-            <header className="py-4 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
-                <Button variant="ghost" size="icon" onClick={() => router.back()}><ArrowLeft className="h-6 w-6" /></Button>
-                <div className='flex flex-col items-center text-center'>
-                    <h1 className="text-2xl font-bold">{isEditing ? 'Reschedule Match' : 'Add New Match'}</h1>
-                    <p className="text-sm text-muted-foreground">{tournament?.name}</p>
+        <div className="min-h-screen bg-gray-900 text-white font-body">
+            <header className="py-4 px-4 md:px-6">
+                <div className="relative text-center">
+                    <Button variant="ghost" size="icon" onClick={() => router.back()} className="absolute left-0 top-1/2 -translate-y-1/2 hover:bg-gray-800"><ArrowLeft className="h-6 w-6" /></Button>
+                    <h1 className="text-2xl font-bold">Schedule a New Match</h1>
+                    <p className="text-sm text-muted-foreground">Choose a group, select two teams, and set the date and time.</p>
                 </div>
-                <div className="w-10"></div>
             </header>
 
-            <main className="p-4 md:p-8 flex justify-center">
-                <Card className="w-full max-w-lg">
-                    <CardHeader>
-                        <CardTitle>{isEditing ? 'Update Date and Time' : 'Schedule a New Match'}</CardTitle>
-                        <CardDescription>{isEditing ? 'Change the scheduled date and time for this match.' : 'Choose a group, select two teams, and set the date and time.'}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
+            <main className="p-4 md:p-8 flex flex-col items-center gap-8">
+                {/* Team Selection */}
+                <div className="w-full max-w-2xl grid grid-cols-[1fr,auto,1fr] items-start gap-4">
+                    <div className="flex flex-col items-center gap-3">
+                        <Image src={team1?.logoUrl || `https://picsum.photos/seed/team1/80/80`} alt={team1?.name || "Team 1"} width={80} height={80} className="rounded-full bg-gray-700 cursor-pointer" onClick={() => setTeam1DialogOpen(true)} />
+                        <span className="font-semibold text-center">{team1?.name || "Team 1"}</span>
+                        <Button variant="secondary" className="bg-gray-700 text-white hover:bg-gray-600" onClick={() => setSquad1DialogOpen(true)} disabled={!team1}>Select Squad</Button>
+                    </div>
+                    <span className="text-2xl font-bold self-center pt-8">VS</span>
+                    <div className="flex flex-col items-center gap-3">
+                        <Image src={team2?.logoUrl || `https://picsum.photos/seed/team2/80/80`} alt={team2?.name || "Team 2"} width={80} height={80} className="rounded-full bg-gray-700 cursor-pointer" onClick={() => setTeam2DialogOpen(true)} />
+                        <span className="font-semibold text-center">{team2?.name || "Team 2"}</span>
+                        <Button variant="secondary" className="bg-gray-700 text-white hover:bg-gray-600" onClick={() => setSquad2DialogOpen(true)} disabled={!team2}>Select Squad</Button>
+                    </div>
+                </div>
+
+                {/* Match Details */}
+                <div className="w-full max-w-md space-y-6">
+                    <div className="space-y-2">
+                        <Label className="font-semibold">Match Round</Label>
+                        <div className="flex flex-wrap gap-2">
+                            <ChipButton label="League" isSelected={matchRound === 'League'} onClick={() => setMatchRound('League')} />
+                            <ChipButton label="Quarter Final" isSelected={matchRound === 'Quarter Final'} onClick={() => setMatchRound('Quarter Final')} />
+                            <ChipButton label="Semi Final" isSelected={matchRound === 'Semi Final'} onClick={() => setMatchRound('Semi Final')} />
+                            <ChipButton label="Final" isSelected={matchRound === 'Final'} onClick={() => setMatchRound('Final')} />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label>Select Team</Label>
-                            <Select onValueChange={handleGroupSelect} value={selectedGroup?.name} disabled={!tournament?.groups || tournament.groups.length === 0 || isEditing}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Choose a group" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {tournament?.groups?.map(g => (
-                                        <SelectItem key={g.name} value={g.name}>{g.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {!tournament?.groups || tournament.groups.length === 0 && (
-                                <p className="text-xs text-destructive">No groups found. Please create groups in the tournament dashboard first.</p>
-                            )}
+                            <Label>Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal bg-gray-800 border-gray-600", !matchDate && "text-muted-foreground")}>
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {matchDate ? format(matchDate, "PPP") : <span>Pick a date</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0 bg-gray-800 border-gray-700 text-white">
+                                    <Calendar mode="single" selected={matchDate} onSelect={setMatchDate} initialFocus />
+                                </PopoverContent>
+                            </Popover>
                         </div>
-
-                        {selectedGroup && (
-                            <div className="space-y-4">
-                                <h4 className="font-semibold">Select Teams from {selectedGroup.name}</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    {selectedGroup.teams.map(teamName => (
-                                        <div key={teamName} className="flex items-center space-x-2 p-3 rounded-md border bg-secondary/30">
-                                            <Checkbox
-                                                id={teamName}
-                                                checked={selectedTeams.includes(teamName)}
-                                                onCheckedChange={() => handleTeamSelect(teamName)}
-                                                disabled={isEditing}
-                                            />
-                                            <label htmlFor={teamName} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                                {teamName}
-                                            </label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Date</Label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !matchDate && "text-muted-foreground")}>
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {matchDate ? format(matchDate, "PPP") : <span>Pick a date</span>}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={matchDate} onSelect={setMatchDate} initialFocus /></PopoverContent>
-                                </Popover>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor='time'>Time</Label>
-                                <Input id="time" type="time" value={matchTime} onChange={(e) => setMatchTime(e.target.value)} />
-                            </div>
+                        <div className="space-y-2">
+                            <Label htmlFor='time'>Time</Label>
+                            <Input id="time" type="time" value={matchTime} onChange={(e) => setMatchTime(e.target.value)} className="bg-gray-800 border-gray-600" />
                         </div>
-                        
-                        <Button onClick={handleScheduleMatch} disabled={selectedTeams.length !== 2 || !matchDate || !matchTime} className="w-full">
-                           {isEditing ? 'Save Changes' : 'Schedule Match'}
-                        </Button>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
+
+                {/* Schedule Button */}
+                <div className="w-full max-w-md">
+                     <Button onClick={handleScheduleMatch} className="w-full h-12 text-lg bg-primary hover:bg-primary/90">
+                        Schedule Match
+                     </Button>
+                </div>
             </main>
+
+            <TeamSelectionDialog
+                open={isTeam1DialogOpen}
+                onOpenChange={setTeam1DialogOpen}
+                teams={allTeams}
+                onTeamSelect={setTeam1}
+                excludeTeamName={team2?.name}
+            />
+            <TeamSelectionDialog
+                open={isTeam2DialogOpen}
+                onOpenChange={setTeam2DialogOpen}
+                teams={allTeams}
+                onTeamSelect={setTeam2}
+                excludeTeamName={team1?.name}
+            />
+            <SquadSelectionDialog
+                open={isSquad1DialogOpen}
+                onOpenChange={setSquad1DialogOpen}
+                team={team1}
+                selectedPlayers={squad1}
+                onSquadConfirm={setSquad1}
+            />
+            <SquadSelectionDialog
+                open={isSquad2DialogOpen}
+                onOpenChange={setSquad2DialogOpen}
+                team={team2}
+                selectedPlayers={squad2}
+                onSquadConfirm={setSquad2}
+            />
         </div>
     );
 }
