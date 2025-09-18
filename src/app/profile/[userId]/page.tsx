@@ -10,7 +10,7 @@ import { ArrowLeft, User, BarChart2, Shield, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import type { UserProfile, MatchState, Batsman, Bowler } from '@/lib/types';
+import type { UserProfile, MatchState, Batsman, Bowler, Innings } from '@/lib/types';
 import { CricketBatIcon, CricketBallIcon } from '@/components/icons';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -124,11 +124,11 @@ function CareerStatsPage() {
         let dismissals = 0;
 
         matches.forEach(match => {
-            const processInnings = (innings: any) => {
-                if (!innings || !innings.batsmen) return;
+            const processInnings = (innings: Innings) => {
+                if (!innings) return;
 
                 // Batting stats
-                const batsman: Batsman | undefined = innings.batsmen[playerId];
+                const batsman = innings.batsmen?.[playerId];
                 if (batsman && (batsman.balls > 0 || batsman.isOut)) {
                     career.runs += batsman.runs;
                     career.ballsFaced += batsman.balls;
@@ -145,7 +145,7 @@ function CareerStatsPage() {
                 }
 
                 // Bowling stats
-                const bowler: Bowler | undefined = innings.bowlers[playerId];
+                const bowler = innings.bowlers?.[playerId];
                 if (bowler && bowler.balls > 0) {
                     career.wickets += bowler.wickets;
                     career.runsConceded += bowler.runsConceded;
@@ -182,6 +182,7 @@ function CareerStatsPage() {
                 if (userSnap.exists()) {
                     setProfile(userSnap.data() as UserProfile);
                 } else {
+                    // Fallback for older UID-based IDs, might be needed if not fully migrated.
                     const q = query(collection(db, 'users'), where('uid', '==', userId));
                     const querySnapshot = await getDocs(q);
                     if (!querySnapshot.empty) {
@@ -202,8 +203,18 @@ function CareerStatsPage() {
 
                 setPlayerMatches(matchesForPlayer);
 
-                const careerStats = calculateStats(matchesForPlayer, userId);
-                setStats(careerStats);
+                if (matchesForPlayer.length > 0) {
+                    const careerStats = calculateStats(matchesForPlayer, userId);
+                    setStats(careerStats);
+                } else {
+                    // Set zero stats if no matches are found
+                    setStats({
+                        matches: 0, runs: 0, ballsFaced: 0, notOuts: 0, fifties: 0, hundreds: 0,
+                        bestScore: { runs: 0, balls: 0, isOut: true }, strikeRate: 0, battingAverage: 0,
+                        wickets: 0, runsConceded: 0, ballsBowled: 0, fiveWicketHauls: 0,
+                        bestBowling: { wickets: 0, runs: 0 }, bowlingAverage: 0, economy: 0,
+                    });
+                }
 
             } catch (error) {
                 console.error("Error fetching player data:", error);
