@@ -695,6 +695,11 @@ function TournamentDetailsPage() {
 
             const matchData = matchDoc.data() as MatchState;
             
+            // Ensure match belongs to the current tournament
+            if (matchData.config.tournamentId !== currentTournament.id) {
+                continue;
+            }
+
             const getPlayerTeam = (playerId: string, team1: Team, team2: Team): [Player | undefined, string] => {
                 const player1 = team1.players.find(p => p.id === playerId);
                 if (player1) return [player1, team1.name];
