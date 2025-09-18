@@ -106,6 +106,8 @@ function PastMatchCard({ match }: { match: TournamentMatch }) {
 function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void>, isOwner: boolean }) {
   const [newGroupName, setNewGroupName] = useState('');
   const { toast } = useToast();
+  const router = useRouter();
+  const tournamentId = tournament.id;
 
   const handleAddGroup = () => {
     if (!newGroupName.trim()) {
@@ -134,6 +136,10 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
     onUpdate({ groups: updatedGroups });
   };
   
+  const handleGenerateFixtures = (groupName: string) => {
+    router.push(`/tournaments/${tournamentId}/add-match?group=${encodeURIComponent(groupName)}`);
+  };
+
   const isNextRound = tournament.qualifiedTeams && tournament.qualifiedTeams.length > 0;
   const availableTeamsForAssignment = isNextRound ? tournament.qualifiedTeams : tournament.participatingTeams;
   
@@ -179,6 +185,11 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
                   </div>
                 ))}
               </div>
+               {isOwner && (
+                  <Button variant="outline" className="w-full mt-4" onClick={() => handleGenerateFixtures(group.name)} disabled={group.teams.length < 2}>
+                    Generate Fixtures
+                  </Button>
+                )}
             </CardContent>
           </Card>
         )) : <p className="text-muted-foreground text-center md:col-span-2">No groups created yet. {isOwner && "Add a group to start assigning teams."}</p>}

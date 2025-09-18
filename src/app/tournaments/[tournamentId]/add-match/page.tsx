@@ -42,6 +42,14 @@ export default function AddMatchPage() {
                 const tournamentData = { ...doc.data() as Tournament, id: doc.id };
                 setTournament(tournamentData);
 
+                const groupNameFromParams = searchParams.get('group');
+                if (groupNameFromParams) {
+                    const group = tournamentData.groups?.find(g => g.name === groupNameFromParams);
+                    if (group) {
+                        setSelectedGroup(group);
+                    }
+                }
+
                 const editMode = searchParams.get('edit') === 'true';
                 const matchId = searchParams.get('matchId');
 
