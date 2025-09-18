@@ -75,6 +75,7 @@ export interface Tournament {
   endDate: string;
   oversPerInnings: number;
   participatingTeams: string[]; // Array of team names
+  qualifiedTeams?: string[]; // Teams qualified for the next round
   pointsPolicy: PointsPolicy;
   prize?: string;
   venue?: string;

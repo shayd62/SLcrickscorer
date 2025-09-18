@@ -192,11 +192,29 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
 }
 
 
-function PointsTable({ teams, title = "Points Table" }: { teams: TournamentPoints[], title?: string }) {
+function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifiedTeams }: { teams: TournamentPoints[], title?: string, onUpdate?: (data: Partial<Tournament>) => Promise<void>, isOwner?: boolean, qualifiedTeams?: string[] }) {
+    const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+
     const sortedTeams = [...teams].sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
         return b.netRunRate - a.netRunRate;
     });
+
+    const handleTeamSelect = (teamName: string, checked: boolean) => {
+        setSelectedTeams(prev => {
+            if (checked) {
+                return [...prev, teamName];
+            } else {
+                return prev.filter(t => t !== teamName);
+            }
+        });
+    };
+    
+    const handleQualify = () => {
+        if (onUpdate) {
+            onUpdate({ qualifiedTeams: selectedTeams });
+        }
+    }
 
     return (
         <Card>
@@ -205,9 +223,11 @@ function PointsTable({ teams, title = "Points Table" }: { teams: TournamentPoint
             </CardHeader>
             <CardContent>
                 {sortedTeams.length > 0 ? (
+                    <>
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                {isOwner && <TableHead />}
                                 <TableHead>Team</TableHead>
                                 <TableHead className="text-center">P</TableHead>
                                 <TableHead className="text-center">W</TableHead>
@@ -220,7 +240,8 @@ function PointsTable({ teams, title = "Points Table" }: { teams: TournamentPoint
                         <TableBody>
                             {sortedTeams.map((team) => (
                                 <TableRow key={team.teamName}>
-                                    <TableCell className="font-medium">{team.teamName}</TableCell>
+                                    {isOwner && <TableCell><Checkbox checked={selectedTeams.includes(team.teamName)} onCheckedChange={(checked) => handleTeamSelect(team.teamName, !!checked)} /></TableCell>}
+                                    <TableCell className="font-medium">{team.teamName} {qualifiedTeams?.includes(team.teamName) && <span className="text-green-500 font-bold ml-2">Q</span>}</TableCell>
                                     <TableCell className="text-center">{team.matchesPlayed}</TableCell>
                                     <TableCell className="text-center">{team.wins}</TableCell>
                                     <TableCell className="text-center">{team.losses}</TableCell>
@@ -231,6 +252,12 @@ function PointsTable({ teams, title = "Points Table" }: { teams: TournamentPoint
                             ))}
                         </TableBody>
                     </Table>
+                    {isOwner && (
+                        <div className="flex justify-end mt-4">
+                            <Button onClick={handleQualify} disabled={selectedTeams.length === 0}>Qualify Selected Teams</Button>
+                        </div>
+                    )}
+                    </>
                 ) : (
                     <p className="text-muted-foreground text-center py-4">No data available to display points.</p>
                 )}
@@ -911,6 +938,7 @@ function TournamentDetailsPage() {
       try {
         const tournamentRef = doc(db, "tournaments", tournamentId);
         await updateDoc(tournamentRef, data);
+        toast({ title: "Tournament Updated", description: "The changes have been saved successfully." });
       } catch (e) {
         console.error("Error updating tournament: ", e);
         toast({ title: "Error", description: "Could not update tournament details.", variant: 'destructive' });
@@ -1102,7 +1130,7 @@ function TournamentDetailsPage() {
                     <TabsContent value="points" className="mt-6 space-y-6">
                        {tournament.groups && tournament.groups.length > 0 ? (
                          tournament.groups.map(group => (
-                           <PointsTable key={group.name} teams={pointsTables[group.name] || []} title={`Points Table - ${group.name}`} />
+                           <PointsTable key={group.name} teams={pointsTables[group.name] || []} title={`Points Table - ${group.name}`} onUpdate={handleUpdateTournament} isOwner={isOwnerOrAdmin} qualifiedTeams={tournament.qualifiedTeams} />
                          ))
                        ) : (
                          <Card><CardHeader><CardTitle>Points Table</CardTitle></CardHeader><CardContent><p className="text-muted-foreground text-center py-4">No groups available. Create groups and play matches to see the points table.</p></CardContent></Card>
