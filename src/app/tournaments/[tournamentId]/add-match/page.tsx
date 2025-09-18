@@ -194,7 +194,7 @@ export default function AddMatchPage() {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="space-y-2">
-                            <Label>Select Group</Label>
+                            <Label>Select Team</Label>
                             <Select onValueChange={handleGroupSelect} value={selectedGroup?.name} disabled={!tournament?.groups || tournament.groups.length === 0 || isEditing}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Choose a group" />
