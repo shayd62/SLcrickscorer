@@ -65,25 +65,31 @@ function CareerStatsPage() {
             economy: 0,
         };
 
+        let dismissals = 0;
+
         matches.forEach(match => {
             const processInnings = (innings: any) => {
-                if (!innings) return;
+                if (!innings || !innings.batsmen) return;
 
                 // Batting stats
-                const batsman: Batsman | undefined = Object.values(innings.batsmen).find((b: any) => b.id === playerId);
+                const batsman: Batsman | undefined = innings.batsmen[playerId];
                 if (batsman && (batsman.balls > 0 || batsman.isOut)) {
                     career.runs += batsman.runs;
                     career.ballsFaced += batsman.balls;
-                    if (!batsman.isOut) career.notOuts++;
+                    if (!batsman.isOut) {
+                      career.notOuts++;
+                    } else {
+                      dismissals++;
+                    }
                     if (batsman.runs >= 50 && batsman.runs < 100) career.fifties++;
                     if (batsman.runs >= 100) career.hundreds++;
-                    if (batsman.runs > career.bestScore.runs || (batsman.runs === career.bestScore.runs && batsman.balls < career.bestScore.balls)) {
+                    if (batsman.runs > career.bestScore.runs || (batsman.runs === career.bestScore.runs && !batsman.isOut)) {
                         career.bestScore = { runs: batsman.runs, balls: batsman.balls, isOut: batsman.isOut };
                     }
                 }
 
                 // Bowling stats
-                const bowler: Bowler | undefined = Object.values(innings.bowlers).find((b: any) => b.id === playerId);
+                const bowler: Bowler | undefined = innings.bowlers[playerId];
                 if (bowler && bowler.balls > 0) {
                     career.wickets += bowler.wickets;
                     career.runsConceded += bowler.runsConceded;
@@ -98,11 +104,6 @@ function CareerStatsPage() {
             processInnings(match.innings1);
             if (match.innings2) processInnings(match.innings2);
         });
-
-        const dismissals = matches.filter(match => {
-            const inningsWithPlayer = [match.innings1, match.innings2].filter(Boolean).find(i => i.batsmen[playerId]);
-            return inningsWithPlayer && inningsWithPlayer.batsmen[playerId].isOut;
-        }).length;
         
         career.battingAverage = dismissals > 0 ? career.runs / dismissals : career.runs;
         career.strikeRate = career.ballsFaced > 0 ? (career.runs / career.ballsFaced) * 100 : 0;
