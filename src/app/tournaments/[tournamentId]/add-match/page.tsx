@@ -16,8 +16,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 function ChipButton({ label, isSelected, onClick }: { label: string; isSelected: boolean; onClick: () => void }) {
     return (
@@ -76,78 +75,12 @@ function TeamSelectionDialog({
     );
 }
 
-function SquadSelectionDialog({
-    open,
-    onOpenChange,
-    team,
-    selectedPlayers,
-    onSquadConfirm,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    team: Team | null;
-    selectedPlayers: Player[];
-    onSquadConfirm: (squad: Player[]) => void;
-}) {
-    const [squad, setSquad] = useState<Player[]>(selectedPlayers);
-
-    useEffect(() => {
-        setSquad(selectedPlayers);
-    }, [selectedPlayers, open]);
-
-    const handlePlayerToggle = (player: Player) => {
-        setSquad(currentSquad =>
-            currentSquad.some(p => p.id === player.id)
-                ? currentSquad.filter(p => p.id !== player.id)
-                : [...currentSquad, player]
-        );
-    };
-    
-    const handleConfirm = () => {
-        onSquadConfirm(squad);
-        onOpenChange(false);
-    }
-
-    if (!team) return null;
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-gray-800 text-white border-gray-700">
-                <DialogHeader>
-                    <DialogTitle>Select Squad for {team.name}</DialogTitle>
-                    <DialogDescription>{squad.length} players selected.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                    {team.players.map(player => (
-                        <div key={player.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-700">
-                            <Checkbox
-                                id={`squad-${player.id}`}
-                                checked={squad.some(p => p.id === player.id)}
-                                onCheckedChange={() => handlePlayerToggle(player)}
-                                className="border-gray-500 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                            />
-                            <Label htmlFor={`squad-${player.id}`} className="cursor-pointer">{player.name}</Label>
-                        </div>
-                    ))}
-                </div>
-                <DialogClose asChild>
-                    <Button onClick={handleConfirm} className="w-full mt-4 bg-primary hover:bg-primary/90">
-                        Confirm Squad
-                    </Button>
-                </DialogClose>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
 
 export default function AddMatchPage() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [allTeams, setAllTeams] = useState<Team[]>([]);
     const [team1, setTeam1] = useState<Team | null>(null);
     const [team2, setTeam2] = useState<Team | null>(null);
-    const [squad1, setSquad1] = useState<Player[]>([]);
-    const [squad2, setSquad2] = useState<Player[]>([]);
     
     const [matchRound, setMatchRound] = useState('League');
     const [matchDate, setMatchDate] = useState<Date | undefined>(new Date());
@@ -155,8 +88,6 @@ export default function AddMatchPage() {
 
     const [isTeam1DialogOpen, setTeam1DialogOpen] = useState(false);
     const [isTeam2DialogOpen, setTeam2DialogOpen] = useState(false);
-    const [isSquad1DialogOpen, setSquad1DialogOpen] = useState(false);
-    const [isSquad2DialogOpen, setSquad2DialogOpen] = useState(false);
 
     const [loading, setLoading] = useState(true);
     
@@ -206,10 +137,6 @@ export default function AddMatchPage() {
     const handleScheduleMatch = async () => {
         if (!team1 || !team2) {
             toast({ title: "Selection Error", description: "Please select both teams.", variant: "destructive" });
-            return;
-        }
-        if (squad1.length === 0 || squad2.length === 0) {
-            toast({ title: "Squad Error", description: "Please select squads for both teams.", variant: "destructive" });
             return;
         }
         if (!matchDate || !matchTime) {
@@ -268,13 +195,11 @@ export default function AddMatchPage() {
                     <div className="flex flex-col items-center gap-3">
                         <Image src={team1?.logoUrl || `https://picsum.photos/seed/team1/80/80`} alt={team1?.name || "Team 1"} width={80} height={80} className="rounded-full bg-gray-700 cursor-pointer" onClick={() => setTeam1DialogOpen(true)} />
                         <span className="font-semibold text-center">{team1?.name || "Team 1"}</span>
-                        <Button variant="secondary" className="bg-gray-700 text-white hover:bg-gray-600" onClick={() => setSquad1DialogOpen(true)} disabled={!team1}>Select Squad</Button>
                     </div>
                     <span className="text-2xl font-bold self-center pt-8">VS</span>
                     <div className="flex flex-col items-center gap-3">
                         <Image src={team2?.logoUrl || `https://picsum.photos/seed/team2/80/80`} alt={team2?.name || "Team 2"} width={80} height={80} className="rounded-full bg-gray-700 cursor-pointer" onClick={() => setTeam2DialogOpen(true)} />
                         <span className="font-semibold text-center">{team2?.name || "Team 2"}</span>
-                        <Button variant="secondary" className="bg-gray-700 text-white hover:bg-gray-600" onClick={() => setSquad2DialogOpen(true)} disabled={!team2}>Select Squad</Button>
                     </div>
                 </div>
 
@@ -332,20 +257,6 @@ export default function AddMatchPage() {
                 teams={displayedTeams}
                 onTeamSelect={setTeam2}
                 excludeTeamName={team1?.name}
-            />
-            <SquadSelectionDialog
-                open={isSquad1DialogOpen}
-                onOpenChange={setSquad1DialogOpen}
-                team={team1}
-                selectedPlayers={squad1}
-                onSquadConfirm={setSquad1}
-            />
-            <SquadSelectionDialog
-                open={isSquad2DialogOpen}
-                onOpenChange={setSquad2DialogOpen}
-                team={team2}
-                selectedPlayers={squad2}
-                onSquadConfirm={setSquad2}
             />
         </div>
     );
