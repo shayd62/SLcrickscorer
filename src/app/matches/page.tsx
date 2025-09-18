@@ -173,7 +173,6 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
 
     const winnerKey = match.winner;
     
-    // Determine which team batted first
     const firstInningsTeamKey = innings1.battingTeam;
     const secondInningsTeamKey = innings2 ? innings2.battingTeam : (firstInningsTeamKey === 'team1' ? 'team2' : 'team1');
 
@@ -204,7 +203,7 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
                     <ChevronRight className="h-5 w-5"/>
                 </div>
                  <div className="text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground">RESULT</span> • {config.matchNumber ? `${config.matchNumber}th Match,` : ''} {config.venue ? `${config.venue},` : ''} {config.matchDate ? new Date(config.matchDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''}
+                    <span className="font-semibold text-foreground">RESULT</span> • {config.matchNumber ? `${config.matchNumber}${['st','nd','rd'][((config.matchNumber+90)%100-10)%10-1]||'th'} Match,` : ''} {config.venue ? `${config.venue},` : ''} {config.matchDate ? new Date(config.matchDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''}
                 </div>
                 
                 <div className="space-y-2">
