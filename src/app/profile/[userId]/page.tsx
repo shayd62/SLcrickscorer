@@ -99,7 +99,11 @@ function CareerStatsPage() {
             if (match.innings2) processInnings(match.innings2);
         });
 
-        const dismissals = career.matches - career.notOuts;
+        const dismissals = matches.filter(match => {
+            const inningsWithPlayer = [match.innings1, match.innings2].filter(Boolean).find(i => i.batsmen[playerId]);
+            return inningsWithPlayer && inningsWithPlayer.batsmen[playerId].isOut;
+        }).length;
+        
         career.battingAverage = dismissals > 0 ? career.runs / dismissals : career.runs;
         career.strikeRate = career.ballsFaced > 0 ? (career.runs / career.ballsFaced) * 100 : 0;
         career.bowlingAverage = career.wickets > 0 ? career.runsConceded / career.wickets : 0;
@@ -117,9 +121,11 @@ function CareerStatsPage() {
                 // Fetch user profile
                 const userDocRef = doc(db, 'users', userId);
                 const userSnap = await getDoc(userDocRef);
+                
                 if (userSnap.exists()) {
                     setProfile(userSnap.data() as UserProfile);
                 } else {
+                    // Fallback to query by UID if ID is not the phone number for some reason
                     const q = query(collection(db, 'users'), where('uid', '==', userId));
                     const querySnapshot = await getDocs(q);
                     if (!querySnapshot.empty) {
@@ -127,20 +133,18 @@ function CareerStatsPage() {
                     }
                 }
 
-                // Fetch matches
+                // Fetch all matches and filter client-side
                 const matchesRef = collection(db, "matches");
-                const q1 = query(matchesRef, where(`innings1.batsmen.${userId}.id`, "==", userId));
-                const q2 = query(matchesRef, where(`innings2.batsmen.${userId}.id`, "==", userId));
+                const matchesSnap = await getDocs(matchesRef);
+                const allMatches = matchesSnap.docs.map(doc => doc.data() as MatchState);
                 
-                const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-                
-                const allMatches: { [key: string]: MatchState } = {};
-                snap1.forEach(doc => allMatches[doc.id] = doc.data() as MatchState);
-                snap2.forEach(doc => allMatches[doc.id] = doc.data() as MatchState);
-                
-                const matchesArray = Object.values(allMatches);
+                const playerMatches = allMatches.filter(match => {
+                    const playerInTeam1 = match.config.team1.players.some(p => p.id === userId);
+                    const playerInTeam2 = match.config.team2.players.some(p => p.id === userId);
+                    return playerInTeam1 || playerInTeam2;
+                });
 
-                const careerStats = calculateStats(matchesArray, userId);
+                const careerStats = calculateStats(playerMatches, userId);
                 setStats(careerStats);
 
             } catch (error) {
