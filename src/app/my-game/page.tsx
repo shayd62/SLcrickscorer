@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -12,8 +11,8 @@ import withAuth from '@/components/with-auth';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
-import type { MatchState, Tournament, TournamentMatch } from '@/lib/types';
-import { collection, onSnapshot, query, where, doc, deleteDoc, getDocs } from "firebase/firestore";
+import type { MatchState, Tournament, TournamentMatch, Team } from '@/lib/types';
+import { collection, onSnapshot, query, where, doc, deleteDoc, getDocs, or } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -125,7 +124,7 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
     return (
         <Card className="p-4 bg-secondary/50 rounded-2xl transition-all hover:bg-secondary/70">
             <div className="flex justify-between items-start">
-                <div className="flex-grow space-y-2 cursor-pointer" onClick={() => router.push(`/scorecard/${match.id}`)}>
+                <div className="flex-grow space-y-2 cursor-pointer" onClick={() => router.push(`/match-analysis/${match.id}`)}>
                     <h3 className="font-semibold text-foreground">{config.team1.name} vs {config.team2.name}</h3>
                     <div className="text-sm text-muted-foreground">
                         <p><span className='font-medium text-foreground'>{resultText}</span></p>
@@ -210,7 +209,7 @@ function BottomNav() {
 
 function MyGamePage() {
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, userProfile } = useAuth();
     const { toast } = useToast();
     const [loading, setLoading] = useState(true);
     const [liveMatches, setLiveMatches] = useState<MatchState[]>([]);
@@ -225,28 +224,44 @@ function MyGamePage() {
 
         setLoading(true);
 
-        // Live Matches
+        // Live Matches (created by user)
         const liveQuery = query(collection(db, "matches"), where("userId", "==", user.uid), where("matchOver", "==", false));
         const liveUnsub = onSnapshot(liveQuery, (snapshot) => {
             const matches = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
             setLiveMatches(matches);
         });
 
-        // Past Matches
-        const pastQuery = query(collection(db, "matches"), where("userId", "==", user.uid), where("matchOver", "==", true));
-        const pastUnsub = onSnapshot(pastQuery, (snapshot) => {
-            const matches = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
-            setPastMatches(matches);
-        });
-
-        // Upcoming Matches
-        const fetchUpcoming = async () => {
-            // First, get all the teams the current user owns
-            const userTeamsQuery = query(collection(db, "teams"), where("userId", "==", user.uid));
+        const fetchPastAndUpcoming = async () => {
+             if (!userProfile) return;
+            // Get all teams the current user is a part of
+            const userTeamsQuery = query(collection(db, "teams"), where("players", "array-contains", { id: user.uid, name: userProfile.name }));
             const userTeamsSnapshot = await getDocs(userTeamsQuery);
             const userTeamNames = userTeamsSnapshot.docs.map(doc => doc.data().name);
 
-            // Then, get all tournaments
+            // Fetch past matches (created by user OR involving user's teams)
+            const createdPastQuery = query(collection(db, "matches"), where("userId", "==", user.uid), where("matchOver", "==", true));
+            const involvedTeam1PastQuery = query(collection(db, "matches"), where("config.team1.name", "in", userTeamNames), where("matchOver", "==", true));
+            const involvedTeam2PastQuery = query(collection(db, "matches"), where("config.team2.name", "in", userTeamNames), where("matchOver", "==", true));
+            
+            const [createdSnap, team1Snap, team2Snap] = await Promise.all([
+                getDocs(createdPastQuery),
+                getDocs(involvedTeam1PastQuery),
+                getDocs(involvedTeam2PastQuery)
+            ]);
+
+            const pastMatchesMap = new Map<string, MatchState>();
+            createdSnap.forEach(doc => pastMatchesMap.set(doc.id, { ...doc.data(), id: doc.id } as MatchState));
+            team1Snap.forEach(doc => pastMatchesMap.set(doc.id, { ...doc.data(), id: doc.id } as MatchState));
+            team2Snap.forEach(doc => pastMatchesMap.set(doc.id, { ...doc.data(), id: doc.id } as MatchState));
+            
+            const sortedPastMatches = Array.from(pastMatchesMap.values()).sort((a, b) => {
+                const timeA = a.endTime ? new Date(a.endTime).getTime() : 0;
+                const timeB = b.endTime ? new Date(b.endTime).getTime() : 0;
+                return timeB - timeA;
+            });
+            setPastMatches(sortedPastMatches);
+
+            // Fetch upcoming matches from tournaments
             const tournamentsQuery = query(collection(db, "tournaments"));
             const tournamentsSnapshot = await getDocs(tournamentsQuery);
             
@@ -267,14 +282,13 @@ function MyGamePage() {
             setUpcomingMatches(allUpcoming);
         };
         
-        fetchUpcoming().finally(() => setLoading(false));
+        fetchPastAndUpcoming().finally(() => setLoading(false));
 
         return () => {
             liveUnsub();
-            pastUnsub();
         };
 
-    }, [user]);
+    }, [user, userProfile]);
 
     const handleDeleteMatch = async (matchId: string) => {
       try {
