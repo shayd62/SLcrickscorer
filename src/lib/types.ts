@@ -286,6 +286,18 @@ export interface UserProfile {
   isPlaceholder?: boolean;
 }
 
+export interface Notification {
+    id: string;
+    userId: string;
+    type: 'info' | 'warning' | 'match_invite' | 'friend_request';
+    title: string;
+    message: string;
+    isRead: boolean;
+    createdAt: any; // Firestore Timestamp
+    link?: string;
+}
+
+
 // New types for the admin panel
 export type AdminRole = "super_admin" | "org_admin" | "scorer" | "viewer";
 

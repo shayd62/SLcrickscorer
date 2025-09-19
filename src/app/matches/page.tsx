@@ -29,6 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { SettingsSheet } from "@/components/settings-sheet";
 import { GlobalSearchDialog } from "@/components/global-search-dialog";
+import { NotificationSheet } from "@/components/notification-sheet";
 
 
 const formatOvers = (balls: number, ballsPerOver: number = 6) => {
@@ -410,9 +411,7 @@ function HomePage() {
                         </h1>
                         <p className="text-sm text-gray-300">Professional Match Scoring</p>
                     </div>
-                     <Button variant="ghost" size="icon">
-                        <Bell className="h-6 w-6" />
-                    </Button>
+                     <NotificationSheet />
                 </header>
                 
                 <main className="space-y-6 mt-4">
