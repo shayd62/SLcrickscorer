@@ -81,7 +81,9 @@ export default function AdminNotificationsPage() {
                  return;
             }
 
-            const notificationPromises = usersToNotify.map(user => {
+            const validUsersToNotify = usersToNotify.filter(user => user && user.uid);
+
+            const notificationPromises = validUsersToNotify.map(user => {
                 return addDoc(collection(db, 'notifications'), {
                     userId: user.uid,
                     title: data.title,
@@ -95,7 +97,7 @@ export default function AdminNotificationsPage() {
 
             await Promise.all(notificationPromises);
 
-            toast({ title: 'Notifications Sent!', description: `Successfully sent notification to ${usersToNotify.length} user(s).` });
+            toast({ title: 'Notifications Sent!', description: `Successfully sent notification to ${validUsersToNotify.length} user(s).` });
             form.reset();
 
         } catch (error: any) {
