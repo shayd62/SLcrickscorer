@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
@@ -10,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, Calendar, MapPin, Plus, ChevronRight, Key, Shield, Search, Settings, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Plus, ChevronRight, Key, Shield, Search, Settings, Trash2, Users } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -108,6 +107,93 @@ function PowerPlayDialog({ open, onOpenChange, control, overs }: { open: boolean
     )
 }
 
+function SquadSelectionDialog({
+    open,
+    onOpenChange,
+    team,
+    onConfirm,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    team: Team | null;
+    onConfirm: (selectedPlayers: Player[], captainId: string, wicketKeeperId: string) => void;
+}) {
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+    const [captainId, setCaptainId] = useState<string>('');
+    const [wicketKeeperId, setWicketKeeperId] = useState<string>('');
+
+    useEffect(() => {
+        if (team) {
+            setSelectedPlayerIds(team.players.map(p => p.id));
+            setCaptainId(team.captainId || '');
+            setWicketKeeperId(team.wicketKeeperId || '');
+        }
+    }, [team]);
+
+    if (!team) return null;
+
+    const handlePlayerCheck = (playerId: string) => {
+        setSelectedPlayerIds(prev =>
+            prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]
+        );
+    };
+
+    const handleConfirmClick = () => {
+        const selectedPlayers = team.players.filter(p => selectedPlayerIds.includes(p.id));
+        onConfirm(selectedPlayers, captainId, wicketKeeperId);
+        onOpenChange(false);
+    };
+
+    const squadPlayers = team.players.filter(p => selectedPlayerIds.includes(p.id));
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Select Squad & Roles for {team.name}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto p-1">
+                    <h4 className="font-semibold">Playing XI ({selectedPlayerIds.length})</h4>
+                    <div className="space-y-2">
+                        {team.players.map(player => (
+                            <div key={player.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                    id={`player-${player.id}`}
+                                    checked={selectedPlayerIds.includes(player.id)}
+                                    onCheckedChange={() => handlePlayerCheck(player.id)}
+                                />
+                                <label htmlFor={`player-${player.id}`}>{player.name}</label>
+                            </div>
+                        ))}
+                    </div>
+                    <Separator />
+                    <div className="space-y-2">
+                        <Label>Captain</Label>
+                        <Select onValueChange={setCaptainId} value={captainId}>
+                            <SelectTrigger><SelectValue placeholder="Select Captain" /></SelectTrigger>
+                            <SelectContent>
+                                {squadPlayers.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Wicket Keeper</Label>
+                        <Select onValueChange={setWicketKeeperId} value={wicketKeeperId}>
+                            <SelectTrigger><SelectValue placeholder="Select Wicket Keeper" /></SelectTrigger>
+                            <SelectContent>
+                                {squadPlayers.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleConfirmClick}>Confirm</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 function MatchDetailsContent() {
     const router = useRouter();
     const params = useParams();
@@ -118,8 +204,15 @@ function MatchDetailsContent() {
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [team1, setTeam1] = useState<Team | null>(null);
     const [team2, setTeam2] = useState<Team | null>(null);
+    const [squad1, setSquad1] = useState<Player[]>([]);
+    const [squad2, setSquad2] = useState<Player[]>([]);
+    const [team1Roles, setTeam1Roles] = useState({ captainId: '', wicketKeeperId: '' });
+    const [team2Roles, setTeam2Roles] = useState({ captainId: '', wicketKeeperId: '' });
     
     const [powerPlayDialogOpen, setPowerPlayDialogOpen] = useState(false);
+    const [squadDialogOpen, setSquadDialogOpen] = useState(false);
+    const [editingTeam, setEditingTeam] = useState<'team1' | 'team2' | null>(null);
+
     
     const team1Name = searchParams.get('team1Name') || 'Team A';
     const team2Name = searchParams.get('team2Name') || 'Team B';
@@ -208,10 +301,16 @@ function MatchDetailsContent() {
             }
 
             const team1Data = await fetchTeamData(team1Name);
-            if (team1Data) setTeam1(team1Data);
+            if (team1Data) {
+                setTeam1(team1Data);
+                setSquad1(team1Data.players);
+            }
 
             const team2Data = await fetchTeamData(team2Name);
-            if (team2Data) setTeam2(team2Data);
+            if (team2Data) {
+                setTeam2(team2Data);
+                setSquad2(team2Data.players);
+            }
 
         } catch (error) {
             console.error("Error fetching teams: ", error);
@@ -230,20 +329,18 @@ function MatchDetailsContent() {
             return;
         }
 
+        if (squad1.length < 2 || squad2.length < 2) {
+            toast({ title: "Squad Error", description: "Both teams must have at least 2 players selected.", variant: 'destructive' });
+            return;
+        }
+
         const config: MatchConfig = {
-            team1: team1,
-            team2: team2,
+            team1: { ...team1, players: squad1, ...team1Roles },
+            team2: { ...team2, players: squad2, ...team2Roles },
             oversPerInnings: data.overs,
-            playersPerSide: Math.min(team1.players.length, team2.players.length), // Use the smaller team size
-            toss: { // Dummy toss, will be decided on next page
-                winner: 'team1',
-                decision: 'bat',
-            },
-            opening: { // Dummy opening players, to be selected later
-                strikerId: '',
-                nonStrikerId: '',
-                bowlerId: '',
-            },
+            playersPerSide: Math.min(squad1.length, squad2.length),
+            toss: { winner: 'team1', decision: 'bat' },
+            opening: { strikerId: '', nonStrikerId: '', bowlerId: ''},
             tournamentId,
             venue: venue,
             matchDate: matchDateStr ? decodeURIComponent(matchDateStr) : undefined,
@@ -263,6 +360,20 @@ function MatchDetailsContent() {
     
     return (
         <div className="min-h-screen bg-background text-foreground font-body">
+            <SquadSelectionDialog
+                open={squadDialogOpen}
+                onOpenChange={setSquadDialogOpen}
+                team={editingTeam === 'team1' ? team1 : team2}
+                onConfirm={(players, captainId, wicketKeeperId) => {
+                    if (editingTeam === 'team1') {
+                        setSquad1(players);
+                        setTeam1Roles({ captainId, wicketKeeperId });
+                    } else {
+                        setSquad2(players);
+                        setTeam2Roles({ captainId, wicketKeeperId });
+                    }
+                }}
+            />
             <PowerPlayDialog open={powerPlayDialogOpen} onOpenChange={setPowerPlayDialogOpen} control={form.control} overs={form.watch('overs')} />
             <form onSubmit={form.handleSubmit(handleProceedToToss)}>
                 <header className="p-4 bg-gray-800 text-white">
@@ -285,11 +396,17 @@ function MatchDetailsContent() {
                         <div className="flex flex-col items-center gap-2">
                             <Image src={team1?.logoUrl || "https://picsum.photos/seed/t1-logo/100/100"} alt="Team 1 Logo" width={60} height={60} className="rounded-full" data-ai-hint="cricket team" />
                             <span className="font-semibold text-sm">{team1Name}</span>
+                             <Button type="button" size="sm" variant="outline" className="mt-1" onClick={() => { setEditingTeam('team1'); setSquadDialogOpen(true); }}>
+                                <Users className="mr-2 h-4 w-4" /> Squad & Role
+                            </Button>
                         </div>
                         <span className="text-2xl font-bold text-gray-400">VS</span>
                          <div className="flex flex-col items-center gap-2">
                             <Image src={team2?.logoUrl || "https://picsum.photos/seed/t2-logo/100/100"} alt="Team 2 Logo" width={60} height={60} className="rounded-full" data-ai-hint="cricket team" />
                             <span className="font-semibold text-sm">{team2Name}</span>
+                            <Button type="button" size="sm" variant="outline" className="mt-1" onClick={() => { setEditingTeam('team2'); setSquadDialogOpen(true); }}>
+                                <Users className="mr-2 h-4 w-4" /> Squad & Role
+                            </Button>
                         </div>
                     </div>
                 </header>
@@ -422,4 +539,4 @@ export default function MatchDetailsPage() {
     )
 }
 
-
+    
