@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ const profileSchema = z.object({
   gender: z.enum(['Male', 'Female', 'Other'], { required_error: 'Gender is required.' }),
   battingStyle: z.enum(['Right-handed', 'Left-handed']).optional(),
   bowlingStyle: z.enum(['Right-arm', 'Left-arm']).optional(),
-  isWicketKeeper: z.boolean().optional(),
+  isWicketKeeper: z.boolean().default(false),
   photoURL: z.string().url().optional().or(z.literal('')),
 });
 
@@ -68,7 +68,7 @@ function EditProfilePage() {
         gender: userProfile.gender,
         battingStyle: userProfile.battingStyle,
         bowlingStyle: userProfile.bowlingStyle,
-        isWicketKeeper: userProfile.isWicketKeeper,
+        isWicketKeeper: userProfile.isWicketKeeper || false,
         photoURL: userProfile.photoURL || '',
       });
       if(userProfile.photoURL) {
@@ -227,7 +227,7 @@ function EditProfilePage() {
                         </div>
                         <div className="flex items-center justify-between">
                             <Label>Are you a wicket-keeper?</Label>
-                            <Switch checked={form.watch('isWicketKeeper')} onCheckedChange={(checked) => form.setValue('isWicketKeeper', checked)} />
+                            <Switch checked={form.watch('isWicketKeeper') || false} onCheckedChange={(checked) => form.setValue('isWicketKeeper', checked)} />
                         </div>
                     </CardContent>
                 </Card>
@@ -245,5 +245,3 @@ function EditProfilePage() {
 }
 
 export default withAuth(EditProfilePage);
-
-    
