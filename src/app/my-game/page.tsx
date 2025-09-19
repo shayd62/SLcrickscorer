@@ -217,43 +217,48 @@ function MyGamePage() {
     const [pastMatches, setPastMatches] = useState<MatchState[]>([]);
 
     useEffect(() => {
-        if (!user) {
+        if (!user || !userProfile) {
             setLoading(false);
             return;
         };
 
         setLoading(true);
 
-        // Live Matches (created by user)
-        const liveQuery = query(collection(db, "matches"), where("userId", "==", user.uid), where("matchOver", "==", false));
-        const liveUnsub = onSnapshot(liveQuery, (snapshot) => {
-            const matches = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
-            setLiveMatches(matches);
-        });
-
-        const fetchPastAndUpcoming = async () => {
-             if (!userProfile) return;
-            // Get all teams the current user is a part of
+        const fetchAllMyData = async () => {
+             // Get all teams the current user is a part of
             const userTeamsQuery = query(collection(db, "teams"), where("players", "array-contains", { id: user.uid, name: userProfile.name }));
             const userTeamsSnapshot = await getDocs(userTeamsQuery);
             const userTeamNames = userTeamsSnapshot.docs.map(doc => doc.data().name);
 
-            // Fetch past matches (created by user OR involving user's teams)
+            // --- Live Matches (created by user OR involving user's teams) ---
+            const liveMatchesQuery = query(collection(db, "matches"), where("matchOver", "==", false));
+            const liveUnsub = onSnapshot(liveMatchesQuery, (snapshot) => {
+                const allLiveMatches = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MatchState));
+                const myLiveMatches = allLiveMatches.filter(match => 
+                    match.userId === user.uid ||
+                    userTeamNames.includes(match.config.team1.name) ||
+                    userTeamNames.includes(match.config.team2.name)
+                );
+                setLiveMatches(myLiveMatches);
+            });
+
+            // --- Past Matches (created by user OR involving user's teams) ---
             const createdPastQuery = query(collection(db, "matches"), where("userId", "==", user.uid), where("matchOver", "==", true));
-            const involvedTeam1PastQuery = query(collection(db, "matches"), where("config.team1.name", "in", userTeamNames), where("matchOver", "==", true));
-            const involvedTeam2PastQuery = query(collection(db, "matches"), where("config.team2.name", "in", userTeamNames), where("matchOver", "==", true));
             
-            const [createdSnap, team1Snap, team2Snap] = await Promise.all([
+            const involvedQueries = userTeamNames.length > 0 ? [
+                query(collection(db, "matches"), where("config.team1.name", "in", userTeamNames), where("matchOver", "==", true)),
+                query(collection(db, "matches"), where("config.team2.name", "in", userTeamNames), where("matchOver", "==", true))
+            ] : [];
+            
+            const [createdSnap, ...involvedSnaps] = await Promise.all([
                 getDocs(createdPastQuery),
-                getDocs(involvedTeam1PastQuery),
-                getDocs(involvedTeam2PastQuery)
+                ...involvedQueries.map(q => getDocs(q))
             ]);
 
             const pastMatchesMap = new Map<string, MatchState>();
             createdSnap.forEach(doc => pastMatchesMap.set(doc.id, { ...doc.data(), id: doc.id } as MatchState));
-            team1Snap.forEach(doc => pastMatchesMap.set(doc.id, { ...doc.data(), id: doc.id } as MatchState));
-            team2Snap.forEach(doc => pastMatchesMap.set(doc.id, { ...doc.data(), id: doc.id } as MatchState));
-            
+            involvedSnaps.forEach(snap => snap.forEach(doc => pastMatchesMap.set(doc.id, { ...doc.data(), id: doc.id } as MatchState)));
+
             const sortedPastMatches = Array.from(pastMatchesMap.values()).sort((a, b) => {
                 const timeA = a.endTime ? new Date(a.endTime).getTime() : 0;
                 const timeB = b.endTime ? new Date(b.endTime).getTime() : 0;
@@ -261,7 +266,7 @@ function MyGamePage() {
             });
             setPastMatches(sortedPastMatches);
 
-            // Fetch upcoming matches from tournaments
+            // --- Upcoming Matches (from tournaments involving user's teams) ---
             const tournamentsQuery = query(collection(db, "tournaments"));
             const tournamentsSnapshot = await getDocs(tournamentsQuery);
             
@@ -280,12 +285,23 @@ function MyGamePage() {
             });
             allUpcoming.sort((a, b) => new Date(a.match.date || 0).getTime() - new Date(b.match.date || 0).getTime());
             setUpcomingMatches(allUpcoming);
+
+            setLoading(false);
+            
+            // Return the live listener unsubscribe function
+            return liveUnsub;
         };
         
-        fetchPastAndUpcoming().finally(() => setLoading(false));
+        let unsubscribe: (() => void) | undefined;
+        fetchAllMyData().then(unsub => {
+            unsubscribe = unsub;
+        });
 
+        // Cleanup function
         return () => {
-            liveUnsub();
+            if (unsubscribe) {
+                unsubscribe();
+            }
         };
 
     }, [user, userProfile]);
@@ -377,5 +393,3 @@ function MyGamePage() {
 }
 
 export default withAuth(MyGamePage);
-
-    
