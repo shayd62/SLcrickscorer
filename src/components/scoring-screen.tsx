@@ -31,7 +31,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 type Action =
   | { type: 'BALL_EVENT'; payload: { runs: number; isExtra: boolean; extraType?: 'wd' | 'nb' | 'by' | 'lb'; } }
-  | { type: 'WICKET'; payload: { dismissalType: string; newBatsmanId: string; fielderId?: string; } }
+  | { type: 'WICKET'; payload: { dismissalType: string; newBatsmanId?: string; fielderId?: string; } }
   | { type: 'SWAP_STRIKER' }
   | { type: 'CHANGE_BOWLER'; payload: { newBowlerId: string } }
   | { type: 'TRIGGER_BOWLER_CHANGE' }
@@ -285,7 +285,7 @@ const matchReducer = (state: MatchState, action: Action): MatchState => {
            newState.onStrikeId = newBatsmanId;
            currentInnings.currentPartnership = {
               batsman1Id: remainingBatsmanId,
-              batsman2Id: newBatsmanId,
+              batsman2Id: newBatsmanId!,
               runs: 0,
               balls: 0,
             };
@@ -561,7 +561,7 @@ function WicketDialog({
 }: { 
   open: boolean, 
   onOpenChange: (open: boolean) => void, 
-  onWicketConfirm: (payload: { dismissalType: string, newBatsmanId: string, fielderId?: string }) => void, 
+  onWicketConfirm: (payload: { dismissalType: string, newBatsmanId?: string, fielderId?: string }) => void, 
   battingTeam: { name: string, players: (Player & {isOut?: boolean})[]}, 
   bowlingTeam: { name: string, players: Player[]}, 
   onStrikeBatsmanId: string, 
@@ -572,10 +572,15 @@ function WicketDialog({
   const [newBatsmanId, setNewBatsmanId] = useState('');
   const [fielderId, setFielderId] = useState<string | undefined>();
 
+  const isLastWicket = useMemo(() => {
+    if (!currentInnings) return false;
+    // The next wicket will be the last one if (players - 2) are already out.
+    return currentInnings.wickets >= battingTeam.players.length - 2;
+  }, [currentInnings, battingTeam.players.length]);
+
   const availableBatsmen = useMemo(() => {
     if (!currentInnings) return [];
     
-    // Get IDs of players who are already out or at the crease
     const outOrCurrentIds = new Set(
       Object.values(currentInnings.batsmen)
         .filter(b => b.isOut || b.id === onStrikeBatsmanId || b.id === nonStrikeBatsmanId)
@@ -589,7 +594,7 @@ function WicketDialog({
   const fielderNeededDismissals = ['Caught', 'Run out', 'Stumped'];
 
   const handleConfirm = () => {
-    if (dismissalType && (newBatsmanId || availableBatsmen.length === 0)) {
+    if (dismissalType && (newBatsmanId || isLastWicket)) {
       onWicketConfirm({ dismissalType, newBatsmanId: newBatsmanId, fielderId });
       onOpenChange(false);
       setDismissalType('');
@@ -597,8 +602,6 @@ function WicketDialog({
       setFielderId(undefined);
     }
   };
-  
-  const isLastWicket = availableBatsmen.length === 0 && currentInnings ? currentInnings.wickets < battingTeam.players.length - 2 : false;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1078,7 +1081,7 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
     updateState({ type: 'BALL_EVENT', payload: { runs, isExtra: true, extraType: type } });
   }
 
-  const handleWicket = (payload: { dismissalType: string; newBatsmanId: string; fielderId?: string }) => {
+  const handleWicket = (payload: { dismissalType: string, newBatsmanId?: string, fielderId?: string }) => {
     setEventAnimation('wicket');
     updateState({ type: 'WICKET', payload });
   }
