@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { CricLogo } from '@/components/icons';
-import { Home, Users, Trophy, BarChart, Bell, Settings, LifeBuoy, LogOut, MessageSquare } from 'lucide-react';
+import { Home, Users, Trophy, BarChart, Bell, Settings, LifeBuoy, LogOut, MessageSquare, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -14,6 +14,7 @@ const navItems = [
   { href: '/admin/users', icon: Users, label: 'Users' },
   { href: '/admin/tournaments', icon: Trophy, label: 'Tournaments' },
   { href: '/admin/feedback', icon: MessageSquare, label: 'Feedback' },
+  { href: '/admin/notifications', icon: Send, label: 'Notifications' },
   { href: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 
