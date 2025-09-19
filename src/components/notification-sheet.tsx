@@ -51,7 +51,7 @@ function NotificationItem({ notification }: { notification: Notification }) {
                 <p className="font-semibold">{notification.title}</p>
                 <p className="text-sm text-muted-foreground">{notification.message}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                    {formatDistanceToNow(notification.createdAt.toDate(), { addSuffix: true })}
+                    {notification.createdAt ? formatDistanceToNow(notification.createdAt.toDate(), { addSuffix: true }) : ''}
                 </p>
             </div>
             {!notification.isRead && <div className="h-2.5 w-2.5 rounded-full bg-primary mt-2"></div>}
@@ -69,12 +69,17 @@ export function NotificationSheet() {
 
         const q = query(
             collection(db, 'notifications'),
-            where('userId', '==', user.uid),
-            orderBy('createdAt', 'desc')
+            where('userId', '==', user.uid)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+            // Sort client-side
+            notifs.sort((a, b) => {
+                const timeA = a.createdAt?.toDate().getTime() || 0;
+                const timeB = b.createdAt?.toDate().getTime() || 0;
+                return timeB - timeA;
+            });
             setNotifications(notifs);
             setUnreadCount(notifs.filter(n => !n.isRead).length);
         });
