@@ -182,7 +182,6 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
   };
 
   const isNextRound = tournament.qualifiedTeams && tournament.qualifiedTeams.length > 0;
-  const availableTeamsForAssignment = isNextRound ? tournament.qualifiedTeams : tournament.participatingTeams;
   
   const leagueGroupAssignedTeams = useMemo(() => 
     (tournament.groups || [])
@@ -190,7 +189,14 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
     .flatMap(g => g.teams), 
   [tournament.groups]);
 
-  const unassignedTeams = useMemo(() => (availableTeamsForAssignment || []).filter(t => !leagueGroupAssignedTeams.includes(t)), [availableTeamsForAssignment, leagueGroupAssignedTeams]);
+  const unassignedTeams = useMemo(() => (tournament.participatingTeams || []).filter(t => !leagueGroupAssignedTeams.includes(t)), [tournament.participatingTeams, leagueGroupAssignedTeams]);
+
+  const semiFinalWinners = useMemo(() => {
+    if (!tournament.matches) return [];
+    return tournament.matches
+      .filter(m => m.matchRound === 'Semi Final' && m.status === 'Completed' && m.result)
+      .map(m => m.result!.winner);
+  }, [tournament.matches]);
   
   return (
     <div className="space-y-6">
@@ -240,6 +246,11 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
       <div className="grid md:grid-cols-2 gap-8">
         {(tournament.groups || []).length > 0 ? (tournament.groups || []).map(group => {
             const isKnockoutGroup = knockoutStages.includes(group.name);
+            const availableTeamsForAssignment = 
+                group.name === 'Final' ? semiFinalWinners :
+                isKnockoutGroup && isNextRound ? tournament.qualifiedTeams :
+                tournament.participatingTeams;
+            
             const assignedTeamsForGroup = isKnockoutGroup ? [] : leagueGroupAssignedTeams;
 
             return (
@@ -265,6 +276,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
                         <label htmlFor={`${group.name}-${teamName}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{teamName}</label>
                       </div>
                     ))}
+                    {group.name === 'Final' && semiFinalWinners.length < 2 && <p className="col-span-2 text-xs text-muted-foreground">Waiting for semi-final results.</p>}
                   </div>
                    {isOwner && !isKnockoutGroup && (
                       <Button variant="outline" className="w-full mt-4" onClick={() => handleGenerateFixtures(group.name)} disabled={group.teams.length < 2}>
@@ -1256,3 +1268,4 @@ function TournamentDetailsPage() {
 }
 
 export default TournamentDetailsPage;
+
