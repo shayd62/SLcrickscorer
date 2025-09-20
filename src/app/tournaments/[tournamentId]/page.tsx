@@ -184,8 +184,13 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
   const isNextRound = tournament.qualifiedTeams && tournament.qualifiedTeams.length > 0;
   const availableTeamsForAssignment = isNextRound ? tournament.qualifiedTeams : tournament.participatingTeams;
   
-  const assignedTeams = useMemo(() => (tournament.groups || []).flatMap(g => g.teams), [tournament.groups]);
-  const unassignedTeams = useMemo(() => (availableTeamsForAssignment || []).filter(t => !assignedTeams.includes(t)), [availableTeamsForAssignment, assignedTeams]);
+  const leagueGroupAssignedTeams = useMemo(() => 
+    (tournament.groups || [])
+    .filter(g => !knockoutStages.includes(g.name))
+    .flatMap(g => g.teams), 
+  [tournament.groups]);
+
+  const unassignedTeams = useMemo(() => (availableTeamsForAssignment || []).filter(t => !leagueGroupAssignedTeams.includes(t)), [availableTeamsForAssignment, leagueGroupAssignedTeams]);
   
   return (
     <div className="space-y-6">
@@ -233,38 +238,43 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
             </CardContent>
         </Card>
       <div className="grid md:grid-cols-2 gap-8">
-        {(tournament.groups || []).length > 0 ? (tournament.groups || []).map(group => (
-          <Card key={group.name}>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{group.name}</CardTitle>
-              {isOwner && !knockoutStages.includes(group.name) && (
-                <AlertDialog>
-                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-5 w-5 text-destructive" /></Button></AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will delete Group {group.name} and all its fixtures. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                      <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveGroup(group.name)}>Delete</AlertDialogAction></AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-              )}
-            </CardHeader>
-            <CardContent>
-              <h4 className="font-semibold mb-2">Assign Teams</h4>
-              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                {(availableTeamsForAssignment || []).map(teamName => (
-                  <div key={teamName} className="flex items-center space-x-2">
-                    <Checkbox id={`${group.name}-${teamName}`} checked={group.teams.includes(teamName)} onCheckedChange={(checked) => isOwner && handleTeamSelection(group.name, teamName, !!checked)} disabled={!group.teams.includes(teamName) && assignedTeams.includes(teamName)} />
-                    <label htmlFor={`${group.name}-${teamName}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{teamName}</label>
+        {(tournament.groups || []).length > 0 ? (tournament.groups || []).map(group => {
+            const isKnockoutGroup = knockoutStages.includes(group.name);
+            const assignedTeamsForGroup = isKnockoutGroup ? [] : leagueGroupAssignedTeams;
+
+            return (
+              <Card key={group.name}>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>{group.name}</CardTitle>
+                  {isOwner && !knockoutStages.includes(group.name) && (
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-5 w-5 text-destructive" /></Button></AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will delete Group {group.name} and all its fixtures. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveGroup(group.name)}>Delete</AlertDialogAction></AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <h4 className="font-semibold mb-2">Assign Teams</h4>
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                    {(availableTeamsForAssignment || []).map(teamName => (
+                      <div key={teamName} className="flex items-center space-x-2">
+                        <Checkbox id={`${group.name}-${teamName}`} checked={group.teams.includes(teamName)} onCheckedChange={(checked) => isOwner && handleTeamSelection(group.name, teamName, !!checked)} disabled={!isKnockoutGroup && !group.teams.includes(teamName) && assignedTeamsForGroup.includes(teamName)} />
+                        <label htmlFor={`${group.name}-${teamName}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{teamName}</label>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-               {isOwner && !knockoutStages.includes(group.name) && (
-                  <Button variant="outline" className="w-full mt-4" onClick={() => handleGenerateFixtures(group.name)} disabled={group.teams.length < 2}>
-                    Generate Fixtures
-                  </Button>
-                )}
-            </CardContent>
-          </Card>
-        )) : <p className="text-muted-foreground text-center md:col-span-2">No groups created yet. {isOwner && "Add a group to start assigning teams."}</p>}
+                   {isOwner && !isKnockoutGroup && (
+                      <Button variant="outline" className="w-full mt-4" onClick={() => handleGenerateFixtures(group.name)} disabled={group.teams.length < 2}>
+                        Generate Fixtures
+                      </Button>
+                    )}
+                </CardContent>
+              </Card>
+            )
+        }) : <p className="text-muted-foreground text-center md:col-span-2">No groups created yet. {isOwner && "Add a group to start assigning teams."}</p>}
       </div>
        {unassignedTeams.length > 0 && (
           <Card className="mt-8">
