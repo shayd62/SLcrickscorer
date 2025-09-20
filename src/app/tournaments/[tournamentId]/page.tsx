@@ -190,7 +190,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
   [tournament.groups]);
 
   const unassignedTeams = useMemo(() => (tournament.participatingTeams || []).filter(t => !leagueGroupAssignedTeams.includes(t)), [tournament.participatingTeams, leagueGroupAssignedTeams]);
-
+  
   const quarterFinalWinners = useMemo(() => {
     if (!tournament.matches) return [];
     return tournament.matches
@@ -204,7 +204,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
       .filter(m => m.matchRound === 'Semi Final' && m.status === 'Completed' && m.result)
       .map(m => m.result!.winner);
   }, [tournament.matches]);
-  
+
   return (
     <div className="space-y-6">
         <Card>
@@ -253,11 +253,21 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
       <div className="grid md:grid-cols-2 gap-8">
         {(tournament.groups || []).length > 0 ? (tournament.groups || []).map(group => {
             const isKnockoutGroup = knockoutStages.includes(group.name);
-            const availableTeamsForAssignment = 
-                group.name === 'Final' ? semiFinalWinners :
-                group.name === 'Semi Final' ? quarterFinalWinners :
-                group.name === 'Quarter Final' ? tournament.qualifiedTeams :
-                tournament.participatingTeams;
+
+            const getAvailableTeams = () => {
+              if (group.name === 'Final') {
+                return selectedRounds.includes('Semi Final') ? semiFinalWinners : selectedRounds.includes('Quarter Final') ? quarterFinalWinners : tournament.qualifiedTeams;
+              }
+              if (group.name === 'Semi Final') {
+                return selectedRounds.includes('Quarter Final') ? quarterFinalWinners : tournament.qualifiedTeams;
+              }
+              if (group.name === 'Quarter Final') {
+                return tournament.qualifiedTeams;
+              }
+              return tournament.participatingTeams;
+            };
+
+            const availableTeamsForAssignment = getAvailableTeams();
             
             const assignedTeamsForGroup = isKnockoutGroup ? [] : leagueGroupAssignedTeams;
 
@@ -284,11 +294,11 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
                         <label htmlFor={`${group.name}-${teamName}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{teamName}</label>
                       </div>
                     ))}
-                    {group.name === 'Final' && semiFinalWinners.length < 2 && <p className="col-span-2 text-xs text-muted-foreground">Waiting for semi-final results.</p>}
-                    {group.name === 'Semi Final' && quarterFinalWinners.length < (tournament.groups?.find(g => g.name === 'Quarter Final')?.teams.length || 4) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for quarter-final results.</p>}
+                    {group.name === 'Final' && selectedRounds.includes('Semi Final') && semiFinalWinners.length < 2 && <p className="col-span-2 text-xs text-muted-foreground">Waiting for semi-final results.</p>}
+                    {group.name === 'Semi Final' && selectedRounds.includes('Quarter Final') && quarterFinalWinners.length < (tournament.groups?.find(g => g.name === 'Quarter Final')?.teams.length || 4) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for quarter-final results.</p>}
                     {group.name === 'Quarter Final' && (!tournament.qualifiedTeams || tournament.qualifiedTeams.length === 0) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for league stage results.</p>}
                   </div>
-                   {isOwner && !knockoutStages.includes(group.name) && (
+                   {isOwner && !isKnockoutGroup && (
                       <Button variant="outline" className="w-full mt-4" onClick={() => handleGenerateFixtures(group.name)} disabled={group.teams.length < 2}>
                         Generate Fixtures
                       </Button>
