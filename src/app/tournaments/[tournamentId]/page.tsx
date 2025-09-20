@@ -105,6 +105,8 @@ function PastMatchCard({ match }: { match: TournamentMatch }) {
 
 function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void>, isOwner: boolean }) {
   const [newGroupName, setNewGroupName] = useState('');
+  const [tournamentType, setTournamentType] = useState<'round-robin' | 'knockout'>('round-robin');
+  const [round, setRound] = useState('league');
   const { toast } = useToast();
   const router = useRouter();
   const tournamentId = tournament.id;
@@ -146,20 +148,50 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
   const assignedTeams = useMemo(() => (tournament.groups || []).flatMap(g => g.teams), [tournament.groups]);
   const unassignedTeams = useMemo(() => (availableTeamsForAssignment || []).filter(t => !assignedTeams.includes(t)), [availableTeamsForAssignment, assignedTeams]);
   
+  const roundRobinOptions = [
+      { value: 'league', label: 'League Matches' },
+      { value: 'super4', label: 'Super 4' },
+      { value: 'super6', label: 'Super 6' },
+      { value: 'super8', label: 'Super 8' },
+      { value: 'quarter', label: 'Quarter Final' },
+      { value: 'semi', label: 'Semi Final' },
+      { value: 'final', label: 'Final' },
+  ];
+  
   return (
     <div className="space-y-6">
-       {isOwner && (
         <Card>
-          <CardHeader>
-            <CardTitle>{isNextRound ? 'Next Round Setup' : 'Create & Manage Groups'}</CardTitle>
-            <CardDescription>{isNextRound ? 'Create new groups for the qualified teams.' : 'Add groups and assign teams to them.'}</CardDescription>
-          </CardHeader>
-           <CardContent className="flex gap-2">
-            <Input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder={isNextRound ? "e.g., Super 8 - Group 1" : "e.g., Group A"} />
-            <Button onClick={handleAddGroup}><Plus className="mr-2 h-4 w-4" /> Add Group</Button>
-          </CardContent>
+            <CardHeader>
+                <CardTitle>Round and Group</CardTitle>
+                <CardDescription>Setup the structure for the current stage of the tournament.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Select value={tournamentType} onValueChange={(value: 'round-robin' | 'knockout') => setTournamentType(value)}>
+                        <SelectTrigger><SelectValue placeholder="Select Type" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="round-robin">Round Robin League</SelectItem>
+                            <SelectItem value="knockout">Knockout</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    {tournamentType === 'round-robin' && (
+                         <Select value={round} onValueChange={setRound}>
+                            <SelectTrigger><SelectValue placeholder="Select Round" /></SelectTrigger>
+                            <SelectContent>
+                                {roundRobinOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    )}
+                </div>
+                
+                 {isOwner && tournamentType === 'round-robin' && round === 'league' && (
+                    <div className="flex gap-2">
+                        <Input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="e.g., Group A" />
+                        <Button onClick={handleAddGroup}><Plus className="mr-2 h-4 w-4" /> Add Group</Button>
+                    </div>
+                 )}
+            </CardContent>
         </Card>
-       )}
       <div className="grid md:grid-cols-2 gap-8">
         {(tournament.groups || []).length > 0 ? (tournament.groups || []).map(group => (
           <Card key={group.name}>
