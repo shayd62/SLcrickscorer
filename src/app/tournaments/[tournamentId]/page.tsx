@@ -191,6 +191,13 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
 
   const unassignedTeams = useMemo(() => (tournament.participatingTeams || []).filter(t => !leagueGroupAssignedTeams.includes(t)), [tournament.participatingTeams, leagueGroupAssignedTeams]);
 
+  const quarterFinalWinners = useMemo(() => {
+    if (!tournament.matches) return [];
+    return tournament.matches
+        .filter(m => m.matchRound === 'Quarter Final' && m.status === 'Completed' && m.result)
+        .map(m => m.result!.winner);
+  }, [tournament.matches]);
+
   const semiFinalWinners = useMemo(() => {
     if (!tournament.matches) return [];
     return tournament.matches
@@ -248,7 +255,8 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
             const isKnockoutGroup = knockoutStages.includes(group.name);
             const availableTeamsForAssignment = 
                 group.name === 'Final' ? semiFinalWinners :
-                isKnockoutGroup && isNextRound ? tournament.qualifiedTeams :
+                group.name === 'Semi Final' ? quarterFinalWinners :
+                group.name === 'Quarter Final' ? tournament.qualifiedTeams :
                 tournament.participatingTeams;
             
             const assignedTeamsForGroup = isKnockoutGroup ? [] : leagueGroupAssignedTeams;
@@ -277,8 +285,10 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
                       </div>
                     ))}
                     {group.name === 'Final' && semiFinalWinners.length < 2 && <p className="col-span-2 text-xs text-muted-foreground">Waiting for semi-final results.</p>}
+                    {group.name === 'Semi Final' && quarterFinalWinners.length < (tournament.groups?.find(g => g.name === 'Quarter Final')?.teams.length || 4) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for quarter-final results.</p>}
+                    {group.name === 'Quarter Final' && (!tournament.qualifiedTeams || tournament.qualifiedTeams.length === 0) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for league stage results.</p>}
                   </div>
-                   {isOwner && !isKnockoutGroup && (
+                   {isOwner && !knockoutStages.includes(group.name) && (
                       <Button variant="outline" className="w-full mt-4" onClick={() => handleGenerateFixtures(group.name)} disabled={group.teams.length < 2}>
                         Generate Fixtures
                       </Button>
@@ -450,7 +460,7 @@ function ParticipatingTeamsCard({ tournament, onUpdate, isOwner }: { tournament:
             setSearchResults([]);
         } catch (e) {
             console.error("Error joining tournament: ", e);
-            toast({ title: "Error", description: "Could not add team to the tournament.", variant: 'destructive' });
+            toast({ title: "Error", description: "Could not add team to the tournament.", variant: "destructive" });
         }
     };
 
