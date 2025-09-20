@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -301,7 +300,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
 }
 
 
-function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifiedTeams }: { teams: TournamentPoints[], title?: string, onUpdate?: (data: Partial<Tournament>) => Promise<void>, isOwner?: boolean, qualifiedTeams?: string[] }) {
+function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifiedTeams, isKnockout }: { teams: TournamentPoints[], title?: string, onUpdate?: (data: Partial<Tournament>) => Promise<void>, isOwner?: boolean, qualifiedTeams?: string[], isKnockout?: boolean }) {
     const [selectedTeams, setSelectedTeams] = useState<string[]>(qualifiedTeams || []);
 
     useEffect(() => {
@@ -340,32 +339,32 @@ function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifi
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                {isOwner && <TableHead />}
+                                {isOwner && !isKnockout && <TableHead />}
                                 <TableHead>Team</TableHead>
                                 <TableHead className="text-center">P</TableHead>
                                 <TableHead className="text-center">W</TableHead>
                                 <TableHead className="text-center">L</TableHead>
-                                <TableHead className="text-center">D</TableHead>
-                                <TableHead className="text-center">Pts</TableHead>
-                                <TableHead className="text-right">NRR</TableHead>
+                                {!isKnockout && <TableHead className="text-center">D</TableHead>}
+                                {!isKnockout && <TableHead className="text-center">Pts</TableHead>}
+                                {!isKnockout && <TableHead className="text-right">NRR</TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {sortedTeams.map((team) => (
                                 <TableRow key={team.teamName}>
-                                    {isOwner && <TableCell><Checkbox checked={selectedTeams.includes(team.teamName)} onCheckedChange={(checked) => handleTeamSelect(team.teamName, !!checked)} /></TableCell>}
+                                    {isOwner && !isKnockout && <TableCell><Checkbox checked={selectedTeams.includes(team.teamName)} onCheckedChange={(checked) => handleTeamSelect(team.teamName, !!checked)} /></TableCell>}
                                     <TableCell className="font-medium">{team.teamName} {qualifiedTeams?.includes(team.teamName) && <span className="text-green-500 font-bold ml-2">Q</span>}</TableCell>
                                     <TableCell className="text-center">{team.matchesPlayed}</TableCell>
                                     <TableCell className="text-center">{team.wins}</TableCell>
                                     <TableCell className="text-center">{team.losses}</TableCell>
-                                    <TableCell className="text-center">{team.draws}</TableCell>
-                                    <TableCell className="text-center font-bold">{team.points}</TableCell>
-                                    <TableCell className="text-right">{team.netRunRate.toFixed(2)}</TableCell>
+                                    {!isKnockout && <TableCell className="text-center">{team.draws}</TableCell>}
+                                    {!isKnockout && <TableCell className="text-center font-bold">{team.points}</TableCell>}
+                                    {!isKnockout && <TableCell className="text-right">{team.netRunRate.toFixed(2)}</TableCell>}
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
-                    {isOwner && (
+                    {isOwner && !isKnockout && (
                         <div className="flex justify-end mt-4">
                             <Button onClick={handleQualify} disabled={selectedTeams.length === 0}>Qualify Selected Teams</Button>
                         </div>
@@ -1083,7 +1082,7 @@ function TournamentDetailsPage() {
     if (loading) return <div className="flex items-center justify-center min-h-screen">Loading tournament...</div>;
     if (!tournament) return <div className="flex items-center justify-center min-h-screen">Tournament not found.</div>;
 
-    const groupNames = tournament.groups?.map(g => g.name) || [];
+    const knockoutStages = ['Quarter Final', 'Semi Final', 'Final'];
 
     return (
         <div className="min-h-screen bg-gray-50 text-foreground font-body">
@@ -1248,7 +1247,15 @@ function TournamentDetailsPage() {
                     <TabsContent value="points" className="mt-6 space-y-6">
                        {tournament.groups && tournament.groups.length > 0 ? (
                          tournament.groups.map(group => (
-                           <PointsTable key={group.name} teams={pointsTables[group.name] || []} title={`Points Table - ${group.name}`} onUpdate={handleUpdateTournament} isOwner={isOwnerOrAdmin} qualifiedTeams={tournament.qualifiedTeams} />
+                           <PointsTable 
+                                key={group.name} 
+                                teams={pointsTables[group.name] || []} 
+                                title={`Points Table - ${group.name}`} 
+                                onUpdate={handleUpdateTournament} 
+                                isOwner={isOwnerOrAdmin} 
+                                qualifiedTeams={tournament.qualifiedTeams} 
+                                isKnockout={knockoutStages.includes(group.name)}
+                           />
                          ))
                        ) : (
                          <Card><CardHeader><CardTitle>Points Table</CardTitle></CardHeader><CardContent><p className="text-muted-foreground text-center py-4">No groups available. Create groups and play matches to see the points table.</p></CardContent></Card>
@@ -1268,4 +1275,3 @@ function TournamentDetailsPage() {
 }
 
 export default TournamentDetailsPage;
-
