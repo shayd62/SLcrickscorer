@@ -257,7 +257,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
                   </div>
                 ))}
               </div>
-               {isOwner && (
+               {isOwner && !knockoutStages.includes(group.name) && (
                   <Button variant="outline" className="w-full mt-4" onClick={() => handleGenerateFixtures(group.name)} disabled={group.teams.length < 2}>
                     Generate Fixtures
                   </Button>
