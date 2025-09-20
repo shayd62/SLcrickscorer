@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -300,7 +301,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
 }
 
 
-function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifiedTeams, isKnockout }: { teams: TournamentPoints[], title?: string, onUpdate?: (data: Partial<Tournament>) => Promise<void>, isOwner?: boolean, qualifiedTeams?: string[], isKnockout?: boolean }) {
+function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifiedTeams, isKnockout, tournamentMatches }: { teams: TournamentPoints[], title?: string, onUpdate?: (data: Partial<Tournament>) => Promise<void>, isOwner?: boolean, qualifiedTeams?: string[], isKnockout?: boolean, tournamentMatches?: TournamentMatch[] }) {
     const [selectedTeams, setSelectedTeams] = useState<string[]>(qualifiedTeams || []);
 
     useEffect(() => {
@@ -327,6 +328,13 @@ function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifi
             onUpdate({ qualifiedTeams: selectedTeams });
         }
     }
+    
+    const getKnockoutResult = (teamName: string) => {
+      if (!tournamentMatches) return 'Pending';
+      const match = tournamentMatches.find(m => (m.team1 === teamName || m.team2 === teamName) && m.status === 'Completed');
+      if (!match || !match.result) return 'Pending';
+      return match.result.winner === teamName ? 'Win' : 'Loss';
+    };
 
     return (
         <Card>
@@ -338,29 +346,43 @@ function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifi
                     <>
                     <Table>
                         <TableHeader>
-                            <TableRow>
-                                {isOwner && !isKnockout && <TableHead />}
-                                <TableHead>Team</TableHead>
-                                <TableHead className="text-center">P</TableHead>
-                                <TableHead className="text-center">W</TableHead>
-                                <TableHead className="text-center">L</TableHead>
-                                {!isKnockout && <TableHead className="text-center">D</TableHead>}
-                                {!isKnockout && <TableHead className="text-center">Pts</TableHead>}
-                                {!isKnockout && <TableHead className="text-right">NRR</TableHead>}
-                            </TableRow>
+                           {isKnockout ? (
+                                <TableRow>
+                                    <TableHead>Team</TableHead>
+                                    <TableHead className="text-right">Result</TableHead>
+                                </TableRow>
+                           ) : (
+                                <TableRow>
+                                    {isOwner && <TableHead />}
+                                    <TableHead>Team</TableHead>
+                                    <TableHead className="text-center">P</TableHead>
+                                    <TableHead className="text-center">W</TableHead>
+                                    <TableHead className="text-center">L</TableHead>
+                                    <TableHead className="text-center">D</TableHead>
+                                    <TableHead className="text-center">Pts</TableHead>
+                                    <TableHead className="text-right">NRR</TableHead>
+                                </TableRow>
+                           )}
                         </TableHeader>
                         <TableBody>
                             {sortedTeams.map((team) => (
+                                isKnockout ? (
+                                    <TableRow key={team.teamName}>
+                                        <TableCell className="font-medium">{team.teamName}</TableCell>
+                                        <TableCell className="text-right font-semibold">{getKnockoutResult(team.teamName)}</TableCell>
+                                    </TableRow>
+                                ) : (
                                 <TableRow key={team.teamName}>
-                                    {isOwner && !isKnockout && <TableCell><Checkbox checked={selectedTeams.includes(team.teamName)} onCheckedChange={(checked) => handleTeamSelect(team.teamName, !!checked)} /></TableCell>}
+                                    {isOwner && <TableCell><Checkbox checked={selectedTeams.includes(team.teamName)} onCheckedChange={(checked) => handleTeamSelect(team.teamName, !!checked)} /></TableCell>}
                                     <TableCell className="font-medium">{team.teamName} {qualifiedTeams?.includes(team.teamName) && <span className="text-green-500 font-bold ml-2">Q</span>}</TableCell>
                                     <TableCell className="text-center">{team.matchesPlayed}</TableCell>
                                     <TableCell className="text-center">{team.wins}</TableCell>
                                     <TableCell className="text-center">{team.losses}</TableCell>
-                                    {!isKnockout && <TableCell className="text-center">{team.draws}</TableCell>}
-                                    {!isKnockout && <TableCell className="text-center font-bold">{team.points}</TableCell>}
-                                    {!isKnockout && <TableCell className="text-right">{team.netRunRate.toFixed(2)}</TableCell>}
+                                    <TableCell className="text-center">{team.draws}</TableCell>
+                                    <TableCell className="text-center font-bold">{team.points}</TableCell>
+                                    <TableCell className="text-right">{team.netRunRate.toFixed(2)}</TableCell>
                                 </TableRow>
+                                )
                             ))}
                         </TableBody>
                     </Table>
@@ -1255,6 +1277,7 @@ function TournamentDetailsPage() {
                                 isOwner={isOwnerOrAdmin} 
                                 qualifiedTeams={tournament.qualifiedTeams} 
                                 isKnockout={knockoutStages.includes(group.name)}
+                                tournamentMatches={tournament.matches}
                            />
                          ))
                        ) : (
