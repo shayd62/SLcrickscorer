@@ -106,10 +106,48 @@ function PastMatchCard({ match }: { match: TournamentMatch }) {
 function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tournament, onUpdate: (data: Partial<Tournament>) => Promise<void>, isOwner: boolean }) {
   const [newGroupName, setNewGroupName] = useState('');
   const [tournamentType, setTournamentType] = useState<'round-robin' | 'knockout'>('round-robin');
-  const [round, setRound] = useState('league');
+  
+  const [selectedRounds, setSelectedRounds] = useState<string[]>([]);
+    useEffect(() => {
+        if (tournament.tournamentStructure) {
+            setSelectedRounds(tournament.tournamentStructure);
+        }
+    }, [tournament.tournamentStructure]);
+  
   const { toast } = useToast();
   const router = useRouter();
   const tournamentId = tournament.id;
+
+    const roundRobinOptions = [
+        'League Matches',
+        'Super 4',
+        'Super 6',
+        'Super 8',
+        'Quarter Final',
+        'Semi Final',
+        'Final',
+    ];
+    const knockoutStages = ['Quarter Final', 'Semi Final', 'Final'];
+
+    const handleRoundSelection = (round: string, checked: boolean) => {
+        const newSelectedRounds = checked
+            ? [...selectedRounds, round]
+            : selectedRounds.filter(r => r !== round);
+        
+        setSelectedRounds(newSelectedRounds);
+        onUpdate({ tournamentStructure: newSelectedRounds });
+
+        if (knockoutStages.includes(round) && checked) {
+            const existingGroups = tournament.groups || [];
+            if (!existingGroups.some(g => g.name === round)) {
+                const updatedGroups = [...existingGroups, { name: round, teams: [] }];
+                onUpdate({ groups: updatedGroups });
+            }
+        } else if (knockoutStages.includes(round) && !checked) {
+            const updatedGroups = (tournament.groups || []).filter(g => g.name !== round);
+            onUpdate({ groups: updatedGroups });
+        }
+    };
 
   const handleAddGroup = () => {
     if (!newGroupName.trim()) {
@@ -148,44 +186,45 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
   const assignedTeams = useMemo(() => (tournament.groups || []).flatMap(g => g.teams), [tournament.groups]);
   const unassignedTeams = useMemo(() => (availableTeamsForAssignment || []).filter(t => !assignedTeams.includes(t)), [availableTeamsForAssignment, assignedTeams]);
   
-  const roundRobinOptions = [
-      { value: 'league', label: 'League Matches' },
-      { value: 'super4', label: 'Super 4' },
-      { value: 'super6', label: 'Super 6' },
-      { value: 'super8', label: 'Super 8' },
-      { value: 'quarter', label: 'Quarter Final' },
-      { value: 'semi', label: 'Semi Final' },
-      { value: 'final', label: 'Final' },
-  ];
-  
   return (
     <div className="space-y-6">
         <Card>
             <CardHeader>
-                <CardTitle>Round and Group</CardTitle>
-                <CardDescription>Setup the structure for the current stage of the tournament.</CardDescription>
+                <CardTitle>Tournament Structure</CardTitle>
+                <CardDescription>Define the stages of your tournament.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <Label>Tournament Type</Label>
                     <Select value={tournamentType} onValueChange={(value: 'round-robin' | 'knockout') => setTournamentType(value)}>
                         <SelectTrigger><SelectValue placeholder="Select Type" /></SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="round-robin">Round Robin League</SelectItem>
+                            <SelectItem value="round-robin">Round Robin / League</SelectItem>
                             <SelectItem value="knockout">Knockout</SelectItem>
                         </SelectContent>
                     </Select>
-                    {tournamentType === 'round-robin' && (
-                         <Select value={round} onValueChange={setRound}>
-                            <SelectTrigger><SelectValue placeholder="Select Round" /></SelectTrigger>
-                            <SelectContent>
-                                {roundRobinOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    )}
                 </div>
                 
-                 {isOwner && tournamentType === 'round-robin' && round === 'league' && (
-                    <div className="flex gap-2">
+                 {tournamentType === 'round-robin' && (
+                    <div className="space-y-2">
+                         <Label>Rounds</Label>
+                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                             {roundRobinOptions.map(round => (
+                                <div key={round} className="flex items-center space-x-2">
+                                    <Checkbox 
+                                        id={round} 
+                                        checked={selectedRounds.includes(round)} 
+                                        onCheckedChange={(checked) => handleRoundSelection(round, !!checked)}
+                                    />
+                                    <label htmlFor={round} className="text-sm font-medium leading-none">{round}</label>
+                                </div>
+                            ))}
+                         </div>
+                    </div>
+                 )}
+                
+                 {isOwner && selectedRounds.includes('League Matches') && (
+                    <div className="flex gap-2 pt-4 border-t">
                         <Input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="e.g., Group A" />
                         <Button onClick={handleAddGroup}><Plus className="mr-2 h-4 w-4" /> Add Group</Button>
                     </div>
@@ -197,7 +236,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
           <Card key={group.name}>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>{group.name}</CardTitle>
-              {isOwner && (
+              {isOwner && !knockoutStages.includes(group.name) && (
                 <AlertDialog>
                     <AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-5 w-5 text-destructive" /></Button></AlertDialogTrigger>
                     <AlertDialogContent>
