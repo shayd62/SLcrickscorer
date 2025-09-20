@@ -4,6 +4,7 @@ export interface Player {
   id: string; // This should be the user's UID
   name: string;
   isOut?: boolean;
+  isRetiredHurt?: boolean; // Add this to track retired hurt status
 }
 
 export interface Team {
@@ -244,6 +245,7 @@ export interface Innings {
   bowlers: Record<string, Bowler>;
   currentPartnership: Partnership;
   fallOfWickets: { batsmanId: string; score: number; overs: number; balls: number }[];
+  retiredHurtBatsmen?: string[]; // Add this to track retired hurt players
 }
 
 export interface MatchState {

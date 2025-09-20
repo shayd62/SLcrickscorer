@@ -37,7 +37,7 @@ type Action =
   | { type: 'TRIGGER_BOWLER_CHANGE' }
   | { type: 'SETUP_NEXT_INNINGS'; payload: { strikerId: string, nonStrikerId: string, bowlerId: string, revisedTarget?: number, revisedOvers?: number } }
   | { type: 'TOGGLE_TICKER'; payload: { ticker: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | 'teamSquad' | 'bowlingTeamSquad' | 'batterCareer' | 'nonStrikerCareer' } }
-  | { type: 'RETIRE_BATSMAN'; payload: { retiringBatsmanId: string, newBatsmanId: string } }
+  | { type: 'RETIRE_BATSMAN'; payload: { retiringBatsmanId: string, newBatsmanId: string, type: 'hurt' | 'out' } }
   | { type: 'END_INNINGS_MANUALLY'; payload: { reason: string } }
   | { type: 'RESET_STATE'; payload: MatchState };
 
@@ -54,7 +54,7 @@ const createInnings = (battingTeamKey: 'team1' | 'team2', bowlingTeamKey: 'team1
     overs: 0,
     balls: 0,
     timeline: [],
-    batsmen: battingTeam.players.reduce((acc, p) => ({ ...acc, [p.id]: { ...p, runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false } }), {}),
+    batsmen: battingTeam.players.reduce((acc, p) => ({ ...acc, [p.id]: { ...p, runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false, isRetiredHurt: false } }), {}),
     bowlers: bowlingTeam.players.reduce((acc, p) => ({ ...acc, [p.id]: { ...p, overs: 0, balls: 0, maidens: 0, runsConceded: 0, wickets: 0 } }), {}),
     currentPartnership: {
       batsman1Id: opening.strikerId,
@@ -63,6 +63,7 @@ const createInnings = (battingTeamKey: 'team1' | 'team2', bowlingTeamKey: 'team1
       balls: 0,
     },
     fallOfWickets: [],
+    retiredHurtBatsmen: [],
   }
 };
 
@@ -277,7 +278,7 @@ const matchReducer = (state: MatchState, action: Action): MatchState => {
 
       const isLastWicket = currentInnings.wickets === battingTeamConfig.players.length - 1;
       
-      if (isLastWicket) {
+      if (isLastWicket || !newBatsmanId) {
           newState.onStrikeId = '';
           currentInnings.currentPartnership = { batsman1Id: '', batsman2Id: '', runs: 0, balls: 0 };
       } else {
@@ -285,7 +286,7 @@ const matchReducer = (state: MatchState, action: Action): MatchState => {
            newState.onStrikeId = newBatsmanId;
            currentInnings.currentPartnership = {
               batsman1Id: remainingBatsmanId,
-              batsman2Id: newBatsmanId!,
+              batsman2Id: newBatsmanId,
               runs: 0,
               balls: 0,
             };
@@ -308,14 +309,23 @@ const matchReducer = (state: MatchState, action: Action): MatchState => {
       return newState;
     }
     case 'RETIRE_BATSMAN': {
-      const { retiringBatsmanId, newBatsmanId } = action.payload;
+      const { retiringBatsmanId, newBatsmanId, type } = action.payload;
       const retiringBatsman = currentInnings.batsmen[retiringBatsmanId];
 
-      retiringBatsman.isOut = true;
-      retiringBatsman.outInfo = {
-        method: 'Retired',
-        by: '', // No bowler involved
-      };
+      if (type === 'out') {
+          retiringBatsman.isOut = true;
+          retiringBatsman.outInfo = {
+            method: 'Retired Out',
+            by: '',
+          };
+          currentInnings.wickets += 1;
+      } else { // 'hurt'
+          retiringBatsman.isRetiredHurt = true;
+          if (!currentInnings.retiredHurtBatsmen) {
+              currentInnings.retiredHurtBatsmen = [];
+          }
+          currentInnings.retiredHurtBatsmen.push(retiringBatsmanId);
+      }
       
       const isRetiringOnStrike = newState.onStrikeId === retiringBatsmanId;
       const otherBatsmanId = isRetiringOnStrike ? newState.nonStrikeId : newState.onStrikeId;
@@ -331,6 +341,10 @@ const matchReducer = (state: MatchState, action: Action): MatchState => {
         batsman2Id: newBatsmanId,
         runs: 0,
         balls: 0,
+      };
+
+      if (type === 'out') {
+          checkForInningsEnd(currentInnings);
       }
 
       return newState;
@@ -586,8 +600,13 @@ function WicketDialog({
         .filter(b => b.isOut || b.id === onStrikeBatsmanId || b.id === nonStrikeBatsmanId)
         .map(b => b.id)
     );
-        
-    return battingTeam.players.filter(p => !outOrCurrentIds.has(p.id));
+    
+    const retiredHurt = currentInnings.retiredHurtBatsmen || [];
+    const canReturn = retiredHurt.map(id => currentInnings.batsmen[id]).filter(Boolean);
+
+    const normalBatsmen = battingTeam.players.filter(p => !outOrCurrentIds.has(p.id) && !retiredHurt.includes(p.id));
+    
+    return [...canReturn, ...normalBatsmen];
   }, [battingTeam.players, currentInnings, onStrikeBatsmanId, nonStrikeBatsmanId]);
 
   const dismissalTypes = ['Bowled', 'Caught', 'LBW', 'Run out', 'Stumped', 'Hit wicket', 'Obstructing the field', 'Handled the ball', 'Timed out'];
@@ -645,7 +664,7 @@ function WicketDialog({
                     <SelectValue placeholder="Select next batsman" />
                 </SelectTrigger>
                 <SelectContent>
-                    {availableBatsmen.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    {availableBatsmen.map(p => <SelectItem key={p.id} value={p.id}>{p.name}{p.isRetiredHurt ? ' (Retired Hurt)' : ''}</SelectItem>)}
                 </SelectContent>
                 </Select>
             </div>
@@ -672,7 +691,7 @@ function RetireBatsmanDialog({
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onConfirm: (payload: { retiringBatsmanId: string, newBatsmanId: string }) => void;
+    onConfirm: (payload: { retiringBatsmanId: string, newBatsmanId: string, type: 'hurt' | 'out' }) => void;
     onStrikeBatsman?: Player;
     nonStrikeBatsman?: Player;
     battingTeam: { name: string, players: (Player & { isOut?: boolean })[] };
@@ -680,6 +699,7 @@ function RetireBatsmanDialog({
 }) {
     const [retiringBatsmanId, setRetiringBatsmanId] = useState('');
     const [newBatsmanId, setNewBatsmanId] = useState('');
+    const [retirementType, setRetirementType] = useState<'hurt' | 'out'>('hurt');
 
     const currentBatsmen = [onStrikeBatsman, nonStrikeBatsman].filter(Boolean) as Player[];
 
@@ -691,10 +711,11 @@ function RetireBatsmanDialog({
 
     const handleConfirm = () => {
         if (retiringBatsmanId && newBatsmanId) {
-            onConfirm({ retiringBatsmanId, newBatsmanId });
+            onConfirm({ retiringBatsmanId, newBatsmanId, type: retirementType });
             onOpenChange(false);
             setRetiringBatsmanId('');
             setNewBatsmanId('');
+            setRetirementType('hurt');
         }
     };
 
@@ -703,7 +724,7 @@ function RetireBatsmanDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Retire Batsman</DialogTitle>
-                    <DialogDescription>Select the batsman to retire and their replacement.</DialogDescription>
+                    <DialogDescription>Select the batsman, retirement type, and replacement.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div>
@@ -712,6 +733,16 @@ function RetireBatsmanDialog({
                             <SelectTrigger><SelectValue placeholder="Select retiring batsman" /></SelectTrigger>
                             <SelectContent>
                                 {currentBatsmen.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div>
+                        <Label>Retirement Type</Label>
+                        <Select onValueChange={(value: 'hurt' | 'out') => setRetirementType(value)} value={retirementType}>
+                            <SelectTrigger><SelectValue placeholder="Select retirement type" /></SelectTrigger>
+                            <SelectContent>
+                               <SelectItem value="hurt">Retired Hurt</SelectItem>
+                               <SelectItem value="out">Retired Out</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -1086,7 +1117,7 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
     updateState({ type: 'WICKET', payload });
   }
   
-  const handleRetire = (payload: { retiringBatsmanId: string; newBatsmanId: string; }) => {
+  const handleRetire = (payload: { retiringBatsmanId: string; newBatsmanId: string; type: 'hurt' | 'out' }) => {
     updateState({ type: 'RETIRE_BATSMAN', payload });
   };
 
@@ -1372,13 +1403,13 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
                     variant={state.activeTicker === 'batterCareer' ? 'default' : 'destructive'}
                     className="h-10 rounded-lg text-xs shadow-sm"
                     onClick={() => updateState({type: 'TOGGLE_TICKER', payload: {ticker: 'batterCareer'}})}>
-                    Bet 1
+                    Bet 1 Carrier
                 </Button>
                  <Button
                     variant={state.activeTicker === 'nonStrikerCareer' ? 'default' : 'destructive'}
                     className="h-10 rounded-lg text-xs shadow-sm"
                     onClick={() => updateState({type: 'TOGGLE_TICKER', payload: {ticker: 'nonStrikerCareer'}})}>
-                    Bet 2
+                    Bet 2 Carrier
                 </Button>
            </div>
         </div>
