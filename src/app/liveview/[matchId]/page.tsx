@@ -2,11 +2,11 @@
 
 'use client';
 
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import type { MatchState, Batsman, Bowler, BallEvent, Innings, Partnership, Team } from '@/lib/types';
+import type { MatchState, Batsman, Bowler, BallEvent, Innings, Partnership, Team, Player, UserProfile } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, getDocs, collection, query, where } from "firebase/firestore";
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 
@@ -621,30 +621,22 @@ function BatterCareerTicker({ batter }: { batter: Batsman }) {
   );
 }
 
-function BowlerCareerTicker({ bowler, team }: { bowler: Bowler, team?: Team }) {
-  // Placeholder data
-  const careerStats = {
-    matches: 10,
-    wickets: 11,
-    average: 15.12,
-    economy: 7.5,
-    best: '3-22',
-    photoUrl: `https://picsum.photos/seed/${bowler.id}/150/150`
-  };
+function BowlerCareerTicker({ bowler, careerStats }: { bowler: Bowler, careerStats?: any }) {
+  if (!careerStats) return null;
 
   const statItems = [
     { label: 'MATCH', value: careerStats.matches },
     { label: 'WICKETS', value: careerStats.wickets },
     { label: 'ECONOMY', value: careerStats.economy.toFixed(1) },
-    { label: 'AVERAGE', value: careerStats.average.toFixed(2) },
-    { label: 'BEST', value: careerStats.best },
+    { label: 'AVERAGE', value: careerStats.bowlingAverage.toFixed(2) },
+    { label: 'BEST', value: `${careerStats.bestBowling.wickets}-${careerStats.bestBowling.runs}` },
   ];
 
   return (
     <div className="fixed bottom-10 left-1/2 -translate-x-1/2 w-full max-w-4xl h-auto flex items-center justify-center p-4 font-sans z-50">
         <div className="flex items-center">
             <Image
-                src={careerStats.photoUrl}
+                src={careerStats.photoURL || `https://picsum.photos/seed/${bowler.id}/150/150`}
                 alt={bowler.name}
                 width={150}
                 height={150}
@@ -673,12 +665,78 @@ function BowlerCareerTicker({ bowler, team }: { bowler: Bowler, team?: Team }) {
 export default function LiveViewPage() {
   const [match, setMatch] = useState<MatchState | null>(null);
   const [eventAnimation, setEventAnimation] = useState<'four' | 'six' | 'wicket' | null>(null);
+  const [bowlerCareerStats, setBowlerCareerStats] = useState<any>(null);
   const params = useParams();
   const router = useRouter();
   const matchId = params.matchId as string;
   const lastTimelineLength = useRef(0);
   const searchParams = useSearchParams();
   const isObs = searchParams.get('obs') === 'true';
+
+  const calculateBowlerStats = useCallback(async (player: Player) => {
+    if (!player) return null;
+    try {
+        const userQuery = query(collection(db, 'users'), where('uid', '==', player.id));
+        const userSnap = await getDocs(userQuery);
+        if (userSnap.empty) return null;
+
+        const playerProfile = userSnap.docs[0].data() as UserProfile;
+
+        const matchesRef = collection(db, "matches");
+        const matchesSnap = await getDocs(matchesRef);
+        const allMatches = matchesSnap.docs.map(doc => ({...doc.data(), id: doc.id}) as MatchState);
+        
+        const matchesForPlayer = allMatches.filter(match => {
+            const playerInTeam1 = match.config.team1.players.some(p => p.name === playerProfile.name);
+            const playerInTeam2 = match.config.team2.players.some(p => p.name === playerProfile.name);
+            return playerInTeam1 || playerInTeam2;
+        });
+
+        if (matchesForPlayer.length === 0) {
+            return {
+                matches: 0, wickets: 0, runsConceded: 0, ballsBowled: 0,
+                fiveWicketHauls: 0, bestBowling: { wickets: 0, runs: 0 },
+                bowlingAverage: 0, economy: 0, photoURL: playerProfile.photoURL
+            };
+        }
+
+        const career = {
+            matches: matchesForPlayer.length,
+            wickets: 0, runsConceded: 0, ballsBowled: 0, fiveWicketHauls: 0,
+            bestBowling: { wickets: 0, runs: 0 }, bowlingAverage: 0, economy: 0,
+            photoURL: playerProfile.photoURL
+        };
+
+        matchesForPlayer.forEach(match => {
+            const processInnings = (innings: Innings) => {
+                if (!innings) return;
+                const matchPlayer = [...Object.values(match.config.team1.players), ...Object.values(match.config.team2.players)].find(p => p.name === playerProfile.name);
+                if (!matchPlayer) return;
+
+                const bowler = innings.bowlers?.[matchPlayer.id];
+                if (bowler && bowler.balls > 0) {
+                    career.wickets += bowler.wickets;
+                    career.runsConceded += bowler.runsConceded;
+                    career.ballsBowled += bowler.balls;
+                    if (bowler.wickets >= 5) career.fiveWicketHauls++;
+                    if (bowler.wickets > career.bestBowling.wickets || (bowler.wickets === career.bestBowling.wickets && bowler.runsConceded < career.bestBowling.runs)) {
+                        career.bestBowling = { wickets: bowler.wickets, runs: bowler.runsConceded };
+                    }
+                }
+            };
+            processInnings(match.innings1);
+            if (match.innings2) processInnings(match.innings2);
+        });
+
+        career.bowlingAverage = career.wickets > 0 ? career.runsConceded / career.wickets : 0;
+        career.economy = career.ballsBowled > 0 ? career.runsConceded / (career.ballsBowled / 6) : 0;
+        
+        return career;
+    } catch (error) {
+        console.error("Error calculating bowler stats:", error);
+        return null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!matchId) return;
@@ -687,6 +745,12 @@ export default function LiveViewPage() {
         if (doc.exists()) {
             const newMatchData = { ...doc.data() as MatchState, id: doc.id };
             setMatch(newMatchData);
+
+            if (newMatchData.activeTicker === 'bowlerCareer') {
+                const currentInningsData = newMatchData.currentInnings === 'innings1' ? newMatchData.innings1 : newMatchData.innings2!;
+                const currentBowler = currentInningsData.bowlers[newMatchData.currentBowlerId];
+                calculateBowlerStats(currentBowler).then(setBowlerCareerStats);
+            }
 
             const currentInnings = newMatchData.currentInnings === 'innings1' ? newMatchData.innings1 : newMatchData.innings2;
             if (currentInnings && currentInnings.timeline.length > lastTimelineLength.current) {
@@ -711,7 +775,7 @@ export default function LiveViewPage() {
     });
 
     return () => unsub();
-  }, [matchId]);
+  }, [matchId, calculateBowlerStats]);
   
   const activeTickerContent = useMemo(() => {
     if (!match) return null;
@@ -742,9 +806,9 @@ export default function LiveViewPage() {
     if (activeTicker === 'bowlingTeamSquad') return <TeamSquadTicker match={match} teamType="bowling" />;
     if (activeTicker === 'batterCareer' && onStrikeBatsman) return <BatterCareerTicker batter={onStrikeBatsman} />;
     if (activeTicker === 'nonStrikerCareer' && nonStrikeBatsman) return <BatterCareerTicker batter={nonStrikeBatsman} />;
-    if (activeTicker === 'bowlerCareer' && currentBowler) return <BowlerCareerTicker bowler={currentBowler} team={bowlingTeam} />;
+    if (activeTicker === 'bowlerCareer' && currentBowler) return <BowlerCareerTicker bowler={currentBowler} careerStats={bowlerCareerStats} />;
     return null;
-  }, [match]);
+  }, [match, bowlerCareerStats]);
 
   if (!match) {
     // For OBS, we don't want to show any loading text, just a blank screen.
