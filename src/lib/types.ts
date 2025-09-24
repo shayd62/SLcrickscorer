@@ -264,7 +264,7 @@ export interface MatchState {
   isBowlerChangeRequired?: boolean;
   isEndOfInnings?: boolean;
   id?: string;
-  activeTicker?: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | 'teamSquad' | 'bowlingTeamSquad' | 'batterCareer' | 'nonStrikerCareer' | null;
+  activeTicker?: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | 'teamSquad' | 'bowlingTeamSquad' | 'batterCareer' | 'nonStrikerCareer' | 'bowlerCareer' | null;
   revisedOvers?: number;
   userId?: string;
   startTime?: string;
@@ -272,7 +272,7 @@ export interface MatchState {
 }
 
 export interface UserProfile {
-  id: string; // The document ID, which is the phone number
+  id: string; // The document ID, which is the user's UID from Firebase Auth
   uid: string;
   name: string;
   shortName?: string;

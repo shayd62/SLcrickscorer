@@ -36,7 +36,7 @@ type Action =
   | { type: 'CHANGE_BOWLER'; payload: { newBowlerId: string } }
   | { type: 'TRIGGER_BOWLER_CHANGE' }
   | { type: 'SETUP_NEXT_INNINGS'; payload: { strikerId: string, nonStrikerId: string, bowlerId: string, revisedTarget?: number, revisedOvers?: number } }
-  | { type: 'TOGGLE_TICKER'; payload: { ticker: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | 'teamSquad' | 'bowlingTeamSquad' | 'batterCareer' | 'nonStrikerCareer' } }
+  | { type: 'TOGGLE_TICKER'; payload: { ticker: 'onStrike' | 'nonStrike' | 'bowler' | 'summary' | 'partnership' | 'tourName' | 'battingCard' | 'bowlingCard' | 'target' | 'teamSquad' | 'bowlingTeamSquad' | 'batterCareer' | 'nonStrikerCareer' | 'bowlerCareer' } }
   | { type: 'RETIRE_BATSMAN'; payload: { retiringBatsmanId: string, newBatsmanId: string, type: 'hurt' | 'out' } }
   | { type: 'END_INNINGS_MANUALLY'; payload: { reason: string } }
   | { type: 'RESET_STATE'; payload: MatchState };
@@ -1410,6 +1410,12 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
                     className="h-10 rounded-lg text-xs shadow-sm"
                     onClick={() => updateState({type: 'TOGGLE_TICKER', payload: {ticker: 'nonStrikerCareer'}})}>
                     Bet 2 Carrier
+                </Button>
+                 <Button
+                    variant={state.activeTicker === 'bowlerCareer' ? 'default' : 'destructive'}
+                    className="h-10 rounded-lg text-xs shadow-sm"
+                    onClick={() => updateState({type: 'TOGGLE_TICKER', payload: {ticker: 'bowlerCareer'}})}>
+                    Bowler Career
                 </Button>
            </div>
         </div>

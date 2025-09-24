@@ -620,6 +620,50 @@ function BatterCareerTicker({ batter }: { batter: Batsman }) {
   );
 }
 
+function BowlerCareerTicker({ bowler, team }: { bowler: Bowler, team?: {name: string, logoUrl?: string} }) {
+  // Placeholder data
+  const careerStats = {
+    matches: 90,
+    wickets: 111,
+    average: 22.45,
+    economy: 7.78,
+    best: '4-22',
+  };
+
+  const statItems = [
+    { label: 'MATCHES', value: careerStats.matches },
+    { label: 'WICKETS', value: careerStats.wickets },
+    { label: 'AVERAGE', value: careerStats.average.toFixed(2) },
+    { label: 'ECONOMY', value: careerStats.economy.toFixed(2) },
+    { label: 'BEST', value: careerStats.best },
+  ];
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 font-sans z-50">
+      <div className="w-[700px] h-[150px] bg-purple-800 text-white rounded-lg shadow-2xl flex items-center p-4">
+        <div className="flex flex-col items-center justify-center w-1/4">
+          <Image src={team?.logoUrl || `https://picsum.photos/seed/${bowler.id}/80/80`} alt={team?.name || 'Team Logo'} width={80} height={80} className="rounded-full border-2 border-white" data-ai-hint="team logo" />
+          <p className="font-semibold mt-2">{team?.name}</p>
+        </div>
+        <div className="w-3/4 pl-4">
+          <div className="flex items-baseline gap-3">
+             <h1 className="text-2xl font-bold uppercase">{bowler.name}</h1>
+             <p className="text-sm font-semibold text-yellow-300">T20I CAREER</p>
+          </div>
+          <div className="grid grid-cols-5 gap-4 mt-3 text-center">
+            {statItems.map(stat => (
+              <div key={stat.label}>
+                <p className="text-xs text-purple-300 uppercase">{stat.label}</p>
+                <p className="text-2xl font-bold">{stat.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 export default function LiveViewPage() {
   const [match, setMatch] = useState<MatchState | null>(null);
@@ -673,6 +717,7 @@ export default function LiveViewPage() {
     const onStrikeBatsman = currentInningsData.batsmen[onStrikeId];
     const nonStrikeBatsman = currentInningsData.batsmen[nonStrikeId];
     const currentBowler = currentInningsData.bowlers[currentBowlerId];
+    const bowlingTeam = currentInningsData.bowlingTeam === 'team1' ? config.team1 : config.team2;
 
     if (activeTicker === 'onStrike' && onStrikeBatsman) return <BatterTicker batter={onStrikeBatsman} timeline={currentInningsData.timeline} />;
     if (activeTicker === 'nonStrike' && nonStrikeBatsman) return <BatterTicker batter={nonStrikeBatsman} timeline={currentInningsData.timeline} />;
@@ -692,6 +737,7 @@ export default function LiveViewPage() {
     if (activeTicker === 'bowlingTeamSquad') return <TeamSquadTicker match={match} teamType="bowling" />;
     if (activeTicker === 'batterCareer' && onStrikeBatsman) return <BatterCareerTicker batter={onStrikeBatsman} />;
     if (activeTicker === 'nonStrikerCareer' && nonStrikeBatsman) return <BatterCareerTicker batter={nonStrikeBatsman} />;
+    if (activeTicker === 'bowlerCareer' && currentBowler) return <BowlerCareerTicker bowler={currentBowler} team={bowlingTeam} />;
     return null;
   }, [match]);
 
