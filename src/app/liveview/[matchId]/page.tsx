@@ -562,30 +562,18 @@ function TeamSquadTicker({ match, teamType }: { match: MatchState, teamType: 'ba
   );
 }
 
-function BatterCareerTicker({ batter }: { batter: Batsman }) {
-  // Placeholder data - replace with real career stats later
-  const careerStats = {
-    matches: 10,
-    runs: 321,
-    fifties: 4,
-    hundreds: 0,
-    average: 32.1,
-    fours: 23,
-    sixes: 15,
-    best: 75,
-    strikeRate: 150,
-    photoUrl: `https://picsum.photos/seed/${batter.id}/240/360`
-  };
+function BatterCareerTicker({ batter, careerStats }: { batter: Batsman, careerStats: any }) {
+  if (!careerStats) return null;
 
   const statItems = [
     { label: 'MATCH', value: careerStats.matches },
     { label: 'RUNS', value: careerStats.runs },
-    { label: 'AVERAGE', value: careerStats.average.toFixed(1) },
+    { label: 'AVERAGE', value: careerStats.battingAverage.toFixed(1) },
     { label: 'FOURS', value: careerStats.fours },
     { label: 'SIXES', value: careerStats.sixes },
     { label: '50/100', value: `${careerStats.fifties}-${careerStats.hundreds}` },
-    { label: 'BEST', value: careerStats.best },
-    { label: 'S/RATE', value: careerStats.strikeRate },
+    { label: 'BEST', value: `${careerStats.bestScore.runs}${careerStats.bestScore.isOut ? '' : '*'}` },
+    { label: 'S/RATE', value: careerStats.strikeRate.toFixed(0) },
   ];
 
   return (
@@ -594,7 +582,7 @@ function BatterCareerTicker({ batter }: { batter: Batsman }) {
         <div className="flex items-end">
           <div className="w-1/4 z-10 -mb-4 ml-4">
             <Image
-              src={careerStats.photoUrl}
+              src={careerStats.photoURL || `https://picsum.photos/seed/${batter.id}/240/360`}
               alt={batter.name}
               width={240}
               height={360}
@@ -665,6 +653,7 @@ function BowlerCareerTicker({ bowler, careerStats }: { bowler: Bowler, careerSta
 export default function LiveViewPage() {
   const [match, setMatch] = useState<MatchState | null>(null);
   const [eventAnimation, setEventAnimation] = useState<'four' | 'six' | 'wicket' | null>(null);
+  const [batterCareerStats, setBatterCareerStats] = useState<any>(null);
   const [bowlerCareerStats, setBowlerCareerStats] = useState<any>(null);
   const params = useParams();
   const router = useRouter();
@@ -672,6 +661,67 @@ export default function LiveViewPage() {
   const lastTimelineLength = useRef(0);
   const searchParams = useSearchParams();
   const isObs = searchParams.get('obs') === 'true';
+
+   const calculateBatterStats = useCallback(async (player: Player) => {
+    if (!player) return null;
+    try {
+      const userQuery = query(collection(db, 'users'), where('uid', '==', player.id));
+      const userSnap = await getDocs(userQuery);
+      if (userSnap.empty) return null;
+      const playerProfile = userSnap.docs[0].data() as UserProfile;
+
+      const matchesRef = collection(db, "matches");
+      const matchesSnap = await getDocs(matchesRef);
+      const allMatches = matchesSnap.docs.map(doc => ({...doc.data(), id: doc.id}) as MatchState);
+      
+      const matchesForPlayer = allMatches.filter(match => 
+        match.config.team1.players.some(p => p.name === playerProfile.name) || 
+        match.config.team2.players.some(p => p.name === playerProfile.name)
+      );
+
+      const career = {
+        matches: matchesForPlayer.length, runs: 0, ballsFaced: 0, notOuts: 0,
+        fifties: 0, hundreds: 0, bestScore: { runs: 0, isOut: true },
+        strikeRate: 0, battingAverage: 0, fours: 0, sixes: 0, photoURL: playerProfile.photoURL
+      };
+
+      let dismissals = 0;
+
+      matchesForPlayer.forEach(match => {
+        const processInnings = (innings: Innings) => {
+          if (!innings) return;
+          const matchPlayer = [...Object.values(match.config.team1.players), ...Object.values(match.config.team2.players)].find(p => p.name === playerProfile.name);
+          if (!matchPlayer) return;
+
+          const batsman = innings.batsmen?.[matchPlayer.id];
+          if (batsman && (batsman.balls > 0 || batsman.isOut)) {
+            career.runs += batsman.runs;
+            career.ballsFaced += batsman.balls;
+            career.fours += batsman.fours;
+            career.sixes += batsman.sixes;
+            if (!batsman.isOut) career.notOuts++;
+            else dismissals++;
+            if (batsman.runs >= 50 && batsman.runs < 100) career.fifties++;
+            if (batsman.runs >= 100) career.hundreds++;
+            if (batsman.runs > career.bestScore.runs || (batsman.runs === career.bestScore.runs && !batsman.isOut)) {
+              career.bestScore = { runs: batsman.runs, isOut: batsman.isOut };
+            }
+          }
+        };
+        processInnings(match.innings1);
+        if (match.innings2) processInnings(match.innings2);
+      });
+
+      career.battingAverage = dismissals > 0 ? career.runs / dismissals : career.runs;
+      career.strikeRate = career.ballsFaced > 0 ? (career.runs / career.ballsFaced) * 100 : 0;
+      
+      return career;
+
+    } catch (error) {
+      console.error("Error calculating batter stats:", error);
+      return null;
+    }
+  }, []);
 
   const calculateBowlerStats = useCallback(async (player: Player) => {
     if (!player) return null;
@@ -745,11 +795,19 @@ export default function LiveViewPage() {
         if (doc.exists()) {
             const newMatchData = { ...doc.data() as MatchState, id: doc.id };
             setMatch(newMatchData);
+            const currentInningsData = newMatchData.currentInnings === 'innings1' ? newMatchData.innings1 : newMatchData.innings2!;
 
             if (newMatchData.activeTicker === 'bowlerCareer') {
-                const currentInningsData = newMatchData.currentInnings === 'innings1' ? newMatchData.innings1 : newMatchData.innings2!;
                 const currentBowler = currentInningsData.bowlers[newMatchData.currentBowlerId];
                 calculateBowlerStats(currentBowler).then(setBowlerCareerStats);
+            }
+             if (newMatchData.activeTicker === 'batterCareer') {
+                const onStrikeBatsman = currentInningsData.batsmen[newMatchData.onStrikeId];
+                calculateBatterStats(onStrikeBatsman).then(setBatterCareerStats);
+            }
+             if (newMatchData.activeTicker === 'nonStrikerCareer') {
+                const nonStrikeBatsman = currentInningsData.batsmen[newMatchData.nonStrikeId];
+                calculateBatterStats(nonStrikeBatsman).then(setBatterCareerStats);
             }
 
             const currentInnings = newMatchData.currentInnings === 'innings1' ? newMatchData.innings1 : newMatchData.innings2;
@@ -775,7 +833,7 @@ export default function LiveViewPage() {
     });
 
     return () => unsub();
-  }, [matchId, calculateBowlerStats]);
+  }, [matchId, calculateBowlerStats, calculateBatterStats]);
   
   const activeTickerContent = useMemo(() => {
     if (!match) return null;
@@ -804,11 +862,11 @@ export default function LiveViewPage() {
     if (activeTicker === 'target') return <TargetTicker match={match} />;
     if (activeTicker === 'teamSquad') return <TeamSquadTicker match={match} teamType="batting" />;
     if (activeTicker === 'bowlingTeamSquad') return <TeamSquadTicker match={match} teamType="bowling" />;
-    if (activeTicker === 'batterCareer' && onStrikeBatsman) return <BatterCareerTicker batter={onStrikeBatsman} />;
-    if (activeTicker === 'nonStrikerCareer' && nonStrikeBatsman) return <BatterCareerTicker batter={nonStrikeBatsman} />;
+    if (activeTicker === 'batterCareer' && onStrikeBatsman) return <BatterCareerTicker batter={onStrikeBatsman} careerStats={batterCareerStats} />;
+    if (activeTicker === 'nonStrikerCareer' && nonStrikeBatsman) return <BatterCareerTicker batter={nonStrikeBatsman} careerStats={batterCareerStats} />;
     if (activeTicker === 'bowlerCareer' && currentBowler) return <BowlerCareerTicker bowler={currentBowler} careerStats={bowlerCareerStats} />;
     return null;
-  }, [match, bowlerCareerStats]);
+  }, [match, bowlerCareerStats, batterCareerStats]);
 
   if (!match) {
     // For OBS, we don't want to show any loading text, just a blank screen.
@@ -923,3 +981,4 @@ export default function LiveViewPage() {
     </div>
   );
 }
+
