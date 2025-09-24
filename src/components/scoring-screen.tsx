@@ -1391,13 +1391,13 @@ export default function ScoringScreen({ matchState: initialMatchState }: { match
                     variant={state.activeTicker === 'teamSquad' ? 'default' : 'destructive'}
                     className="h-10 rounded-lg text-xs shadow-sm"
                     onClick={() => updateState({type: 'TOGGLE_TICKER', payload: {ticker: 'teamSquad'}})}>
-                    Bet 11
+                    Batting Team
                 </Button>
                 <Button
                     variant={state.activeTicker === 'bowlingTeamSquad' ? 'default' : 'destructive'}
                     className="h-10 rounded-lg text-xs shadow-sm"
                     onClick={() => updateState({type: 'TOGGLE_TICKER', payload: {ticker: 'bowlingTeamSquad'}})}>
-                    Ball 11
+                    Bowling Team
                 </Button>
                 <Button
                     variant={state.activeTicker === 'batterCareer' ? 'default' : 'destructive'}

@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
@@ -497,27 +496,26 @@ function TargetTicker({ match }: { match: MatchState }) {
   );
 }
 
-function TeamSquadTicker({ match, teamType }: { match: MatchState, teamType: 'batting' | 'bowling' }) {
-  const currentInningsData = match.currentInnings === 'innings1' ? match.innings1 : match.innings2;
-  if (!currentInningsData) return null;
+function TeamSquadTicker({ team, teamStats }: { team?: Team, teamStats: any[] }) {
+  if (!team) return null;
 
-  const teamKey = teamType === 'batting' ? currentInningsData.battingTeam : currentInningsData.bowlingTeam;
-  const teamConfig = teamKey === 'team1' ? match.config.team1 : match.config.team2;
-  
-  const players = teamConfig.players.slice(0, 11);
-  const extraPlayers = teamConfig.players.slice(11);
+  const players = team.players.slice(0, 11).map(p => {
+    const stats = teamStats.find(s => s.id === p.id);
+    return { ...p, ...stats };
+  });
+  const extraPlayers = team.players.slice(11);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/70 p-4 font-sans backdrop-blur-sm">
       <div className="w-full max-w-4xl bg-white text-black rounded-lg shadow-2xl flex flex-col">
         {/* Header */}
         <div className="p-4 flex justify-between items-center border-b">
-          <Image src={teamConfig.logoUrl || "https://picsum.photos/seed/bmc-left/80/80"} alt="Team Logo" width={80} height={80} className="rounded-full" data-ai-hint="cricket club" />
+          <Image src={team.logoUrl || "https://picsum.photos/seed/bmc-left/80/80"} alt="Team Logo" width={80} height={80} className="rounded-full" data-ai-hint="cricket club" />
           <div className="text-center">
-            <h1 className="text-3xl font-bold uppercase">{teamConfig.name}</h1>
-            <p className="text-sm text-gray-600">{teamConfig.city || 'Mohimagonj, Gobindogonj, Gaibandha.'}</p>
+            <h1 className="text-3xl font-bold uppercase">{team.name}</h1>
+            <p className="text-sm text-gray-600">{team.city || 'Mohimagonj, Gobindogonj, Gaibandha.'}</p>
           </div>
-          <Image src={teamConfig.logoUrl || "https://picsum.photos/seed/bmc-right/80/80"} alt="Team Logo" width={80} height={80} className="rounded-full" data-ai-hint="cricket club" />
+          <Image src={team.logoUrl || "https://picsum.photos/seed/bmc-right/80/80"} alt="Team Logo" width={80} height={80} className="rounded-full" data-ai-hint="cricket club" />
         </div>
 
         {/* Squad Table */}
@@ -527,11 +525,11 @@ function TeamSquadTicker({ match, teamType }: { match: MatchState, teamType: 'ba
               <tr className="border-b">
                 <th className="p-2 text-left font-semibold">S.L NO</th>
                 <th className="p-2 text-left font-semibold">Player name</th>
-                <th className="p-2 text-left font-semibold">Matches</th>
-                <th className="p-2 text-left font-semibold">Runs</th>
-                <th className="p-2 text-left font-semibold">Best</th>
-                <th className="p-2 text-left font-semibold">Wickets</th>
-                <th className="p-2 text-left font-semibold">Best</th>
+                <th className="p-2 text-right font-semibold">Matches</th>
+                <th className="p-2 text-right font-semibold">Runs</th>
+                <th className="p-2 text-right font-semibold">Best</th>
+                <th className="p-2 text-right font-semibold">Wickets</th>
+                <th className="p-2 text-right font-semibold">Best</th>
               </tr>
             </thead>
             <tbody>
@@ -539,11 +537,11 @@ function TeamSquadTicker({ match, teamType }: { match: MatchState, teamType: 'ba
                 <tr key={player.id} className="border-b">
                   <td className="p-2">{index + 1}</td>
                   <td className="p-2 font-medium">{player.name}</td>
-                  <td className="p-2"></td>
-                  <td className="p-2"></td>
-                  <td className="p-2"></td>
-                  <td className="p-2"></td>
-                  <td className="p-2"></td>
+                  <td className="p-2 text-right">{player.matches || 0}</td>
+                  <td className="p-2 text-right">{player.runs || 0}</td>
+                  <td className="p-2 text-right">{player.bestScore?.runs || 0}{player.bestScore?.isOut === false ? '*' : ''}</td>
+                  <td className="p-2 text-right">{player.wickets || 0}</td>
+                  <td className="p-2 text-right">{player.bestBowling ? `${player.bestBowling.wickets}-${player.bestBowling.runs}` : '0-0'}</td>
                 </tr>
               ))}
             </tbody>
@@ -655,6 +653,7 @@ export default function LiveViewPage() {
   const [eventAnimation, setEventAnimation] = useState<'four' | 'six' | 'wicket' | null>(null);
   const [batterCareerStats, setBatterCareerStats] = useState<any>(null);
   const [bowlerCareerStats, setBowlerCareerStats] = useState<any>(null);
+  const [teamStats, setTeamStats] = useState<any[]>([]);
   const params = useParams();
   const router = useRouter();
   const matchId = params.matchId as string;
@@ -662,100 +661,33 @@ export default function LiveViewPage() {
   const searchParams = useSearchParams();
   const isObs = searchParams.get('obs') === 'true';
 
-   const calculateBatterStats = useCallback(async (player: Player) => {
-    if (!player) return null;
-    try {
-      const userQuery = query(collection(db, 'users'), where('uid', '==', player.id));
-      const userSnap = await getDocs(userQuery);
-      if (userSnap.empty) return null;
-      const playerProfile = userSnap.docs[0].data() as UserProfile;
-
-      const matchesRef = collection(db, "matches");
-      const matchesSnap = await getDocs(matchesRef);
-      const allMatches = matchesSnap.docs.map(doc => ({...doc.data(), id: doc.id}) as MatchState);
-      
-      const matchesForPlayer = allMatches.filter(match => 
-        match.config.team1.players.some(p => p.name === playerProfile.name) || 
-        match.config.team2.players.some(p => p.name === playerProfile.name)
-      );
-
-      const career = {
-        matches: matchesForPlayer.length, runs: 0, ballsFaced: 0, notOuts: 0,
-        fifties: 0, hundreds: 0, bestScore: { runs: 0, isOut: true },
-        strikeRate: 0, battingAverage: 0, fours: 0, sixes: 0, photoURL: playerProfile.photoURL
-      };
-
-      let dismissals = 0;
-
-      matchesForPlayer.forEach(match => {
-        const processInnings = (innings: Innings) => {
-          if (!innings) return;
-          const matchPlayer = [...Object.values(match.config.team1.players), ...Object.values(match.config.team2.players)].find(p => p.name === playerProfile.name);
-          if (!matchPlayer) return;
-
-          const batsman = innings.batsmen?.[matchPlayer.id];
-          if (batsman && (batsman.balls > 0 || batsman.isOut)) {
-            career.runs += batsman.runs;
-            career.ballsFaced += batsman.balls;
-            career.fours += batsman.fours;
-            career.sixes += batsman.sixes;
-            if (!batsman.isOut) career.notOuts++;
-            else dismissals++;
-            if (batsman.runs >= 50 && batsman.runs < 100) career.fifties++;
-            if (batsman.runs >= 100) career.hundreds++;
-            if (batsman.runs > career.bestScore.runs || (batsman.runs === career.bestScore.runs && !batsman.isOut)) {
-              career.bestScore = { runs: batsman.runs, isOut: batsman.isOut };
-            }
-          }
-        };
-        processInnings(match.innings1);
-        if (match.innings2) processInnings(match.innings2);
-      });
-
-      career.battingAverage = dismissals > 0 ? career.runs / dismissals : career.runs;
-      career.strikeRate = career.ballsFaced > 0 ? (career.runs / career.ballsFaced) * 100 : 0;
-      
-      return career;
-
-    } catch (error) {
-      console.error("Error calculating batter stats:", error);
-      return null;
-    }
-  }, []);
-
-  const calculateBowlerStats = useCallback(async (player: Player) => {
+   const calculateAllPlayerStats = useCallback(async (player: Player) => {
     if (!player) return null;
     try {
         const userQuery = query(collection(db, 'users'), where('uid', '==', player.id));
         const userSnap = await getDocs(userQuery);
         if (userSnap.empty) return null;
-
         const playerProfile = userSnap.docs[0].data() as UserProfile;
 
         const matchesRef = collection(db, "matches");
         const matchesSnap = await getDocs(matchesRef);
         const allMatches = matchesSnap.docs.map(doc => ({...doc.data(), id: doc.id}) as MatchState);
         
-        const matchesForPlayer = allMatches.filter(match => {
-            const playerInTeam1 = match.config.team1.players.some(p => p.name === playerProfile.name);
-            const playerInTeam2 = match.config.team2.players.some(p => p.name === playerProfile.name);
-            return playerInTeam1 || playerInTeam2;
-        });
-
-        if (matchesForPlayer.length === 0) {
-            return {
-                matches: 0, wickets: 0, runsConceded: 0, ballsBowled: 0,
-                fiveWicketHauls: 0, bestBowling: { wickets: 0, runs: 0 },
-                bowlingAverage: 0, economy: 0, photoURL: playerProfile.photoURL
-            };
-        }
+        const matchesForPlayer = allMatches.filter(match => 
+            match.config.team1.players.some(p => p.name === playerProfile.name) || 
+            match.config.team2.players.some(p => p.name === playerProfile.name)
+        );
 
         const career = {
-            matches: matchesForPlayer.length,
+            id: player.id,
+            matches: matchesForPlayer.length, runs: 0, ballsFaced: 0, notOuts: 0,
+            fifties: 0, hundreds: 0, bestScore: { runs: 0, isOut: true },
+            strikeRate: 0, battingAverage: 0, fours: 0, sixes: 0, photoURL: playerProfile.photoURL,
             wickets: 0, runsConceded: 0, ballsBowled: 0, fiveWicketHauls: 0,
             bestBowling: { wickets: 0, runs: 0 }, bowlingAverage: 0, economy: 0,
-            photoURL: playerProfile.photoURL
         };
+
+        let dismissals = 0;
 
         matchesForPlayer.forEach(match => {
             const processInnings = (innings: Innings) => {
@@ -763,6 +695,20 @@ export default function LiveViewPage() {
                 const matchPlayer = [...Object.values(match.config.team1.players), ...Object.values(match.config.team2.players)].find(p => p.name === playerProfile.name);
                 if (!matchPlayer) return;
 
+                const batsman = innings.batsmen?.[matchPlayer.id];
+                if (batsman && (batsman.balls > 0 || batsman.isOut)) {
+                    career.runs += batsman.runs;
+                    career.ballsFaced += batsman.balls;
+                    career.fours += batsman.fours;
+                    career.sixes += batsman.sixes;
+                    if (!batsman.isOut) career.notOuts++;
+                    else dismissals++;
+                    if (batsman.runs >= 50 && batsman.runs < 100) career.fifties++;
+                    if (batsman.runs >= 100) career.hundreds++;
+                    if (batsman.runs > career.bestScore.runs || (batsman.runs === career.bestScore.runs && !batsman.isOut)) {
+                      career.bestScore = { runs: batsman.runs, isOut: batsman.isOut };
+                    }
+                }
                 const bowler = innings.bowlers?.[matchPlayer.id];
                 if (bowler && bowler.balls > 0) {
                     career.wickets += bowler.wickets;
@@ -778,12 +724,15 @@ export default function LiveViewPage() {
             if (match.innings2) processInnings(match.innings2);
         });
 
+        career.battingAverage = dismissals > 0 ? career.runs / dismissals : career.runs;
+        career.strikeRate = career.ballsFaced > 0 ? (career.runs / career.ballsFaced) * 100 : 0;
         career.bowlingAverage = career.wickets > 0 ? career.runsConceded / career.wickets : 0;
         career.economy = career.ballsBowled > 0 ? career.runsConceded / (career.ballsBowled / 6) : 0;
         
         return career;
+
     } catch (error) {
-        console.error("Error calculating bowler stats:", error);
+        console.error("Error calculating player stats:", error);
         return null;
     }
   }, []);
@@ -791,7 +740,7 @@ export default function LiveViewPage() {
   useEffect(() => {
     if (!matchId) return;
 
-    const unsub = onSnapshot(doc(db, "matches", matchId), (doc) => {
+    const unsub = onSnapshot(doc(db, "matches", matchId), async (doc) => {
         if (doc.exists()) {
             const newMatchData = { ...doc.data() as MatchState, id: doc.id };
             setMatch(newMatchData);
@@ -799,15 +748,23 @@ export default function LiveViewPage() {
 
             if (newMatchData.activeTicker === 'bowlerCareer') {
                 const currentBowler = currentInningsData.bowlers[newMatchData.currentBowlerId];
-                calculateBowlerStats(currentBowler).then(setBowlerCareerStats);
+                calculateAllPlayerStats(currentBowler).then(setBowlerCareerStats);
             }
              if (newMatchData.activeTicker === 'batterCareer') {
                 const onStrikeBatsman = currentInningsData.batsmen[newMatchData.onStrikeId];
-                calculateBatterStats(onStrikeBatsman).then(setBatterCareerStats);
+                calculateAllPlayerStats(onStrikeBatsman).then(setBatterCareerStats);
             }
              if (newMatchData.activeTicker === 'nonStrikerCareer') {
                 const nonStrikeBatsman = currentInningsData.batsmen[newMatchData.nonStrikeId];
-                calculateBatterStats(nonStrikeBatsman).then(setBatterCareerStats);
+                calculateAllPlayerStats(nonStrikeBatsman).then(setBatterCareerStats);
+            }
+
+            if (newMatchData.activeTicker === 'teamSquad' || newMatchData.activeTicker === 'bowlingTeamSquad') {
+                const teamKey = newMatchData.activeTicker === 'teamSquad' ? currentInningsData.battingTeam : currentInningsData.bowlingTeam;
+                const teamConfig = teamKey === 'team1' ? newMatchData.config.team1 : newMatchData.config.team2;
+                const statsPromises = teamConfig.players.map(p => calculateAllPlayerStats(p));
+                const results = await Promise.all(statsPromises);
+                setTeamStats(results.filter(Boolean));
             }
 
             const currentInnings = newMatchData.currentInnings === 'innings1' ? newMatchData.innings1 : newMatchData.innings2;
@@ -833,7 +790,7 @@ export default function LiveViewPage() {
     });
 
     return () => unsub();
-  }, [matchId, calculateBowlerStats, calculateBatterStats]);
+  }, [matchId, calculateAllPlayerStats]);
   
   const activeTickerContent = useMemo(() => {
     if (!match) return null;
@@ -844,7 +801,6 @@ export default function LiveViewPage() {
     const onStrikeBatsman = currentInningsData.batsmen[onStrikeId];
     const nonStrikeBatsman = currentInningsData.batsmen[nonStrikeId];
     const currentBowler = currentInningsData.bowlers[currentBowlerId];
-    const bowlingTeam = currentInningsData.bowlingTeam === 'team1' ? config.team1 : config.team2;
 
     if (activeTicker === 'onStrike' && onStrikeBatsman) return <BatterTicker batter={onStrikeBatsman} timeline={currentInningsData.timeline} />;
     if (activeTicker === 'nonStrike' && nonStrikeBatsman) return <BatterTicker batter={nonStrikeBatsman} timeline={currentInningsData.timeline} />;
@@ -860,13 +816,19 @@ export default function LiveViewPage() {
     if (activeTicker === 'battingCard') return <BattingCardTicker match={match} />;
     if (activeTicker === 'bowlingCard') return <BowlingCardTicker match={match} />;
     if (activeTicker === 'target') return <TargetTicker match={match} />;
-    if (activeTicker === 'teamSquad') return <TeamSquadTicker match={match} teamType="batting" />;
-    if (activeTicker === 'bowlingTeamSquad') return <TeamSquadTicker match={match} teamType="bowling" />;
+    if (activeTicker === 'teamSquad') {
+      const team = currentInningsData.battingTeam === 'team1' ? config.team1 : config.team2;
+      return <TeamSquadTicker team={team} teamStats={teamStats} />;
+    }
+    if (activeTicker === 'bowlingTeamSquad') {
+      const team = currentInningsData.bowlingTeam === 'team1' ? config.team1 : config.team2;
+      return <TeamSquadTicker team={team} teamStats={teamStats} />;
+    }
     if (activeTicker === 'batterCareer' && onStrikeBatsman) return <BatterCareerTicker batter={onStrikeBatsman} careerStats={batterCareerStats} />;
     if (activeTicker === 'nonStrikerCareer' && nonStrikeBatsman) return <BatterCareerTicker batter={nonStrikeBatsman} careerStats={batterCareerStats} />;
     if (activeTicker === 'bowlerCareer' && currentBowler) return <BowlerCareerTicker bowler={currentBowler} careerStats={bowlerCareerStats} />;
     return null;
-  }, [match, bowlerCareerStats, batterCareerStats]);
+  }, [match, bowlerCareerStats, batterCareerStats, teamStats]);
 
   if (!match) {
     // For OBS, we don't want to show any loading text, just a blank screen.
