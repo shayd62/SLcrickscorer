@@ -565,54 +565,55 @@ function TeamSquadTicker({ match, teamType }: { match: MatchState, teamType: 'ba
 function BatterCareerTicker({ batter }: { batter: Batsman }) {
   // Placeholder data - replace with real career stats later
   const careerStats = {
-    matches: 8,
-    runs: 282,
+    matches: 10,
+    runs: 321,
     fifties: 4,
     hundreds: 0,
-    average: 40.28,
-    fours: 26,
-    sixes: 4,
-    photoUrl: `https://picsum.photos/seed/${batter.id}/200/300`
+    average: 32.1,
+    fours: 23,
+    sixes: 15,
+    best: 75,
+    strikeRate: 150,
+    photoUrl: `https://picsum.photos/seed/${batter.id}/240/360`
   };
 
   const statItems = [
-    { label: 'MATCHES', value: careerStats.matches },
+    { label: 'MATCH', value: careerStats.matches },
     { label: 'RUNS', value: careerStats.runs },
-    { label: '50s / 100s', value: `${careerStats.fifties} - ${careerStats.hundreds}` },
-    { label: 'AVERAGE', value: careerStats.average.toFixed(2) },
+    { label: 'AVERAGE', value: careerStats.average.toFixed(1) },
     { label: 'FOURS', value: careerStats.fours },
     { label: 'SIXES', value: careerStats.sixes },
+    { label: '50/100', value: `${careerStats.fifties}-${careerStats.hundreds}` },
+    { label: 'BEST', value: careerStats.best },
+    { label: 'S/RATE', value: careerStats.strikeRate },
   ];
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 font-sans z-50">
-      <div
-        className="w-full max-w-2xl h-auto bg-cover bg-center rounded-lg shadow-2xl flex flex-col p-4"
-        style={{ backgroundImage: "url('/green-bg.jpg')", backgroundColor: '#0c4a24' }}
-      >
-        <div className="text-center mb-4">
-          <h1 className="text-4xl font-extrabold text-white uppercase tracking-wider" style={{ WebkitTextStroke: '1px black' }}>
-            {batter.name}
-          </h1>
-        </div>
-        <div className="flex gap-4">
-          <div className="w-1/3">
+      <div className="relative w-full max-w-4xl">
+        <div className="flex items-end">
+          <div className="w-1/4 z-10 -mb-4 ml-4">
             <Image
               src={careerStats.photoUrl}
               alt={batter.name}
-              width={200}
-              height={300}
-              className="rounded-lg border-4 border-yellow-400 object-cover"
+              width={240}
+              height={360}
+              className="rounded-lg border-4 border-white object-cover shadow-2xl"
               data-ai-hint="cricket player"
             />
           </div>
-          <div className="w-2/3 flex flex-col justify-center gap-2">
-            {statItems.map(stat => (
-              <div key={stat.label} className="bg-green-700/80 rounded-lg p-2 flex justify-between items-center text-white border-2 border-green-400/50">
-                <span className="text-sm font-semibold uppercase">{stat.label}</span>
-                <span className="text-2xl font-bold">{stat.value}</span>
-              </div>
-            ))}
+          <div className="w-3/4 bg-gradient-to-r from-green-300 via-teal-300 to-cyan-400 rounded-lg shadow-2xl overflow-hidden pt-4 -ml-8">
+            <h1 className="text-3xl font-extrabold text-black uppercase tracking-wider text-center pb-2">
+              {batter.name}
+            </h1>
+            <div className="bg-green-500/80 p-4 grid grid-cols-4 gap-x-2 gap-y-4 text-center">
+              {statItems.map(stat => (
+                <div key={stat.label}>
+                  <p className="text-sm font-semibold text-gray-800 uppercase">{stat.label}</p>
+                  <p className="text-2xl font-bold text-black">{stat.value}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

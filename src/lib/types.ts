@@ -272,8 +272,8 @@ export interface MatchState {
 }
 
 export interface UserProfile {
-  id: string; // The document ID, which is the user's UID from Firebase Auth
-  uid: string;
+  id: string;
+  uid: string; // The user's UID from Firebase Auth
   name: string;
   shortName?: string;
   email?: string;
@@ -288,6 +288,7 @@ export interface UserProfile {
   role?: 'admin' | 'user';
   isPlaceholder?: boolean;
 }
+
 
 export interface Notification {
     id: string;
