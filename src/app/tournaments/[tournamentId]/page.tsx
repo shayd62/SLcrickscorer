@@ -190,17 +190,17 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
 
   const unassignedTeams = useMemo(() => (tournament.participatingTeams || []).filter(t => !leagueGroupAssignedTeams.includes(t)), [tournament.participatingTeams, leagueGroupAssignedTeams]);
   
-  const quarterFinalWinners = useMemo(() => {
-    if (!tournament.matches) return [];
-    return tournament.matches
-        .filter(m => m.matchRound === 'Quarter Final' && m.status === 'Completed' && m.result)
-        .map(m => m.result!.winner);
-  }, [tournament.matches]);
-
   const semiFinalWinners = useMemo(() => {
     if (!tournament.matches) return [];
     return tournament.matches
       .filter(m => m.matchRound === 'Semi Final' && m.status === 'Completed' && m.result)
+      .map(m => m.result!.winner);
+  }, [tournament.matches]);
+
+  const finalWinners = useMemo(() => {
+    if (!tournament.matches) return [];
+    return tournament.matches
+      .filter(m => m.matchRound === 'Final' && m.status === 'Completed' && m.result)
       .map(m => m.result!.winner);
   }, [tournament.matches]);
 
@@ -254,16 +254,16 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
             const isKnockoutGroup = knockoutStages.includes(group.name);
 
             const getAvailableTeams = () => {
-              if (group.name === 'Final') {
-                return selectedRounds.includes('Semi Final') ? semiFinalWinners : selectedRounds.includes('Quarter Final') ? quarterFinalWinners : tournament.qualifiedTeams;
-              }
-              if (group.name === 'Semi Final') {
-                return selectedRounds.includes('Quarter Final') ? quarterFinalWinners : tournament.qualifiedTeams;
-              }
-              if (group.name === 'Quarter Final') {
-                return tournament.qualifiedTeams;
-              }
-              return tournament.participatingTeams;
+                if (group.name === 'Final') {
+                    return semiFinalWinners;
+                }
+                if (group.name === 'Semi Final') {
+                    return tournament.qualifiedTeams;
+                }
+                if (group.name === 'Quarter Final') {
+                    return tournament.qualifiedTeams;
+                }
+                return tournament.participatingTeams;
             };
 
             const availableTeamsForAssignment = getAvailableTeams();
@@ -293,8 +293,8 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
                         <label htmlFor={`${group.name}-${teamName}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{teamName}</label>
                       </div>
                     ))}
-                    {group.name === 'Final' && selectedRounds.includes('Semi Final') && semiFinalWinners.length < 2 && <p className="col-span-2 text-xs text-muted-foreground">Waiting for semi-final results.</p>}
-                    {group.name === 'Semi Final' && selectedRounds.includes('Quarter Final') && quarterFinalWinners.length < (tournament.groups?.find(g => g.name === 'Quarter Final')?.teams.length || 4) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for quarter-final results.</p>}
+                    {group.name === 'Final' && semiFinalWinners.length < 2 && <p className="col-span-2 text-xs text-muted-foreground">Waiting for semi-final results.</p>}
+                    {group.name === 'Semi Final' && (!tournament.qualifiedTeams || tournament.qualifiedTeams.length === 0) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for league stage results.</p>}
                     {group.name === 'Quarter Final' && (!tournament.qualifiedTeams || tournament.qualifiedTeams.length === 0) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for league stage results.</p>}
                   </div>
                    {isOwner && (
@@ -320,7 +320,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
 }
 
 
-function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifiedTeams, isKnockout, tournamentMatches }: { teams: TournamentPoints[], title?: string, onUpdate?: (data: Partial<Tournament>) => Promise<void>, isOwner?: boolean, qualifiedTeams?: string[], isKnockout?: boolean, tournamentMatches?: TournamentMatch[] }) {
+function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifiedTeams, isKnockout, tournamentMatches, groupName }: { teams: TournamentPoints[], title?: string, onUpdate?: (data: Partial<Tournament>) => Promise<void>, isOwner?: boolean, qualifiedTeams?: string[], isKnockout?: boolean, tournamentMatches?: TournamentMatch[], groupName: string }) {
     const [selectedTeams, setSelectedTeams] = useState<string[]>(qualifiedTeams || []);
 
     useEffect(() => {
@@ -349,10 +349,15 @@ function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifi
     }
     
     const getKnockoutResult = (teamName: string) => {
-      if (!tournamentMatches) return 'Pending';
-      const match = tournamentMatches.find(m => (m.team1 === teamName || m.team2 === teamName) && m.status === 'Completed');
-      if (!match || !match.result) return 'Pending';
-      return match.result.winner === teamName ? 'Win' : 'Loss';
+        if (!tournamentMatches) return 'Pending';
+        const match = tournamentMatches.find(m => m.groupName === groupName && (m.team1 === teamName || m.team2 === teamName));
+        if (!match) return 'Pending';
+        if (match.status === 'Live') return 'Live';
+        if (match.status === 'Upcoming') return 'Upcoming';
+        if (match.status === 'Completed' && match.result) {
+            return match.result.winner === teamName ? 'Win' : 'Loss';
+        }
+        return 'Pending';
     };
 
     return (
@@ -1297,6 +1302,7 @@ function TournamentDetailsPage() {
                                 qualifiedTeams={tournament.qualifiedTeams} 
                                 isKnockout={knockoutStages.includes(group.name)}
                                 tournamentMatches={tournament.matches}
+                                groupName={group.name}
                            />
                          ))
                        ) : (
@@ -1317,5 +1323,3 @@ function TournamentDetailsPage() {
 }
 
 export default TournamentDetailsPage;
-
-    
