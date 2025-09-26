@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -298,7 +297,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
                     {group.name === 'Semi Final' && selectedRounds.includes('Quarter Final') && quarterFinalWinners.length < (tournament.groups?.find(g => g.name === 'Quarter Final')?.teams.length || 4) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for quarter-final results.</p>}
                     {group.name === 'Quarter Final' && (!tournament.qualifiedTeams || tournament.qualifiedTeams.length === 0) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for league stage results.</p>}
                   </div>
-                   {isOwner && !isKnockoutGroup && (
+                   {isOwner && (
                       <Button variant="outline" className="w-full mt-4" onClick={() => handleGenerateFixtures(group.name)} disabled={group.teams.length < 2}>
                         Generate Fixtures
                       </Button>
@@ -1318,3 +1317,5 @@ function TournamentDetailsPage() {
 }
 
 export default TournamentDetailsPage;
+
+    
