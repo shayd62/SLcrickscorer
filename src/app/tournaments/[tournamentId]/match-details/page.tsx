@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, Calendar, MapPin, Plus, ChevronRight, Key, Shield, Search, Settings, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Plus, ChevronRight, Key, Shield, Search, Settings, Trash2, Users, UserPlus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -112,11 +112,13 @@ function SquadSelectionDialog({
     onOpenChange,
     team,
     onConfirm,
+    onAddPlayer,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     team: Team | null;
     onConfirm: (selectedPlayers: Player[], captainId: string, wicketKeeperId: string) => void;
+    onAddPlayer: () => void;
 }) {
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [captainId, setCaptainId] = useState<string>('');
@@ -166,6 +168,10 @@ function SquadSelectionDialog({
                             </div>
                         ))}
                     </div>
+                     <Button variant="outline" className="w-full" onClick={onAddPlayer}>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Add New Player
+                    </Button>
                     <Separator />
                     <div className="space-y-2">
                         <Label>Captain</Label>
@@ -212,7 +218,7 @@ function MatchDetailsContent() {
     const [powerPlayDialogOpen, setPowerPlayDialogOpen] = useState(false);
     const [squadDialogOpen, setSquadDialogOpen] = useState(false);
     const [editingTeam, setEditingTeam] = useState<'team1' | 'team2' | null>(null);
-
+    const [playerSearchOpen, setPlayerSearchOpen] = useState(false);
     
     const team1Name = searchParams.get('team1Name') || 'Team A';
     const team2Name = searchParams.get('team2Name') || 'Team B';
@@ -322,6 +328,45 @@ function MatchDetailsContent() {
         fetchTeams();
     }, [fetchTeams]);
 
+    const handleOpenPlayerSearch = () => {
+        setSquadDialogOpen(false); // Close squad dialog first
+        setPlayerSearchOpen(true);
+    };
+
+    const handleAddPlayerToTeam = async (player: UserProfile) => {
+        if (!editingTeam) return;
+
+        const teamToUpdate = editingTeam === 'team1' ? team1 : team2;
+        if (!teamToUpdate) return;
+        
+        const isAlreadyAdded = teamToUpdate.players.some(p => p.id === player.uid);
+        if (isAlreadyAdded) {
+            toast({ title: "Player already in team", variant: "destructive" });
+            return;
+        }
+
+        const newPlayer: Player = { id: player.uid, name: player.name };
+        
+        try {
+            const teamRef = doc(db, 'teams', teamToUpdate.id);
+            await updateDoc(teamRef, { players: arrayUnion(newPlayer) });
+
+            const updatedTeam = { ...teamToUpdate, players: [...teamToUpdate.players, newPlayer] };
+            if (editingTeam === 'team1') {
+                setTeam1(updatedTeam);
+            } else {
+                setTeam2(updatedTeam);
+            }
+            
+            toast({ title: "Player Added!", description: `${newPlayer.name} has been added to ${teamToUpdate.name}.` });
+            setPlayerSearchOpen(false);
+            setSquadDialogOpen(true); // Re-open squad dialog
+        } catch (error) {
+            console.error("Error adding player: ", error);
+            toast({ title: "Error", description: "Could not add player.", variant: "destructive" });
+        }
+    };
+
 
     const handleProceedToToss = (data: MatchDetailsFormValues) => {
         if (!team1 || !team2) {
@@ -360,6 +405,7 @@ function MatchDetailsContent() {
     
     return (
         <div className="min-h-screen bg-background text-foreground font-body">
+            <PlayerSearchDialog open={playerSearchOpen} onOpenChange={setPlayerSearchOpen} onPlayerSelect={handleAddPlayerToTeam} />
             <SquadSelectionDialog
                 open={squadDialogOpen}
                 onOpenChange={setSquadDialogOpen}
@@ -373,6 +419,7 @@ function MatchDetailsContent() {
                         setTeam2Roles({ captainId, wicketKeeperId });
                     }
                 }}
+                onAddPlayer={handleOpenPlayerSearch}
             />
             <PowerPlayDialog open={powerPlayDialogOpen} onOpenChange={setPowerPlayDialogOpen} control={form.control} overs={form.watch('overs')} />
             <form onSubmit={form.handleSubmit(handleProceedToToss)}>
@@ -538,5 +585,3 @@ export default function MatchDetailsPage() {
         </Suspense>
     )
 }
-
-    
