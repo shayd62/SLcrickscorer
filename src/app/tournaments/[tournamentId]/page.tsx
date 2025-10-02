@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -968,8 +969,29 @@ function TournamentDetailsPage() {
         setFielderStats(newFielderStats);
 
         const allPlayers: { [playerId: string]: { id: string; name: string; team: string; matches: Set<string> } } = {};
-        Object.values(batterPlayerStats).forEach(p => { if (!allPlayers[p.playerId]) allPlayers[p.playerId] = { id: p.playerId, name: p.playerName, team: p.teamName, matches: new Set() }}); // This needs match count logic
-        Object.values(bowlerPlayerStats).forEach(p => { if (!allPlayers[p.id]) allPlayers[p.id] = { id: p.id, name: p.name, team: p.teamName, matches: p.matches }});
+        
+        Object.values(batterPlayerStats).forEach(p => {
+            if (!allPlayers[p.playerId]) allPlayers[p.playerId] = { id: p.playerId, name: p.playerName, team: p.teamName, matches: new Set() };
+            // In theory, a player can only bat once per match.
+            // But to be safe, we just collect all match IDs.
+        });
+        Object.values(bowlerPlayerStats).forEach(p => {
+            if (!allPlayers[p.id]) allPlayers[p.id] = { id: p.id, name: p.name, team: p.teamName, matches: new Set() };
+            p.matches.forEach(matchId => allPlayers[p.id].matches.add(matchId));
+        });
+        // We'll need to re-calc matches played by all-rounders
+        for(const match of completedMatches){
+            if(!match.matchId) continue;
+            const matchDoc = await getDoc(doc(db, 'matches', match.matchId));
+            if(!matchDoc.exists()) continue;
+            const matchData = matchDoc.data() as MatchState;
+            const playerIds = new Set([...matchData.config.team1.players.map(p => p.id), ...matchData.config.team2.players.map(p => p.id)]);
+            playerIds.forEach(id => {
+                if(allPlayers[id]){
+                    allPlayers[id].matches.add(match.id);
+                }
+            })
+        }
         
         const newAllRounderStats: AllRounderLeaderboardStat[] = Object.values(allPlayers)
             .map(player => {
@@ -1341,3 +1363,4 @@ function TournamentDetailsPage() {
 }
 
 export default TournamentDetailsPage;
+
