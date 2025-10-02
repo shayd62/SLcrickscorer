@@ -717,7 +717,7 @@ function BowlerLeaderboard({ stats }: { stats: BowlerLeaderboardStat[] }) {
 
 function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
     if (stats.length === 0) {
-        return <p className="text-muted-foreground text-center py-8">No fielding data available yet. Complete some matches to see the leaderboard.</p>;
+        return <p className="text-muted-foreground text-center py-8">No fielding data available yet.</p>;
     }
     
     return (
@@ -728,6 +728,7 @@ function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
                     <TableHead className="text-center">Catches</TableHead>
                     <TableHead className="text-center">Run Outs</TableHead>
                     <TableHead className="text-right">Stumpings</TableHead>
+                    <TableHead className="text-right">Points</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -739,6 +740,7 @@ function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
                         <TableCell className="text-center font-bold">{player.catches}</TableCell>
                         <TableCell className="text-center">{player.runOuts}</TableCell>
                         <TableCell className="text-right">{player.stumpings}</TableCell>
+                        <TableCell className="text-right font-bold">{player.points}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>
