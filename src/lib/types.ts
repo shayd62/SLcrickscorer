@@ -113,8 +113,11 @@ export interface BatterLeaderboardStat {
     playerName: string;
     teamName: string;
     matches: number;
+    innings: number;
     runs: number;
     balls: number;
+    notOuts: number;
+    average: number;
     strikeRate: number;
     points: number;
 }

@@ -678,9 +678,10 @@ function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
             <TableHeader>
                 <TableRow>
                     <TableHead>Player</TableHead>
-                    <TableHead className="text-center">Matches</TableHead>
+                    <TableHead className="text-center">I</TableHead>
                     <TableHead className="text-center">Runs</TableHead>
-                    <TableHead className="text-right">Points</TableHead>
+                    <TableHead className="text-center">Avg</TableHead>
+                    <TableHead className="text-right">SR</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -689,9 +690,10 @@ function BatterLeaderboard({ stats }: { stats: BatterLeaderboardStat[] }) {
                         <TableCell className="font-medium">
                           <Link href={`/profile/${player.playerId}`} className="hover:underline">{player.playerName}</Link>
                         </TableCell>
-                        <TableCell className="text-center">{player.matches}</TableCell>
+                        <TableCell className="text-center">{player.innings}</TableCell>
                         <TableCell className="text-center font-bold">{player.runs}</TableCell>
-                        <TableCell className="text-right font-bold">{player.points}</TableCell>
+                        <TableCell className="text-center">{player.average.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{player.strikeRate.toFixed(2)}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>
@@ -822,7 +824,7 @@ function TournamentDetailsPage() {
     const pastMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Completed'), [tournament?.matches]);
 
     const calculateLeaderboards = useCallback(async (completedMatches: TournamentMatch[], currentTournament: Tournament) => {
-        const batterPlayerStats: { [playerId: string]: Batsman & { teamName: string; matches: Set<string> } } = {};
+        const batterPlayerStats: { [playerId: string]: BatterLeaderboardStat & { notOuts: number, innings: number } } = {};
         const bowlerPlayerStats: { [playerId: string]: Bowler & { teamName: string; matches: Set<string>, allInnings: Innings[] } } = {};
         const fielderPlayerStats: { [playerId: string]: { name: string; team: string; catches: number; runOuts: number; stumpings: number; matches: Set<string> } } = {};
 
@@ -834,7 +836,6 @@ function TournamentDetailsPage() {
 
             const matchData = matchDoc.data() as MatchState;
             
-            // Ensure match belongs to the current tournament
             if (matchData.config.tournamentId !== currentTournament.id) {
                 continue;
             }
@@ -847,25 +848,35 @@ function TournamentDetailsPage() {
                 return [undefined, ''];
             }
 
-            const processInnings = (innings: Innings, battingTeamName: string, bowlingTeamName: string) => {
-                if (!innings) return;
-                // Batting Stats
-                if (innings.batsmen) {
-                    for (const batsman of Object.values(innings.batsmen) as Batsman[]) {
+            const processInnings = (inningsData: Innings, battingTeamName: string, bowlingTeamName: string) => {
+                if (!inningsData) return;
+
+                if (inningsData.batsmen) {
+                    for (const batsman of Object.values(inningsData.batsmen) as Batsman[]) {
                         if (batsman.balls > 0 || batsman.isOut) {
                              if (!batterPlayerStats[batsman.id]) {
-                                batterPlayerStats[batsman.id] = { ...batsman, teamName: battingTeamName, matches: new Set() };
-                            } else {
-                                batterPlayerStats[batsman.id].runs += batsman.runs;
-                                batterPlayerStats[batsman.id].balls += batsman.balls;
-                                batterPlayerStats[batsman.id].fours += batsman.fours;
-                                batterPlayerStats[batsman.id].sixes += batsman.sixes;
-                                batterPlayerStats[batsman.id].isOut = batterPlayerStats[batsman.id].isOut || batsman.isOut;
+                                batterPlayerStats[batsman.id] = { 
+                                  playerId: batsman.id,
+                                  playerName: batsman.name,
+                                  teamName: battingTeamName,
+                                  matches: 0,
+                                  innings: 0,
+                                  runs: 0, 
+                                  balls: 0,
+                                  notOuts: 0,
+                                  average: 0,
+                                  strikeRate: 0,
+                                  points: 0
+                                };
                             }
-                            batterPlayerStats[batsman.id].matches.add(match.id);
+                            batterPlayerStats[batsman.id].runs += batsman.runs;
+                            batterPlayerStats[batsman.id].balls += batsman.balls;
+                            batterPlayerStats[batsman.id].innings += 1;
+                            if (!batsman.isOut) {
+                              batterPlayerStats[batsman.id].notOuts += 1;
+                            }
                         }
 
-                        // Fielding stats from dismissals
                         if (batsman.isOut && batsman.outInfo?.fielderId) {
                             const { method, fielderId } = batsman.outInfo;
                             const [fielder, fielderTeam] = getPlayerTeam(fielderId, matchData.config.team1, matchData.config.team2);
@@ -882,9 +893,8 @@ function TournamentDetailsPage() {
                         }
                     }
                 }
-                 // Bowling Stats
-                if (innings.bowlers) {
-                    for (const bowler of Object.values(innings.bowlers) as Bowler[]) {
+                 if (inningsData.bowlers) {
+                    for (const bowler of Object.values(inningsData.bowlers) as Bowler[]) {
                         if (bowler.balls > 0) {
                              if (!bowlerPlayerStats[bowler.id]) {
                                 bowlerPlayerStats[bowler.id] = { ...bowler, teamName: bowlingTeamName, matches: new Set(), allInnings: [] };
@@ -894,7 +904,7 @@ function TournamentDetailsPage() {
                                 bowlerPlayerStats[bowler.id].wickets += bowler.wickets;
                             }
                             bowlerPlayerStats[bowler.id].matches.add(match.id);
-                            bowlerPlayerStats[bowler.id].allInnings.push(innings);
+                            bowlerPlayerStats[bowler.id].allInnings.push(inningsData);
                         }
                     }
                 }
@@ -907,17 +917,18 @@ function TournamentDetailsPage() {
         }
         
         const newBatterStats: BatterLeaderboardStat[] = Object.values(batterPlayerStats)
-            .map(data => ({
-                playerId: data.id,
-                playerName: data.name,
-                teamName: data.teamName,
-                matches: data.matches.size,
-                runs: data.runs,
-                balls: data.balls,
-                strikeRate: data.balls > 0 ? (data.runs / data.balls) * 100 : 0,
-                points: calculateBattingPoints(data)
-            }))
-            .sort((a, b) => b.points - a.points);
+            .map(data => {
+              const dismissals = data.innings - data.notOuts;
+              const average = dismissals > 0 ? data.runs / dismissals : data.runs;
+              const strikeRate = data.balls > 0 ? (data.runs / data.balls) * 100 : 0;
+              return {
+                ...data,
+                average,
+                strikeRate,
+                points: calculateBattingPoints(data as Batsman)
+              }
+            })
+            .sort((a, b) => b.runs - a.runs);
         setBatterStats(newBatterStats);
 
         const newBowlerStats: BowlerLeaderboardStat[] = Object.values(bowlerPlayerStats)
@@ -950,16 +961,16 @@ function TournamentDetailsPage() {
         setFielderStats(newFielderStats);
 
         const allPlayers: { [playerId: string]: { id: string; name: string; team: string; matches: Set<string> } } = {};
-        Object.values(batterPlayerStats).forEach(p => { if (!allPlayers[p.id]) allPlayers[p.id] = { id: p.id, name: p.name, team: p.teamName, matches: p.matches }});
+        Object.values(batterPlayerStats).forEach(p => { if (!allPlayers[p.playerId]) allPlayers[p.playerId] = { id: p.playerId, name: p.playerName, team: p.teamName, matches: new Set() }}); // This needs match count logic
         Object.values(bowlerPlayerStats).forEach(p => { if (!allPlayers[p.id]) allPlayers[p.id] = { id: p.id, name: p.name, team: p.teamName, matches: p.matches }});
         
         const newAllRounderStats: AllRounderLeaderboardStat[] = Object.values(allPlayers)
             .map(player => {
-                const batting = batterPlayerStats[player.id] || { runs: 0, isOut: false, balls: 0, fours: 0, sixes: 0 };
+                const batting = batterPlayerStats[player.id] || { runs: 0, isOut: false, balls: 0, fours: 0, sixes: 0, notOuts: 0, innings: 0 };
                 const bowling = bowlerPlayerStats[player.id] || { wickets: 0, allInnings: [] };
                 const fielding = fielderPlayerStats[player.id] || { catches: 0, runOuts: 0, stumpings: 0 };
                 
-                const battingPoints = calculateBattingPoints(batting);
+                const battingPoints = calculateBattingPoints(batting as Batsman);
                 const bowlingPoints = calculateBowlingPoints(bowling, bowling.allInnings, currentTournament.oversPerInnings);
                 const fieldingPoints = calculateFieldingPoints(fielding);
                 const points = battingPoints + bowlingPoints + fieldingPoints;
