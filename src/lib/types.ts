@@ -128,9 +128,12 @@ export interface BowlerLeaderboardStat {
     teamName: string;
     matches: number;
     overs: string;
+    balls: number;
     wickets: number;
     runsConceded: number;
     economy: number;
+    average: number;
+    strikeRate: number;
     points: number;
 }
 

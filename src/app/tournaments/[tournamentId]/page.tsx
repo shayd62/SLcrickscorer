@@ -711,8 +711,10 @@ function BowlerLeaderboard({ stats }: { stats: BowlerLeaderboardStat[] }) {
             <TableHeader>
                 <TableRow>
                     <TableHead>Player</TableHead>
-                    <TableHead className="text-center">Wickets</TableHead>
-                    <TableHead className="text-right">Points</TableHead>
+                    <TableHead className="text-center">Wkts</TableHead>
+                    <TableHead className="text-center">Econ</TableHead>
+                    <TableHead className="text-center">Avg</TableHead>
+                    <TableHead className="text-right">SR</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -722,7 +724,9 @@ function BowlerLeaderboard({ stats }: { stats: BowlerLeaderboardStat[] }) {
                            <Link href={`/profile/${player.playerId}`} className="hover:underline">{player.playerName}</Link>
                         </TableCell>
                         <TableCell className="text-center font-bold">{player.wickets}</TableCell>
-                        <TableCell className="text-right font-bold">{player.points.toFixed(1)}</TableCell>
+                        <TableCell className="text-center">{player.economy.toFixed(2)}</TableCell>
+                        <TableCell className="text-center">{player.average.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{player.strikeRate.toFixed(2)}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>
@@ -938,9 +942,12 @@ function TournamentDetailsPage() {
                 teamName: data.teamName,
                 matches: data.matches.size,
                 overs: formatOvers(data.balls),
+                balls: data.balls,
                 wickets: data.wickets,
                 runsConceded: data.runsConceded,
                 economy: data.balls > 0 ? (data.runsConceded / (data.balls / 6)) : 0,
+                average: data.wickets > 0 ? data.runsConceded / data.wickets : 0,
+                strikeRate: data.wickets > 0 ? data.balls / data.wickets : 0,
                 points: calculateBowlingPoints(data, data.allInnings, currentTournament.oversPerInnings)
             }))
             .sort((a, b) => b.points - a.points);
