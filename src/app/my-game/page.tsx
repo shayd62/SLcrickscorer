@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Radio, Settings, Gamepad2, Trophy, Home as HomeIcon, User, LogOut } from 'lucide-react';
+import { ArrowLeft, Radio, Settings, Gamepad2, Trophy, Home as HomeIcon, User, LogOut, Shield } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import withAuth from '@/components/with-auth';
 import Link from 'next/link';
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Users as UsersIcon, Trash2, Calendar, Clock } from "lucide-react";
 import { SettingsSheet } from '@/components/settings-sheet';
+import Image from 'next/image';
 
 
 function ActiveMatchCard({ match, onDelete, currentUserId }: { match: MatchState, onDelete: (matchId: string) => void, currentUserId?: string }) {
@@ -156,6 +157,61 @@ function RecentResultCard({ match, onDelete, currentUserId }: { match: MatchStat
     );
 }
 
+function MyTeamsList({ teams }: { teams: Team[] }) {
+    const router = useRouter();
+
+    if (teams.length === 0) {
+        return <Card><CardContent className="p-6 text-center text-muted-foreground">You are not a part of any teams.</CardContent></Card>;
+    }
+
+    return (
+        <div className="space-y-4">
+            {teams.map(team => (
+                 <Card key={team.id} className="flex flex-col cursor-pointer" onClick={() => router.push(`/teams/edit/${team.id}`)}>
+                    <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                            <Image src={team.logoUrl || '/placeholder-team.png'} alt={team.name} width={48} height={48} className="rounded-full border" />
+                            <div>
+                            <p className="font-semibold hover:underline">{team.name}</p>
+                            <p className="text-xs text-muted-foreground">{team.players.length} Players</p>
+                            </div>
+                        </div>
+                    </div>
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+    );
+}
+
+function MyTournamentsList({ tournaments }: { tournaments: Tournament[] }) {
+    const router = useRouter();
+    if (tournaments.length === 0) {
+        return <Card><CardContent className="p-6 text-center text-muted-foreground">You are not participating in any tournaments.</CardContent></Card>;
+    }
+
+    return (
+        <div className="space-y-4">
+            {tournaments.map(tournament => (
+                 <Card key={tournament.id} className="flex flex-col rounded-xl shadow-md transition-all hover:shadow-lg cursor-pointer" onClick={() => router.push(`/tournaments/${tournament.id}`)}>
+                    <CardHeader>
+                        <CardTitle className="flex justify-between items-start">
+                            <span className="hover:underline">{tournament.name}</span>
+                        </CardTitle>
+                        <CardDescription>{new Date(tournament.startDate).toLocaleDateString()} - {new Date(tournament.endDate).toLocaleDateString()}</CardDescription>
+                    </CardHeader>
+                     <CardContent className="flex-grow flex flex-col justify-between">
+                        <div>
+                            <p className="text-sm font-medium">{(tournament.participatingTeams?.length || 0)} teams</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+    );
+}
+
 function BottomNav() {
   const navItemsLeft = [
     { name: 'Home', icon: HomeIcon, href: '/matches', active: false },
@@ -215,6 +271,8 @@ function MyGamePage() {
     const [liveMatches, setLiveMatches] = useState<MatchState[]>([]);
     const [upcomingMatches, setUpcomingMatches] = useState<{ match: TournamentMatch, tournamentName: string }[]>([]);
     const [pastMatches, setPastMatches] = useState<MatchState[]>([]);
+    const [myTeams, setMyTeams] = useState<Team[]>([]);
+    const [myTournaments, setMyTournaments] = useState<Tournament[]>([]);
 
     useEffect(() => {
         if (!user || !userProfile) {
@@ -228,7 +286,9 @@ function MyGamePage() {
              // Get all teams the current user is a part of
             const userTeamsQuery = query(collection(db, "teams"), where("players", "array-contains", { id: user.uid, name: userProfile.name }));
             const userTeamsSnapshot = await getDocs(userTeamsQuery);
-            const userTeamNames = userTeamsSnapshot.docs.map(doc => doc.data().name);
+            const userTeams = userTeamsSnapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as Team);
+            setMyTeams(userTeams);
+            const userTeamNames = userTeams.map(t => t.name);
 
             // --- Live Matches (created by user OR involving user's teams) ---
             const liveMatchesQuery = query(collection(db, "matches"), where("matchOver", "==", false));
@@ -266,15 +326,29 @@ function MyGamePage() {
             });
             setPastMatches(sortedPastMatches);
 
+            // --- Tournaments (user is admin, scorer, or part of a participating team) ---
+            const tourneysRef = collection(db, "tournaments");
+            const adminQuery = query(tourneysRef, where("adminUids", "array-contains", user.uid));
+            const scorerQuery = query(tourneysRef, where("scorerUids", "array-contains", user.uid));
+            const participatingQuery = userTeamNames.length > 0 ? query(tourneysRef, where("participatingTeams", "array-contains-any", userTeamNames)) : null;
+
+            const [adminSnap, scorerSnap, participatingSnap] = await Promise.all([
+                getDocs(adminQuery),
+                getDocs(scorerQuery),
+                participatingQuery ? getDocs(participatingQuery) : Promise.resolve({ docs: [] }),
+            ]);
+
+            const tourneysMap = new Map<string, Tournament>();
+            adminSnap.forEach(doc => tourneysMap.set(doc.id, { ...doc.data(), id: doc.id } as Tournament));
+            scorerSnap.forEach(doc => tourneysMap.set(doc.id, { ...doc.data(), id: doc.id } as Tournament));
+            participatingSnap.docs.forEach(doc => tourneysMap.set(doc.id, { ...doc.data(), id: doc.id } as Tournament));
+            setMyTournaments(Array.from(tourneysMap.values()));
+
+
             // --- Upcoming Matches (from tournaments involving user's teams) ---
-            const tournamentsQuery = query(collection(db, "tournaments"));
-            const tournamentsSnapshot = await getDocs(tournamentsQuery);
-            
             const allUpcoming: { match: TournamentMatch, tournamentName: string }[] = [];
-            
-            tournamentsSnapshot.forEach(doc => {
-                const tournament = doc.data() as Tournament;
-                if (tournament.matches) {
+            tourneysMap.forEach(tournament => {
+                 if (tournament.matches) {
                     const upcomingForUser = tournament.matches.filter(m => 
                         m.status === 'Upcoming' && 
                         (userTeamNames.includes(m.team1) || userTeamNames.includes(m.team2))
@@ -338,51 +412,60 @@ function MyGamePage() {
                 </header>
                 
                 <main className="mt-4">
-                     <Tabs defaultValue="live" className="w-full">
+                     <Tabs defaultValue="matches" className="w-full">
                         <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="live">Live</TabsTrigger>
-                            <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                            <TabsTrigger value="past">Past</TabsTrigger>
+                            <TabsTrigger value="matches"><Gamepad2 className="mr-2 h-4 w-4" />Matches</TabsTrigger>
+                            <TabsTrigger value="tournaments"><Trophy className="mr-2 h-4 w-4" />Tournaments</TabsTrigger>
+                            <TabsTrigger value="teams"><UsersIcon className="mr-2 h-4 w-4" />Teams</TabsTrigger>
                         </TabsList>
-                        <TabsContent value="live" className="mt-4 space-y-4">
-                             {loading && <p>Loading...</p>}
-                            {!loading && liveMatches.length === 0 && (
-                                <Card>
-                                    <CardContent className="p-6 text-center text-muted-foreground">
-                                        <Radio className="mx-auto h-8 w-8 mb-2 animate-pulse text-green-500" />
-                                        <p>No live matches involving you right now.</p>
-                                    </CardContent>
-                                </Card>
-                            )}
-                             {liveMatches.map(match => (
-                                <ActiveMatchCard key={match.id} match={match} onDelete={handleDeleteMatch} currentUserId={user?.uid} />
-                            ))}
+
+                        <TabsContent value="matches" className="mt-4">
+                             <Tabs defaultValue="live" className="w-full">
+                                <TabsList className="grid w-full grid-cols-3">
+                                    <TabsTrigger value="live">Live</TabsTrigger>
+                                    <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+                                    <TabsTrigger value="past">Past</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="live" className="mt-4 space-y-4">
+                                    {loading && <p>Loading...</p>}
+                                    {!loading && liveMatches.length === 0 && (
+                                        <Card><CardContent className="p-6 text-center text-muted-foreground"><Radio className="mx-auto h-8 w-8 mb-2 animate-pulse text-green-500" /><p>No live matches involving you right now.</p></CardContent></Card>
+                                    )}
+                                    {liveMatches.map(match => (
+                                        <ActiveMatchCard key={match.id} match={match} onDelete={handleDeleteMatch} currentUserId={user?.uid} />
+                                    ))}
+                                </TabsContent>
+                                <TabsContent value="upcoming" className="mt-4 space-y-4">
+                                    {loading && <p>Loading...</p>}
+                                    {!loading && upcomingMatches.length === 0 && (
+                                        <Card><CardContent className="p-6 text-center text-muted-foreground"><p>No upcoming matches found.</p></CardContent></Card>
+                                    )}
+                                    {upcomingMatches.map(({match, tournamentName}) => (
+                                        <UpcomingMatchCard key={match.id} match={match} tournamentName={tournamentName} />
+                                    ))}
+                                </TabsContent>
+                                <TabsContent value="past" className="mt-4 space-y-4">
+                                    {loading && <p>Loading...</p>}
+                                    {!loading && pastMatches.length === 0 && (
+                                        <Card><CardContent className="p-6 text-center text-muted-foreground"><p>You haven't played any matches yet.</p></CardContent></Card>
+                                    )}
+                                    {pastMatches.map(match => (
+                                        <RecentResultCard key={match.id} match={match} onDelete={handleDeleteMatch} currentUserId={user?.uid} />
+                                    ))}
+                                </TabsContent>
+                            </Tabs>
                         </TabsContent>
-                        <TabsContent value="upcoming" className="mt-4 space-y-4">
-                            {loading && <p>Loading...</p>}
-                            {!loading && upcomingMatches.length === 0 && (
-                                <Card>
-                                    <CardContent className="p-6 text-center text-muted-foreground">
-                                        <p>No upcoming matches found.</p>
-                                    </CardContent>
-                                </Card>
-                            )}
-                            {upcomingMatches.map(({match, tournamentName}) => (
-                                <UpcomingMatchCard key={match.id} match={match} tournamentName={tournamentName} />
-                             ))}
+                        
+                        <TabsContent value="tournaments" className="mt-4 space-y-4">
+                           {loading && <p>Loading...</p>}
+                           {!loading && myTournaments.length === 0 && <Card><CardContent className="p-6 text-center text-muted-foreground"><p>You are not in any tournaments.</p></CardContent></Card>}
+                           <MyTournamentsList tournaments={myTournaments} />
                         </TabsContent>
-                         <TabsContent value="past" className="mt-4 space-y-4">
-                            {loading && <p>Loading...</p>}
-                            {!loading && pastMatches.length === 0 && (
-                                <Card>
-                                    <CardContent className="p-6 text-center text-muted-foreground">
-                                    <p>You haven't played any matches yet.</p>
-                                    </CardContent>
-                                </Card>
-                            )}
-                            {pastMatches.map(match => (
-                                <RecentResultCard key={match.id} match={match} onDelete={handleDeleteMatch} currentUserId={user?.uid} />
-                            ))}
+                        
+                        <TabsContent value="teams" className="mt-4 space-y-4">
+                           {loading && <p>Loading...</p>}
+                           {!loading && myTeams.length === 0 && <Card><CardContent className="p-6 text-center text-muted-foreground"><p>You have not joined any teams.</p></CardContent></Card>}
+                           <MyTeamsList teams={myTeams} />
                         </TabsContent>
                     </Tabs>
                 </main>
