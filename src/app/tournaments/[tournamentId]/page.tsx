@@ -24,6 +24,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { PlayerSearchDialog } from '@/components/player-search-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 const formatOvers = (balls: number, ballsPerOver: number = 6) => `${Math.floor(balls / ballsPerOver)}.${balls % ballsPerOver}`;
 
@@ -190,20 +191,6 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
   [tournament.groups]);
 
   const unassignedTeams = useMemo(() => (tournament.participatingTeams || []).filter(t => !leagueGroupAssignedTeams.includes(t)), [tournament.participatingTeams, leagueGroupAssignedTeams]);
-  
-  const semiFinalWinners = useMemo(() => {
-    if (!tournament.matches) return [];
-    return tournament.matches
-      .filter(m => m.matchRound === 'Semi Final' && m.status === 'Completed' && m.result)
-      .map(m => m.result!.winner);
-  }, [tournament.matches]);
-
-  const finalWinners = useMemo(() => {
-    if (!tournament.matches) return [];
-    return tournament.matches
-      .filter(m => m.matchRound === 'Final' && m.status === 'Completed' && m.result)
-      .map(m => m.result!.winner);
-  }, [tournament.matches]);
 
   return (
     <div className="space-y-6">
@@ -256,19 +243,17 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
 
             const getAvailableTeams = () => {
                 if (group.name === 'Final') {
-                    return semiFinalWinners;
+                    // This logic might need refinement based on how winners are determined.
+                    // For now, let's assume it pulls from a list of qualified teams.
+                    return tournament.qualifiedTeams; 
                 }
-                if (group.name === 'Semi Final') {
-                    return tournament.qualifiedTeams;
-                }
-                if (group.name === 'Quarter Final') {
+                if (group.name === 'Semi Final' || group.name === 'Quarter Final') {
                     return tournament.qualifiedTeams;
                 }
                 return tournament.participatingTeams;
             };
 
             const availableTeamsForAssignment = getAvailableTeams();
-            
             const assignedTeamsForGroup = isKnockoutGroup ? [] : leagueGroupAssignedTeams;
 
             return (
@@ -294,9 +279,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
                         <label htmlFor={`${group.name}-${teamName}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{teamName}</label>
                       </div>
                     ))}
-                    {group.name === 'Final' && semiFinalWinners.length < 2 && <p className="col-span-2 text-xs text-muted-foreground">Waiting for semi-final results.</p>}
-                    {group.name === 'Semi Final' && (!tournament.qualifiedTeams || tournament.qualifiedTeams.length === 0) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for league stage results.</p>}
-                    {group.name === 'Quarter Final' && (!tournament.qualifiedTeams || tournament.qualifiedTeams.length === 0) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for league stage results.</p>}
+                    {(group.name === 'Final' || group.name === 'Semi Final' || group.name === 'Quarter Final') && (!tournament.qualifiedTeams || tournament.qualifiedTeams.length === 0) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for previous stage results.</p>}
                   </div>
                    {isOwner && (
                       <Button variant="outline" className="w-full mt-4" onClick={() => handleGenerateFixtures(group.name)} disabled={group.teams.length < 2}>
@@ -394,7 +377,7 @@ function PointsTable({ teams, title = "Points Table", onUpdate, isOwner, qualifi
                                 isKnockout ? (
                                     <TableRow key={team.teamName}>
                                         <TableCell className="font-medium">{team.teamName}</TableCell>
-                                        <TableCell className="text-right font-semibold">{getKnockoutResult(team.teamName)}</TableCell>
+                                        <TableCell className={cn("text-right font-semibold", getKnockoutResult(team.teamName) === 'Win' && 'text-green-500', getKnockoutResult(team.teamName) === 'Loss' && 'text-red-500')}>{getKnockoutResult(team.teamName)}</TableCell>
                                     </TableRow>
                                 ) : (
                                 <TableRow key={team.teamName}>
@@ -745,7 +728,6 @@ function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
             <TableHeader>
                 <TableRow>
                     <TableHead>Player</TableHead>
-                    <TableHead className="text-center">Matches</TableHead>
                     <TableHead className="text-center">Catches</TableHead>
                     <TableHead className="text-center">Run Outs</TableHead>
                     <TableHead className="text-right">Stumpings</TableHead>
@@ -758,7 +740,6 @@ function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
                         <TableCell className="font-medium">
                            <Link href={`/profile/${player.playerId}`} className="hover:underline">{player.playerName}</Link>
                         </TableCell>
-                        <TableCell className="text-center">{player.matches}</TableCell>
                         <TableCell className="text-center font-bold">{player.catches}</TableCell>
                         <TableCell className="text-center">{player.runOuts}</TableCell>
                         <TableCell className="text-right">{player.stumpings}</TableCell>
@@ -829,7 +810,7 @@ function TournamentDetailsPage() {
     const pastMatches = useMemo(() => (tournament?.matches || []).filter(m => m.status === 'Completed'), [tournament?.matches]);
 
     const calculateLeaderboards = useCallback(async (completedMatches: TournamentMatch[], currentTournament: Tournament) => {
-        const batterPlayerStats: { [playerId: string]: BatterLeaderboardStat & { notOuts: number, innings: number } } = {};
+        const batterPlayerStats: { [playerId: string]: BatterLeaderboardStat & { notOuts: number } } = {};
         const bowlerPlayerStats: { [playerId: string]: Bowler & { teamName: string; matches: Set<string>, allInnings: Innings[] } } = {};
         const fielderPlayerStats: { [playerId: string]: { name: string; team: string; catches: number; runOuts: number; stumpings: number; matches: Set<string> } } = {};
 
@@ -951,7 +932,7 @@ function TournamentDetailsPage() {
                 strikeRate: data.wickets > 0 ? data.balls / data.wickets : 0,
                 points: calculateBowlingPoints(data, data.allInnings, currentTournament.oversPerInnings)
             }))
-            .sort((a, b) => b.points - a.points);
+            .sort((a, b) => b.wickets - a.wickets || a.runsConceded - b.runsConceded);
         setBowlerStats(newBowlerStats);
         
         const newFielderStats: FielderLeaderboardStat[] = Object.entries(fielderPlayerStats)
@@ -959,7 +940,6 @@ function TournamentDetailsPage() {
                 playerId,
                 playerName: data.name,
                 teamName: data.team,
-                matches: data.matches.size,
                 catches: data.catches,
                 runOuts: data.runOuts,
                 stumpings: data.stumpings,

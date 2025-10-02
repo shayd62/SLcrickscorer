@@ -141,7 +141,6 @@ export interface FielderLeaderboardStat {
     playerId: string;
     playerName: string;
     teamName: string;
-    matches: number;
     catches: number;
     runOuts: number;
     stumpings: number;
