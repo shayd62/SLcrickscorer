@@ -242,15 +242,10 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
             const isKnockoutGroup = knockoutStages.includes(group.name);
 
             const getAvailableTeams = () => {
-                if (group.name === 'Final') {
-                    // This logic might need refinement based on how winners are determined.
-                    // For now, let's assume it pulls from a list of qualified teams.
-                    return tournament.qualifiedTeams; 
+                if (isKnockoutGroup) {
+                    return tournament.qualifiedTeams || []; 
                 }
-                if (group.name === 'Semi Final' || group.name === 'Quarter Final') {
-                    return tournament.qualifiedTeams;
-                }
-                return tournament.participatingTeams;
+                return tournament.participatingTeams || [];
             };
 
             const availableTeamsForAssignment = getAvailableTeams();
@@ -279,7 +274,7 @@ function GroupManagement({ tournament, onUpdate, isOwner }: { tournament: Tourna
                         <label htmlFor={`${group.name}-${teamName}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{teamName}</label>
                       </div>
                     ))}
-                    {(group.name === 'Final' || group.name === 'Semi Final' || group.name === 'Quarter Final') && (!tournament.qualifiedTeams || tournament.qualifiedTeams.length === 0) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for previous stage results.</p>}
+                    {isKnockoutGroup && (!tournament.qualifiedTeams || tournament.qualifiedTeams.length === 0) && <p className="col-span-2 text-xs text-muted-foreground">Waiting for previous stage results.</p>}
                   </div>
                    {isOwner && (
                       <Button variant="outline" className="w-full mt-4" onClick={() => handleGenerateFixtures(group.name)} disabled={group.teams.length < 2}>
@@ -695,6 +690,7 @@ function BowlerLeaderboard({ stats }: { stats: BowlerLeaderboardStat[] }) {
             <TableHeader>
                 <TableRow>
                     <TableHead>Player</TableHead>
+                    <TableHead className="text-center">M</TableHead>
                     <TableHead className="text-center">Wkts</TableHead>
                     <TableHead className="text-center">Econ</TableHead>
                     <TableHead className="text-center">Avg</TableHead>
@@ -707,6 +703,7 @@ function BowlerLeaderboard({ stats }: { stats: BowlerLeaderboardStat[] }) {
                         <TableCell className="font-medium">
                            <Link href={`/profile/${player.playerId}`} className="hover:underline">{player.playerName}</Link>
                         </TableCell>
+                        <TableCell className="text-center">{player.matches}</TableCell>
                         <TableCell className="text-center font-bold">{player.wickets}</TableCell>
                         <TableCell className="text-center">{player.economy.toFixed(2)}</TableCell>
                         <TableCell className="text-center">{player.average.toFixed(2)}</TableCell>
@@ -731,7 +728,6 @@ function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
                     <TableHead className="text-center">Catches</TableHead>
                     <TableHead className="text-center">Run Outs</TableHead>
                     <TableHead className="text-right">Stumpings</TableHead>
-                     <TableHead className="text-right">Points</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -743,7 +739,6 @@ function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
                         <TableCell className="text-center font-bold">{player.catches}</TableCell>
                         <TableCell className="text-center">{player.runOuts}</TableCell>
                         <TableCell className="text-right">{player.stumpings}</TableCell>
-                        <TableCell className="text-right font-bold">{player.points}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>
@@ -940,6 +935,7 @@ function TournamentDetailsPage() {
                 playerId,
                 playerName: data.name,
                 teamName: data.team,
+                matches: data.matches.size,
                 catches: data.catches,
                 runOuts: data.runOuts,
                 stumpings: data.stumpings,
@@ -950,28 +946,31 @@ function TournamentDetailsPage() {
 
         const allPlayers: { [playerId: string]: { id: string; name: string; team: string; matches: Set<string> } } = {};
         
-        Object.values(batterPlayerStats).forEach(p => {
-            if (!allPlayers[p.playerId]) allPlayers[p.playerId] = { id: p.playerId, name: p.playerName, team: p.teamName, matches: new Set() };
-            // In theory, a player can only bat once per match.
-            // But to be safe, we just collect all match IDs.
-        });
-        Object.values(bowlerPlayerStats).forEach(p => {
-            if (!allPlayers[p.id]) allPlayers[p.id] = { id: p.id, name: p.name, team: p.teamName, matches: new Set() };
-            p.matches.forEach(matchId => allPlayers[p.id].matches.add(matchId));
-        });
-        // We'll need to re-calc matches played by all-rounders
-        for(const match of completedMatches){
-            if(!match.matchId) continue;
-            const matchDoc = await getDoc(doc(db, 'matches', match.matchId));
-            if(!matchDoc.exists()) continue;
-            const matchData = matchDoc.data() as MatchState;
-            const playerIds = new Set([...matchData.config.team1.players.map(p => p.id), ...matchData.config.team2.players.map(p => p.id)]);
-            playerIds.forEach(id => {
-                if(allPlayers[id]){
-                    allPlayers[id].matches.add(match.id);
+        const processPlayerMatches = async () => {
+            for (const match of completedMatches) {
+                if (!match.matchId) continue;
+                const matchDoc = await getDoc(doc(db, 'matches', match.matchId));
+                if (!matchDoc.exists()) continue;
+                const matchData = matchDoc.data() as MatchState;
+                const playerIds = new Set([...matchData.config.team1.players.map(p => p.id), ...matchData.config.team2.players.map(p => p.id)]);
+        
+                for (const playerId of playerIds) {
+                    if (batterPlayerStats[playerId] || bowlerPlayerStats[playerId]) {
+                        if (!allPlayers[playerId]) {
+                           const [player, teamName] = getPlayerTeam(playerId, matchData.config.team1, matchData.config.team2);
+                           if (player) {
+                             allPlayers[playerId] = { id: playerId, name: player.name, team: teamName, matches: new Set() };
+                           }
+                        }
+                        if(allPlayers[playerId]) {
+                           allPlayers[playerId].matches.add(match.id);
+                        }
+                    }
                 }
-            })
-        }
+            }
+        };
+
+        await processPlayerMatches();
         
         const newAllRounderStats: AllRounderLeaderboardStat[] = Object.values(allPlayers)
             .map(player => {
@@ -998,6 +997,14 @@ function TournamentDetailsPage() {
         setAllRounderStats(newAllRounderStats);
 
     }, []);
+    
+    const getPlayerTeam = (playerId: string, team1: Team, team2: Team): [Player | undefined, string] => {
+        const player1 = team1.players.find(p => p.id === playerId);
+        if (player1) return [player1, team1.name];
+        const player2 = team2.players.find(p => p.id === playerId);
+        if (player2) return [player2, team2.name];
+        return [undefined, ''];
+    }
 
     const calculatePointsForAllGroups = useCallback(async (currentTournament: Tournament) => {
         if (!currentTournament.groups || !currentTournament.matches || !currentTournament.pointsPolicy) return;
