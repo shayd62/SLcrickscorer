@@ -749,7 +749,7 @@ function FielderLeaderboard({ stats }: { stats: FielderLeaderboardStat[] }) {
                     <TableHead className="text-center">Catches</TableHead>
                     <TableHead className="text-center">Run Outs</TableHead>
                     <TableHead className="text-right">Stumpings</TableHead>
-                    <TableHead className="text-right">Points</TableHead>
+                     <TableHead className="text-right">Points</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -1363,4 +1363,3 @@ function TournamentDetailsPage() {
 }
 
 export default TournamentDetailsPage;
-
